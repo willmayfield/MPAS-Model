@@ -1,7 +1,11 @@
+#ifdef MPAS_PIO_SUPPORT
 #ifdef USE_PIO2
    integer, parameter :: MPAS_IO_OFFSET_KIND = PIO_OFFSET_KIND
 #else
    integer, parameter :: MPAS_IO_OFFSET_KIND = PIO_OFFSET
+#endif
+#else
+   integer, parameter :: MPAS_IO_OFFSET_KIND = I8KIND
 #endif
 
    ! File access modes
@@ -61,7 +65,9 @@
       logical :: initialized = .false.
       logical :: preexisting_file = .false.
       logical :: data_mode = .false.
+#ifdef MPAS_PIO_SUPPORT
       type (file_desc_t) :: pio_file
+#endif
       character (len=StrKIND) :: filename
       integer :: iomode
       integer :: ioformat
@@ -81,7 +87,9 @@
       integer :: field_type
       integer, dimension(:), pointer :: dims
       integer, dimension(:), pointer :: indices
+#ifdef MPAS_PIO_SUPPORT
       type (io_desc_t) :: pio_iodesc
+#endif
    end type decomphandle_type
 
    type atthandle_type
@@ -105,7 +113,9 @@
    type fieldhandle_type
       character (len=StrKIND) :: fieldname
       integer :: fieldid
+#ifdef MPAS_PIO_SUPPORT
       type (Var_desc_t) :: field_desc
+#endif
       integer :: field_type
       logical :: has_unlimited_dim = .false.
       integer :: ndims
@@ -138,7 +148,9 @@
 
    type mpas_io_context_type
       type (decomplist_type), pointer :: decomp_list => null()
+#ifdef MPAS_PIO_SUPPORT
       type (iosystem_desc_t), pointer :: pio_iosystem => null()
+#endif
       integer :: master_pio_iotype = -999
       type (dm_info), pointer :: dminfo => null()
    end type mpas_io_context_type
