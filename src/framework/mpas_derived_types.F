@@ -32,6 +32,10 @@ module mpas_derived_types
    use pio_types
 #endif
 
+#ifdef MPAS_SMIOL_SUPPORT
+   use smiolf, only : SMIOLf_context, SMIOLf_decomp, SMIOLf_file, SMIOL_offset_kind
+#endif
+
    use ESMF
    use ESMF_BaseMod
    use ESMF_Stubs
