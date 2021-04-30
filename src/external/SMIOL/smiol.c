@@ -9,8 +9,8 @@
 #include "pnetcdf.h"
 #define PNETCDF_DEFINE_MODE 0
 #define PNETCDF_DATA_MODE 1
-#define N_REQS 256 
-#define BUFSIZE (64*1024*1024)
+#define N_REQS 1024 
+#define BUFSIZE (1024*1024*1024)
 #endif
 
 #define START_COUNT_READ 0
@@ -354,7 +354,7 @@ int SMIOL_close_file(struct SMIOL_file **file)
 #ifdef SMIOL_PNETCDF
 	if ((*file)->io_task) {
 		if ((*file)->n_reqs > 0) {
-fprintf(stderr, "Waiting on %i reqs in SMIOL_close_file\n", (*file)->n_reqs);
+//fprintf(stderr, "Waiting on %i reqs in SMIOL_close_file\n", (*file)->n_reqs);
 			ierr = ncmpi_wait_all((*file)->ncidp, (*file)->n_reqs, (*file)->reqs, statuses);
 			(*file)->n_reqs = 0;
 		}
@@ -1130,9 +1130,9 @@ int SMIOL_put_var(struct SMIOL_file *file, const char *varname,
 
 			lusage = usage;
 			ierr = MPI_Allreduce(&lusage, &max_usage, 1, MPI_LONG, MPI_MAX, MPI_Comm_f2c(file->io_file_comm));
-fprintf(stderr, "max_usage = %li, n_reqs = %i\n", max_usage, file->n_reqs);
+//fprintf(stderr, "max_usage = %li, n_reqs = %i\n", max_usage, file->n_reqs);
 			if (max_usage > BUFSIZE || file->n_reqs == N_REQS) {
-fprintf(stderr, "Waiting on %i reqs before queueing more writes\n", file->n_reqs);
+//fprintf(stderr, "Waiting on %i reqs before queueing more writes\n", file->n_reqs);
 				ierr = ncmpi_wait_all(file->ncidp, file->n_reqs, file->reqs, statuses);
 				file->n_reqs = 0;
 			}
@@ -1745,7 +1745,7 @@ int SMIOL_sync_file(struct SMIOL_file *file)
 	if (file->io_task) {
 #ifdef SMIOL_PNETCDF
 		if (file->n_reqs > 0) {
-fprintf(stderr, "Waiting on %i reqs in SMIOL_sync_file\n", file->n_reqs);
+//fprintf(stderr, "Waiting on %i reqs in SMIOL_sync_file\n", file->n_reqs);
 			ierr = ncmpi_wait_all(file->ncidp, file->n_reqs, file->reqs, statuses);
 			file->n_reqs = 0;
 		}
@@ -1921,7 +1921,7 @@ int SMIOL_create_decomp(struct SMIOL_context *context,
 	size_t n_compute_elements_agg;
 	SMIOL_Offset *compute_elements_agg = NULL;
 #ifdef SMIOL_AGGREGATION
-	const int agg_factor = 9;     /* Eventually, compute this or get value from user */
+	const int agg_factor = 20;     /* Eventually, compute this or get value from user */
 
 	int comm_rank;
 	MPI_Comm agg_comm;
