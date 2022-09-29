@@ -370,6 +370,116 @@ int transfer_field(const struct SMIOL_decomp *decomp, int dir,
 
 /*******************************************************************************
  *
+ * aggregate_list
+ *
+ * Aggregates lists of elements from across all ranks onto a chosen root rank
+ *
+ * On entry, each MPI rank supplies a list of SMIOL_Offset values as well as the
+ * size of that input list. The input list may be zero size.
+ *
+ * Upon successful return, for the root rank, the out_list argument will point
+ * to an allocated array containing the aggregated elements from all MPI ranks
+ * in the communicator, and n_out will specify the number of elements in the
+ * output array. On all other ranks, n_out will be zero, and out_list will be a
+ * NULL pointer.
+ *
+ * Also on the root rank, the counts and displs arrays will be allocated with
+ * size equal to the size of the communicator, and they will contain the number
+ * of elements in the aggregated list from each MPI rank as well as the
+ * beginning offset in the aggregated list of elements from each rank. On all
+ * non-root ranks, counts and displs will be returned as NULL pointers.
+ *
+ * Although the number of elements in each input list is given by a size_t,
+ * the number of elements must not exceed the maximum representable value of
+ * a signed integer due to restrictions imposed by MPI argument types.
+ * Similarly, it must be ensured that the number of output elements does not
+ * exceed the maximum representable value of a signed integer.
+ *
+ * If no errors occurred, 0 is returned. Otherwise, a value of 1 is returned.
+ *
+ *******************************************************************************/
+int aggregate_list(MPI_Comm comm, int root, size_t n_in, SMIOL_Offset *in_list,
+                   size_t *n_out, SMIOL_Offset **out_list,
+                   int **counts, int **displs)
+{
+	int comm_size;
+	int comm_rank;
+	int err;
+	int i;
+	int n_in_i;
+
+
+	*n_out = 0;
+	*out_list = NULL;
+
+	*counts = NULL;
+	*displs = NULL;
+
+	n_in_i = (int)n_in;
+
+	if (MPI_Comm_size(comm, &comm_size) != MPI_SUCCESS) {
+		fprintf(stderr, "Error: MPI_Comm_size failed in aggregate_list\n");
+		return 1;
+	}
+
+	if (MPI_Comm_rank(comm, &comm_rank) != MPI_SUCCESS) {
+		fprintf(stderr, "Error: MPI_Comm_rank failed in aggregate_list\n");
+		return 1;
+	}
+
+	if (comm_rank == root) {
+		*counts = (int *)malloc(sizeof(int) * (size_t)(comm_size));
+		*displs = (int *)malloc(sizeof(int) * (size_t)(comm_size));
+	}
+
+	/*
+	 * Gather the number of input elements from all tasks onto root rank
+	 */
+	err = MPI_Gather((const void *)&n_in_i, 1, MPI_INT,
+	                 (void *)(*counts), 1, MPI_INT, root, comm);
+	if (err != MPI_SUCCESS) {
+		fprintf(stderr, "Error: MPI_Gather failed in aggregate_list\n");
+		return 1;
+	}
+
+	/*
+	 * Perform a scan of counts to get displs, and compute the number of
+	 * output elements on root rank as the sum of the number of input
+	 * elements across all tasks in the communicator
+	 */
+	if (comm_rank == root) {
+		(*displs)[0] = 0;
+		*n_out = (size_t)(*counts)[0];
+		for (i = 1; i < comm_size; i++) {
+			(*displs)[i] = (*displs)[i-1] + (*counts)[i-1];
+			*n_out += (size_t)(*counts)[i];
+		}
+
+		*out_list = (SMIOL_Offset *)malloc(sizeof(SMIOL_Offset)
+		                                   * (*n_out));
+	}
+
+	/* TO DO: Find an MPI type that is guaranteed to match SMIOL_Offset */
+	/*        For now, just return an error if MPI_LONG isn't appropriate */
+	if (sizeof(long) != sizeof(SMIOL_Offset)) {
+		fprintf(stderr, "Error: sizeof(long) != sizeof(SMIOL_Offset)\n");
+		return 1;
+	}
+
+	err = MPI_Gatherv((const void *)in_list, n_in_i, MPI_LONG,
+	                  (void *)(*out_list), (*counts), (*displs), MPI_LONG,
+	                  root, comm);
+	if (err != MPI_SUCCESS) {
+		fprintf(stderr, "Error: MPI_Gatherv failed in aggregate_list\n");
+		return 1;
+	}
+
+	return 0;
+}
+
+
+/*******************************************************************************
+ *
  * get_io_elements
  *
  * Returns a contiguous range of I/O elements for an MPI task
@@ -720,13 +830,12 @@ int build_exchange(struct SMIOL_context *context,
 	(*decomp)->io_list = NULL;
 	(*decomp)->io_start = 0;
 	(*decomp)->io_count = 0;
-#ifdef SMIOL_AGGREGATION
-        (*decomp)->agg_comm = MPI_Comm_c2f(MPI_COMM_NULL);
-        (*decomp)->n_compute = 0;
-        (*decomp)->n_compute_agg = 0;
-        (*decomp)->counts = NULL;
-        (*decomp)->displs = NULL;
-#endif
+	(*decomp)->agg_factor = 1;   /* Group with 1 task -> no aggregation */
+	(*decomp)->agg_comm = MPI_Comm_c2f(MPI_COMM_NULL);
+	(*decomp)->n_compute = 0;
+	(*decomp)->n_compute_agg = 0;
+	(*decomp)->counts = NULL;
+	(*decomp)->displs = NULL;
 
 
 	/*
@@ -987,6 +1096,46 @@ void print_lists(int comm_rank, SMIOL_Offset *comp_list, SMIOL_Offset *io_list)
 		}
 		j += n_elems;
 	}
+	fprintf(f, "\n\n");
+
+
+	fprintf(f, "SMIOL_Offset comp_list_correct[] = { ");
+	j = 0;
+	n_neighbors = comp_list[j++];
+	fprintf(f, "%i", (int)n_neighbors);
+
+	for (i = 0; i < n_neighbors; i++) {
+		neighbor = comp_list[j++];
+		fprintf(f, ", %i", (int)neighbor);
+
+		n_elems = comp_list[j++];
+		fprintf(f, ", %i", (int)n_elems);
+
+		for (k = 0; k < n_elems; k++) {
+			fprintf(f, ", %i", (int)comp_list[j+k]);
+		}
+		j += n_elems;
+	}
+	fprintf(f, " };\n");
+
+	fprintf(f, "SMIOL_Offset io_list_correct[] = { ");
+	j = 0;
+	n_neighbors = io_list[j++];
+	fprintf(f, "%i", (int)n_neighbors);
+
+	for (i = 0; i < n_neighbors; i++) {
+		neighbor = io_list[j++];
+		fprintf(f, ", %i", (int)neighbor);
+
+		n_elems = io_list[j++];
+		fprintf(f, ", %i", (int)n_elems);
+
+		for (k = 0; k < n_elems; k++) {
+			fprintf(f, ", %i", (int)io_list[j+k]);
+		}
+		j += n_elems;
+	}
+	fprintf(f, " };\n");
 
 	fclose(f);
 }

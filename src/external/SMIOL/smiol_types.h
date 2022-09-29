@@ -36,12 +36,12 @@ struct SMIOL_file {
 #ifdef SMIOL_PNETCDF
 	int state; /* parallel-netCDF file state (i.e. Define or data mode) */
 	int ncidp; /* parallel-netCDF file handle */
-	int io_task; /* 1 = this task performs I/O calls; 0 = no I/O calls on this task */
-	int io_file_comm;
-	int io_group_comm;
-	int n_reqs;
-	int *reqs;
+	int n_reqs;  /* Number of pending non-blocking requests */
+	int *reqs;   /* Array of pending non-blocking request handles */
 #endif
+	int io_task; /* 1 = this task performs I/O calls; 0 = no I/O calls on this task */
+	MPI_Fint io_file_comm;  /* Communicator shared by all tasks with io_task == 1 */
+	MPI_Fint io_group_comm; /* Communicator shared by tasks associated with one I/O task */
 };
 
 struct SMIOL_decomp {
@@ -62,13 +62,13 @@ struct SMIOL_decomp {
 	size_t io_start;  /* The starting offset on disk for I/O by a task */
 	size_t io_count;  /* The number of elements for I/O by a task */
 
-#ifdef SMIOL_AGGREGATION
-	MPI_Fint agg_comm;
-	size_t n_compute;
-	size_t n_compute_agg;
-	int *counts;
-	int *displs;
-#endif
+	int agg_factor;        /* Aggregation factor, or size of aggregation group */
+	MPI_Fint agg_comm;     /* Communicator for aggregation/deaggregation operations */
+	size_t n_compute;      /* Number of un-aggregated compute elements on the task */
+	size_t n_compute_agg;  /* Number of aggregated compute elements on the task */
+	int *counts;           /* Compute element counts for tasks in aggregation group */
+	int *displs;           /* Displacements in aggregated list of elements for tasks */
+	                       /*    in aggregation group */
 };
 
 
