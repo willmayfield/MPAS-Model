@@ -954,7 +954,7 @@ int SMIOL_put_var(struct SMIOL_file *file, const char *varname,
 	int statuses[N_REQS];
 #endif
 
-fprintf(stderr, "---- Writing variable %s ----\n", varname);
+//fprintf(stderr, "---- Writing variable %s ----\n", varname);
 
 	/*
 	 * Basic checks on arguments
@@ -1142,17 +1142,17 @@ fprintf(stderr, "---- Writing variable %s ----\n", varname);
 			 * size, just write through the non-buffered interface; otherwise,
 			 * the ncmpi_bput_vara call will fail.
 			 */
-fprintf(stderr, "   mine/max chunk size across all tasks: %ld %ld\n", lusage, max_usage);
+//fprintf(stderr, "   mine/max chunk size across all tasks: %ld %ld\n", lusage, max_usage);
 			if (max_usage > BUFSIZE || max_usage > ((MPI_Offset)INT_MAX)) {
 				if (max_usage <= ((MPI_Offset)INT_MAX)) {
-fprintf(stderr, "   variable %s has chunks <2GB, so just put_vara_all\n", varname);
+//fprintf(stderr, "   variable %s has chunks <2GB, so just put_vara_all\n", varname);
 					ierr = ncmpi_put_vara_all(file->ncidp,
 					                          varidp,
 					                          mpi_start, mpi_count,
 					                          buf_p,
 					                          0, MPI_DATATYPE_NULL);
 					if (ierr != NC_NOERR) {
-fprintf(stderr, "   call to ncmpi_put_vara_all returned %d\n", ierr);
+//fprintf(stderr, "   call to ncmpi_put_vara_all returned %d\n", ierr);
 					}
 				} else {
 					int iter_idx = 0;
@@ -1160,7 +1160,7 @@ fprintf(stderr, "   call to ncmpi_put_vara_all returned %d\n", ierr);
 					MPI_Offset max_count;
 					long done, global_done;
 					size_t buf_offset;
-fprintf(stderr, "   variable %s has chunks >2GB\n", varname);
+//fprintf(stderr, "   variable %s has chunks >2GB\n", varname);
 
 /* TO DO: if this var has a record dim, increment iter_idx */
 					if (has_unlimited_dim) iter_idx++;
@@ -1174,7 +1174,7 @@ fprintf(stderr, "   variable %s has chunks >2GB\n", varname);
 					global_done = 0;
 					buf_offset = 0;
 					while (!global_done) {
-fprintf(stderr, "       writing chunk start/count/offset %ld/%ld/%ld\n", (long)mpi_start[iter_idx], (long)mpi_count[iter_idx], (long)buf_offset);
+//fprintf(stderr, "       writing chunk start/count/offset %ld/%ld/%ld\n", (long)mpi_start[iter_idx], (long)mpi_count[iter_idx], (long)buf_offset);
 						ierr = ncmpi_put_vara_all(file->ncidp,
 						                          varidp,
 						                          mpi_start, mpi_count,
@@ -1192,7 +1192,7 @@ fprintf(stderr, "       writing chunk start/count/offset %ld/%ld/%ld\n", (long)m
 /* TO DO: can the setting of done go inside the if-test above? */
 
 						if (ierr != NC_NOERR) {
-fprintf(stderr, "   call to ncmpi_put_vara_all returned %d\n", ierr);
+//fprintf(stderr, "   call to ncmpi_put_vara_all returned %d\n", ierr);
 							done = -1;
 						}
 
@@ -1217,14 +1217,14 @@ if (ierr != NC_NOERR) {
 /* TO DO: check for errors in MPI_Allreduce */
 				ierr = MPI_Allreduce(&lusage, &max_usage, 1, MPI_LONG, MPI_MAX,
 				                     MPI_Comm_f2c(file->io_file_comm));
-fprintf(stderr, "   mine/max buffer use across all tasks: %ld %ld\n", lusage, max_usage);
+//fprintf(stderr, "   mine/max buffer use across all tasks: %ld %ld\n", lusage, max_usage);
 				if (max_usage > BUFSIZE || file->n_reqs == N_REQS) {
 /* TO DO: check for errors in ncmpi_wait_all */
-fprintf(stderr, "       waiting for %i requests\n", file->n_reqs);
+//fprintf(stderr, "       waiting for %i requests\n", file->n_reqs);
 					ierr = ncmpi_wait_all(file->ncidp, file->n_reqs,
 					                      file->reqs, NULL);  /* statuses */
 					file->n_reqs = 0;
-fprintf(stderr, "   ==== cleared buffer, and now n_reqs = %d\n", file->n_reqs);
+//fprintf(stderr, "   ==== cleared buffer, and now n_reqs = %d\n", file->n_reqs);
 				}
 
 				ierr = ncmpi_bput_vara(file->ncidp,
@@ -1237,7 +1237,7 @@ fprintf(stderr, "   ==== cleared buffer, and now n_reqs = %d\n", file->n_reqs);
 if (ierr != NC_NOERR) {
 	fprintf(stderr, "   ncmpi_bput_vara returned %d\n", ierr);
 }
-fprintf(stderr, "   ==== buffered %s and now n_reqs = %d\n", varname, file->n_reqs);
+//fprintf(stderr, "   ==== buffered %s and now n_reqs = %d\n", varname, file->n_reqs);
 			}
 		}
 /* TO DO: to handle failures in MPI_Bcast, we could set ierr to other than NC_NOERR on all non-I/O tasks? */
@@ -1484,7 +1484,7 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 			 */
 /* TO DO: maybe we need separate error codes for each library's calls, and check all codes after block? */
 			if (max_usage > ((MPI_Offset)INT_MAX)) {
-fprintf(stderr, "---- variable %s has chunks >2GB ----\n", varname);
+//fprintf(stderr, "---- variable %s has chunks >2GB ----\n", varname);
 				int iter_idx = 0;
 				MPI_Offset remaining_count;
 				MPI_Offset max_count;
@@ -1503,7 +1503,7 @@ fprintf(stderr, "---- variable %s has chunks >2GB ----\n", varname);
 				global_done = 0;
 				buf_offset = 0;
 				while (!global_done) {
-fprintf(stderr, "        read start/count = %ld %ld\n", (long)mpi_start[iter_idx], (long)mpi_count[iter_idx]);
+//fprintf(stderr, "        read start/count = %ld %ld\n", (long)mpi_start[iter_idx], (long)mpi_count[iter_idx]);
 					ierr = ncmpi_get_vara_all(file->ncidp,
 					                          varidp,
 					                          mpi_start, mpi_count,
@@ -1528,7 +1528,7 @@ fprintf(stderr, "        read start/count = %ld %ld\n", (long)mpi_start[iter_idx
 /* TO DO: check for errors in MPI_Allreduce */
 					MPI_Allreduce(&done, &global_done, 1, MPI_LONG, MPI_MIN,
 					                     MPI_Comm_f2c(file->io_file_comm));
-fprintf(stderr, "        global_done = %ld\n", done);
+//fprintf(stderr, "        global_done = %ld\n", done);
 				};
 			} else {
 				ierr = ncmpi_get_vara_all(file->ncidp,
