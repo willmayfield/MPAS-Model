@@ -847,7 +847,7 @@ module mpas_io
 #ifdef MPAS_SMIOL_SUPPORT
          local_ierr = SMIOLf_inquire_var(handle % smiol_file, trim(fieldname), vartype=smiol_type)
          if (local_ierr /= SMIOL_SUCCESS) then
-            call mpas_log_write('SMIOLf_inquire_var failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
+!            call mpas_log_write('SMIOLf_inquire_var failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
             if (present(ierr)) ierr = MPAS_IO_ERR_PIO
             deallocate(new_fieldlist_node % fieldhandle)
             deallocate(new_fieldlist_node)
@@ -886,7 +886,7 @@ module mpas_io
 #ifdef MPAS_SMIOL_SUPPORT
          local_ierr = SMIOLf_inquire_var(handle % smiol_file, trim(fieldname), ndims=smiol_ndims)
          if (local_ierr /= SMIOL_SUCCESS) then
-            call mpas_log_write('SMIOLf_inquire_var failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
+!            call mpas_log_write('SMIOLf_inquire_var failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
             if (present(ierr)) ierr = MPAS_IO_ERR_PIO
             deallocate(new_fieldlist_node % fieldhandle)
             deallocate(new_fieldlist_node)
@@ -4228,7 +4228,7 @@ module mpas_io
          local_ierr = SMIOLf_inquire_att(handle % smiol_file, '', trim(attName), attValue)
       end if
       if (local_ierr /= SMIOL_SUCCESS) then
-         call mpas_log_write('SMIOLf_inquire_att failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
+!         call mpas_log_write('SMIOLf_inquire_att failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
          if (local_ierr == SMIOL_WRONG_ARG_TYPE) then
             if (present(ierr)) ierr=MPAS_IO_ERR_WRONG_ATT_TYPE
             return
@@ -4610,7 +4610,7 @@ module mpas_io
 
 #ifdef MPAS_SMIOL_SUPPORT
       if (local_ierr /= SMIOL_SUCCESS) then
-         call mpas_log_write('SMIOLf_inquire_att failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
+!         call mpas_log_write('SMIOLf_inquire_att failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
          if (local_ierr == SMIOL_WRONG_ARG_TYPE) then
             if (present(ierr)) ierr=MPAS_IO_ERR_WRONG_ATT_TYPE
             return
@@ -4970,7 +4970,7 @@ module mpas_io
          local_ierr = SMIOLf_inquire_att(handle % smiol_file, '', trim(attName), attValue)
       end if
       if (local_ierr /= SMIOL_SUCCESS) then
-         call mpas_log_write('SMIOLf_inquire_att failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
+!         call mpas_log_write('SMIOLf_inquire_att failed with error $i', intArgs=[local_ierr], messageType=MPAS_LOG_ERR)
          if (local_ierr == SMIOL_WRONG_ARG_TYPE) then
             if (present(ierr)) ierr=MPAS_IO_ERR_WRONG_ATT_TYPE
             return
