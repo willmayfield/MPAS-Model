@@ -416,7 +416,7 @@
 
 !input arguments:
  logical,intent(in):: l_mp_tables
- 
+
  integer,parameter:: open_OK = 0
  integer:: i,j,k,l,m,n
  integer:: istat
@@ -1059,7 +1059,7 @@
 !     endif
 
       dt = dt_in
-   
+
       qc_max = 0.
       qr_max = 0.
       qs_max = 0.
@@ -1316,14 +1316,15 @@
       enddo j_loop
 
 ! DEBUG - GT
-      write(mp_debug,'(a,7(a,e13.6,1x,a,i3,a,i3,a,i3,a,1x))') 'MP-GT:', &
-         'qc: ', qc_max, '(', imax_qc, ',', jmax_qc, ',', kmax_qc, ')', &
-         'qr: ', qr_max, '(', imax_qr, ',', jmax_qr, ',', kmax_qr, ')', &
-         'qi: ', qi_max, '(', imax_qi, ',', jmax_qi, ',', kmax_qi, ')', &
-         'qs: ', qs_max, '(', imax_qs, ',', jmax_qs, ',', kmax_qs, ')', &
-         'qg: ', qg_max, '(', imax_qg, ',', jmax_qg, ',', kmax_qg, ')', &
-         'ni: ', ni_max, '(', imax_ni, ',', jmax_ni, ',', kmax_ni, ')', &
-         'nr: ', nr_max, '(', imax_nr, ',', jmax_nr, ',', kmax_nr, ')'
+      ! mp_debug may be not long enough for this message
+      !write(mp_debug,'(1x,a,7(a,e20.8,1x,3(a,i3),a,1x))') 'MP-GT: ', &
+      !   'qc: ', qc_max, '(', imax_qc, ',', jmax_qc, ',', kmax_qc, ')', &
+      !   'qr: ', qr_max, '(', imax_qr, ',', jmax_qr, ',', kmax_qr, ')', &
+      !   'qi: ', qi_max, '(', imax_qi, ',', jmax_qi, ',', kmax_qi, ')', &
+      !   'qs: ', qs_max, '(', imax_qs, ',', jmax_qs, ',', kmax_qs, ')', &
+      !   'qg: ', qg_max, '(', imax_qg, ',', jmax_qg, ',', kmax_qg, ')', &
+      !   'ni: ', ni_max, '(', imax_ni, ',', jmax_ni, ',', kmax_ni, ')', &
+      !   'nr: ', nr_max, '(', imax_nr, ',', jmax_nr, ',', kmax_nr, ')'
 !     CALL wrf_debug(150, mp_debug)
 ! END DEBUG - GT
 
@@ -2802,7 +2803,7 @@
          if ((qi1d(k) + qiten(k)*DT) .gt. R1) then
             ri(k) = (qi1d(k) + qiten(k)*DT)*rho(k)
             ni(k) = MAX(R2, (ni1d(k) + niten(k)*DT)*rho(k))
-            L_qi(k) = .true. 
+            L_qi(k) = .true.
          else
             ri(k) = R1
             ni(k) = R2
@@ -2829,7 +2830,7 @@
             nr(k) = R2
             L_qr(k) = .false.
          endif
-               
+
          if ((qs1d(k) + qsten(k)*DT) .gt. R1) then
             rs(k) = (qs1d(k) + qsten(k)*DT)*rho(k)
             L_qs(k) = .true.
@@ -3096,7 +3097,7 @@
           prv_rev(k) = MIN(DBLE(rate_max), prv_rev(k)*orho)
 
 !..TEST: G. Thompson  10 May 2013
-!..Reduce the rain evaporation in same places as melting graupel occurs. 
+!..Reduce the rain evaporation in same places as melting graupel occurs.
 !..Rationale: falling and simultaneous melting graupel in subsaturated
 !..regions will not melt as fast because particle temperature stays
 !..at 0C.  Also not much shedding of the water from the graupel so
@@ -3748,7 +3749,7 @@
                   massr = am_r * Dr(n2)**bm_r
                   do n = 1, nbs
                      masss = am_s * Ds(n)**bm_s
-      
+
                      dvs = 0.5d0*((vr(n2) - vs(n)) + DABS(vr(n2)-vs(n)))
                      dvr = 0.5d0*((vs(n) - vr(n2)) + DABS(vs(n)-vr(n2)))
 
@@ -4399,7 +4400,7 @@
 !+---+-----------------------------------------------------------------+
       SUBROUTINE GSER(GAMSER,A,X,GLN)
 !     --- RETURNS THE INCOMPLETE GAMMA FUNCTION P(A,X) EVALUATED BY ITS
-!     --- ITS SERIES REPRESENTATION AS GAMSER.  ALSO RETURNS LN(GAMMA(A)) 
+!     --- ITS SERIES REPRESENTATION AS GAMSER.  ALSO RETURNS LN(GAMMA(A))
 !     --- AS GLN.
 !     --- USES GAMMLN
       IMPLICIT NONE
@@ -4669,7 +4670,7 @@
       a2  = -A*(y1+y2)*0.5
       a3  = A/3.
 
-      if (yy.le.y1) then 
+      if (yy.le.y1) then
          dab = aa
       else if (yy.ge.y2) then
          dab = bb
@@ -4677,15 +4678,15 @@
          dab = a0+(a1*yy)+(a2*yy*yy)+(a3*yy*yy*yy)
       endif
 
-      if (dab.lt.aa) then 
+      if (dab.lt.aa) then
          dab = aa
       endif
-      if (dab.gt.bb) then 
+      if (dab.gt.bb) then
          dab = bb
       endif
       delta_p = dab
 
-      END FUNCTION delta_p 
+      END FUNCTION delta_p
 
 !+---+-----------------------------------------------------------------+
 !ctrlL
