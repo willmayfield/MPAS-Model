@@ -1133,7 +1133,7 @@ module atm_time_integration
                      call mpas_pool_get_dimension(state, 'index_qr', index_qr)
                      call mpas_pool_get_dimension(state, 'index_qi', index_qi)
                      call mpas_pool_get_dimension(state, 'index_qs', index_qs)
-                     call mpas_pool_get_dimension(state, 'index_qg', index_qg)
+                     call mpas_pool_get_dimension(state, 'index_qg', index_qg)  
                      call mpas_pool_get_dimension(state, 'index_qh', index_qh)
                      call mpas_pool_get_dimension(state, 'index_nc', index_nc)
                      call mpas_pool_get_dimension(state, 'index_nr', index_nr)
@@ -1559,7 +1559,7 @@ module atm_time_integration
                   call mpas_pool_get_dimension(state, 'index_qr', index_qr)
                   call mpas_pool_get_dimension(state, 'index_qi', index_qi)
                   call mpas_pool_get_dimension(state, 'index_qs', index_qs)
-                  call mpas_pool_get_dimension(state, 'index_qg', index_qg)
+                  call mpas_pool_get_dimension(state, 'index_qg', index_qg)  
                   call mpas_pool_get_dimension(state, 'index_qh', index_qh)
                   call mpas_pool_get_dimension(state, 'index_nc', index_nc)
                   call mpas_pool_get_dimension(state, 'index_nr', index_nr)
@@ -1825,7 +1825,7 @@ module atm_time_integration
             call mpas_pool_get_dimension(state, 'index_qr', index_qr)
             call mpas_pool_get_dimension(state, 'index_qi', index_qi)
             call mpas_pool_get_dimension(state, 'index_qs', index_qs)
-            call mpas_pool_get_dimension(state, 'index_qg', index_qg)
+            call mpas_pool_get_dimension(state, 'index_qg', index_qg)  
             call mpas_pool_get_dimension(state, 'index_qh', index_qh)
             call mpas_pool_get_dimension(state, 'index_nc', index_nc)
             call mpas_pool_get_dimension(state, 'index_nr', index_nr)
@@ -6832,10 +6832,12 @@ module atm_time_integration
        real (kind=RKIND) :: scalar_min, scalar_max
        real (kind=RKIND) :: global_scalar_min, global_scalar_max
 
+       real (kind=RKIND), pointer :: config_dt
        real (kind=RKIND), dimension(:), pointer :: latCell
        real (kind=RKIND), dimension(:), pointer :: lonCell
        real (kind=RKIND), dimension(:), pointer :: latEdge
        real (kind=RKIND), dimension(:), pointer :: lonEdge
+       real (kind=RKIND), dimension(:), pointer :: dcEdge
        integer, dimension(:), pointer :: indexToCellID
        integer :: indexMax, indexMax_global
        integer :: kMax, kMax_global
@@ -6843,14 +6845,19 @@ module atm_time_integration
        real (kind=RKIND) :: lonMax, lonMax_global
        real (kind=RKIND), dimension(5) :: localVals, globalVals
 
-       real (kind=RKIND) :: spd
+       real (kind=RKIND) :: spd, courant, lipschitz, uEdge, rdz
        real (kind=RKIND), dimension(:,:), pointer :: w
        real (kind=RKIND), dimension(:,:), pointer :: u, v, uReconstructZonal, uReconstructMeridional, uReconstructX, uReconstructY, uReconstructZ
        real (kind=RKIND), dimension(:,:,:), pointer :: scalars, scalars_1, scalars_2
+       real (kind=RKIND), dimension(:,:), pointer :: rho_zz, wwavg, uhAvg, zz
+       real (kind=RKIND), dimension(:), pointer :: rdzw, rdzu, fzm, fzp
+       integer, dimension(:,:), pointer :: cellsOnEdge
+       integer :: cell1, cell2
 
        call mpas_pool_get_config(domain % blocklist % configs, 'config_print_global_minmax_vel', config_print_global_minmax_vel)
        call mpas_pool_get_config(domain % blocklist % configs, 'config_print_detailed_minmax_vel', config_print_detailed_minmax_vel)
        call mpas_pool_get_config(domain % blocklist % configs, 'config_print_global_minmax_sca', config_print_global_minmax_sca)
+       call mpas_pool_get_config(domain % blocklist % configs, 'config_dt', config_dt)
 
       if (config_print_detailed_minmax_vel) then
          call mpas_log_write('')
@@ -6863,6 +6870,7 @@ module atm_time_integration
 
             call mpas_pool_get_array(state, 'w', w, 2)
             call mpas_pool_get_array(state, 'u', u, 2)
+            call mpas_pool_get_array(diag, 'ruAvg', uhAvg)
             call mpas_pool_get_array(diag, 'v', v)
             call mpas_pool_get_array(mesh, 'indexToCellID', indexToCellID)
             call mpas_pool_get_array(mesh, 'latCell', latCell)
@@ -6872,6 +6880,16 @@ module atm_time_integration
             call mpas_pool_get_dimension(state, 'nCellsSolve', nCellsSolve)
             call mpas_pool_get_dimension(state, 'nEdgesSolve', nEdgesSolve)
             call mpas_pool_get_dimension(state, 'nVertLevels', nVertLevels)
+
+            call mpas_pool_get_array(state, 'rho_zz', rho_zz, 2)
+            call mpas_pool_get_array(diag, 'wwAvg', wwavg)
+            call mpas_pool_get_array(mesh, 'rdzu', rdzu)
+            call mpas_pool_get_array(mesh, 'rdzw', rdzw)
+            call mpas_pool_get_array(mesh, 'fzp', fzm)
+            call mpas_pool_get_array(mesh, 'fzm', fzp)
+            call mpas_pool_get_array(mesh, 'dcEdge', dcEdge)
+            call mpas_pool_get_array(mesh, 'cellsOnEdge', cellsOnEdge)
+            call mpas_pool_get_array(mesh, 'zz', zz)
 
             scalar_min = 1.0e20
             indexMax = -1
@@ -6945,6 +6963,81 @@ module atm_time_integration
             call mpas_log_write(' global max w: $r k=$i, $r lat, $r lon', intArgs=(/kMax_global/), &
                                 realArgs=(/global_scalar_max, latMax_global, lonMax_global/))
 
+            scalar_max = -1.0e20
+            indexMax = -1
+            kMax = -1
+            latMax = 0.0
+            lonMax = 0.0
+            do iCell = 1, nCellsSolve
+            do k = 2, nVertLevels
+               rdz = rdzu(k)*(fzm(k)*zz(k,iCell)+fzp(k)*zz(k-1,iCell)) 
+               courant = config_dt*wwavg(k,iCell)*rdz/(fzm(k)*rho_zz(k,iCell)+fzp(k)*rho_zz(k-1,iCell))
+               if (courant > scalar_max) then
+                  scalar_max = courant
+                  indexMax = iCell
+                  kMax = k
+                  latMax = latCell(iCell)
+                  lonMax = lonCell(iCell)
+               end if
+            end do
+            end do
+            localVals(1) = scalar_max
+            localVals(2) = real(indexMax,kind=RKIND)
+            localVals(3) = real(kMax,kind=RKIND)
+            localVals(4) = latMax
+            localVals(5) = lonMax
+            call mpas_dmpar_maxattributes_real(domain % dminfo, scalar_max, localVals, globalVals)
+            global_scalar_max = globalVals(1)
+            indexMax_global = int(globalVals(2))
+            kMax_global = int(globalVals(3))
+            latMax_global = globalVals(4)
+            lonMax_global = globalVals(5)
+            latMax_global = latMax_global * 180.0_RKIND / pi_const
+            lonMax_global = lonMax_global * 180.0_RKIND / pi_const
+            if (lonMax_global > 180.0) then
+               lonMax_global = lonMax_global - 360.0
+            end if
+            ! format statement should be '(a,f9.4,a,i4,a,f7.3,a,f8.3,a)'
+            call mpas_log_write(' global max Cr_w (scalar): $r k=$i, $r lat, $r lon', intArgs=(/kMax_global/), &
+                                realArgs=(/global_scalar_max, latMax_global, lonMax_global/))
+            
+            scalar_max = -1.0e20
+            indexMax = -1
+            kMax = -1
+            latMax = 0.0
+            lonMax = 0.0
+            do iCell = 1, nCellsSolve
+            do k = 2, nVertLevels
+               lipschitz = config_dt*(wwavg(k+1,iCell)-wwavg(k,iCell))*rdzw(k)/rho_zz(k,iCell)
+               if (lipschitz > scalar_max) then
+                  scalar_max = lipschitz
+                  indexMax = iCell
+                  kMax = k
+                  latMax = latCell(iCell)
+                  lonMax = lonCell(iCell)
+               end if
+            end do
+            end do
+            localVals(1) = scalar_max
+            localVals(2) = real(indexMax,kind=RKIND)
+            localVals(3) = real(kMax,kind=RKIND)
+            localVals(4) = latMax
+            localVals(5) = lonMax
+            call mpas_dmpar_maxattributes_real(domain % dminfo, scalar_max, localVals, globalVals)
+            global_scalar_max = globalVals(1)
+            indexMax_global = int(globalVals(2))
+            kMax_global = int(globalVals(3))
+            latMax_global = globalVals(4)
+            lonMax_global = globalVals(5)
+            latMax_global = latMax_global * 180.0_RKIND / pi_const
+            lonMax_global = lonMax_global * 180.0_RKIND / pi_const
+            if (lonMax_global > 180.0) then
+               lonMax_global = lonMax_global - 360.0
+            end if
+            ! format statement should be '(a,f9.4,a,i4,a,f7.3,a,f8.3,a)'
+            call mpas_log_write(' global max Lipschitz_z (scalar): $r k=$i, $r lat, $r lon', intArgs=(/kMax_global/), &
+                                realArgs=(/global_scalar_max, latMax_global, lonMax_global/))
+            
             scalar_min = 1.0e20
             indexMax = -1
             kMax = -1
@@ -7015,6 +7108,46 @@ module atm_time_integration
             end if
             ! format statement should be '(a,f9.4,a,i4,a,f7.3,a,f8.3,a)'
             call mpas_log_write(' global max u: $r k=$i, $r lat, $r lon', intArgs=(/kMax_global/), &
+                                realArgs=(/global_scalar_max, latMax_global, lonMax_global/))
+
+            scalar_max = -1.0e20
+            indexMax = -1
+            kMax = -1
+            latMax = 0.0
+            lonMax = 0.0
+            do iEdge = 1, nEdgesSolve
+            do k = 1, nVertLevels
+               cell1 = cellsOnEdge(1,iEdge)
+               cell2 = cellsOnEdge(2,iEdge)
+               uEdge = 2.0*uhAvg(k,iEdge)/(rho_zz(k,cell1)+rho_zz(k,cell2))
+               courant = abs(uEdge*config_dt/dcEdge(iEdge))
+               if (courant > scalar_max) then
+                  scalar_max = courant
+                  indexMax = iEdge
+                  kMax = k
+                  latMax = latEdge(iEdge)
+                  lonMax = lonEdge(iEdge)
+               end if
+            end do
+            end do
+            localVals(1) = scalar_max
+            localVals(2) = real(indexMax,kind=RKIND)
+            localVals(3) = real(kMax,kind=RKIND)
+            localVals(4) = latMax
+            localVals(5) = lonMax
+            call mpas_dmpar_maxattributes_real(domain % dminfo, scalar_max, localVals, globalVals)
+            global_scalar_max = globalVals(1)
+            indexMax_global = int(globalVals(2))
+            kMax_global = int(globalVals(3))
+            latMax_global = globalVals(4)
+            lonMax_global = globalVals(5)
+            latMax_global = latMax_global * 180.0_RKIND / pi_const
+            lonMax_global = lonMax_global * 180.0_RKIND / pi_const
+            if (lonMax_global > 180.0) then
+               lonMax_global = lonMax_global - 360.0
+            end if
+            ! format statement should be '(a,f9.4,a,i4,a,f7.3,a,f8.3,a)'
+            call mpas_log_write(' global max Cr_u(scalar): $r k=$i, $r lat, $r lon', intArgs=(/kMax_global/), &
                                 realArgs=(/global_scalar_max, latMax_global, lonMax_global/))
 
             scalar_max = -1.0e20
