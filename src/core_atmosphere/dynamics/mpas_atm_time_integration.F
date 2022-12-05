@@ -4307,9 +4307,11 @@ module atm_time_integration
       real (kind=RKIND), pointer :: config_h_theta_eddy_visc2, config_v_theta_eddy_visc2
 
       real (kind=RKIND), pointer :: config_mpas_cam_coef
+      integer, pointer :: config_nlevels_cam_damp
       logical, pointer :: config_rayleigh_damp_u
       real (kind=RKIND), pointer :: config_rayleigh_damp_u_timescale_days
       integer, pointer :: config_number_rayleigh_damp_u_levels
+
 
       logical :: inactive_rthdynten
 
@@ -4329,6 +4331,7 @@ module atm_time_integration
       call mpas_pool_get_config(configs, 'config_len_disp', config_len_disp)
       call mpas_pool_get_config(configs, 'config_smagorinsky_coef', c_s)
       call mpas_pool_get_config(configs, 'config_mpas_cam_coef', config_mpas_cam_coef)
+      call mpas_pool_get_config(configs, 'config_nlevels_cam_damp', config_nlevels_cam_damp)
       call mpas_pool_get_config(configs, 'config_rayleigh_damp_u', config_rayleigh_damp_u)
       call mpas_pool_get_config(configs, 'config_rayleigh_damp_u_timescale_days', config_rayleigh_damp_u_timescale_days)
       call mpas_pool_get_config(configs, 'config_number_rayleigh_damp_u_levels', config_number_rayleigh_damp_u_levels)
@@ -4465,7 +4468,7 @@ module atm_time_integration
          tend_w_pgf, tend_w_buoy, coef_3rd_order, c_s, config_mix_full, config_horiz_mixing, config_del4u_div_factor, &
          config_h_mom_eddy_visc2, config_v_mom_eddy_visc2, config_h_theta_eddy_visc2, config_v_theta_eddy_visc2, &
          config_h_theta_eddy_visc4, config_h_mom_eddy_visc4, config_visc4_2dsmag, config_len_disp, rk_step, dt, &
-         config_mpas_cam_coef, &
+         config_mpas_cam_coef, config_nlevels_cam_damp, &
          config_rayleigh_damp_u, config_rayleigh_damp_u_timescale_days, config_number_rayleigh_damp_u_levels, &
          tend_rtheta_adv, rthdynten, &
          cellStart, cellEnd, vertexStart, vertexEnd, edgeStart, edgeEnd, &
@@ -4492,7 +4495,7 @@ module atm_time_integration
       tend_w_pgf, tend_w_buoy, coef_3rd_order, c_s, config_mix_full, config_horiz_mixing, config_del4u_div_factor, &
       config_h_mom_eddy_visc2, config_v_mom_eddy_visc2, config_h_theta_eddy_visc2, config_v_theta_eddy_visc2, &
       config_h_theta_eddy_visc4, config_h_mom_eddy_visc4, config_visc4_2dsmag, config_len_disp, rk_step, dt, &
-      config_mpas_cam_coef, &
+      config_mpas_cam_coef, nlevels_cam_damp, &
       config_rayleigh_damp_u, config_rayleigh_damp_u_timescale_days, config_number_rayleigh_damp_u_levels, &
       tend_rtheta_adv, rthdynten, &
       cellStart, cellEnd, vertexStart, vertexEnd, edgeStart, edgeEnd, &
@@ -4614,6 +4617,7 @@ module atm_time_integration
       real (kind=RKIND), intent(in) :: dt
 
       real (kind=RKIND) :: config_mpas_cam_coef
+      integer, intent(in) :: nlevels_cam_damp
 
       logical, intent(in) :: config_rayleigh_damp_u
       real (kind=RKIND), intent(in) :: config_rayleigh_damp_u_timescale_days
@@ -4630,6 +4634,7 @@ module atm_time_integration
       ! Local variables
       !
       integer :: iEdge, iCell, iVertex, k, cell1, cell2, vertex1, vertex2, eoe, i, j, iq, iAdvCell
+      integer :: kk
 
       !real (kind=RKIND), parameter :: c_s = 0.125
       real (kind=RKIND), dimension( nVertLevels+1 ) :: d_diag, d_off_diag, flux_arr
@@ -4648,6 +4653,8 @@ module atm_time_integration
       real (kind=RKIND) :: kdiffu, z1, z2, z3, z4, zm, z0, zp, rayleigh_coef_inverse
 
       real (kind=RKIND), dimension( nVertLevels ) :: rayleigh_damp_coef
+
+      real (kind=RKIND), dimension(nlevels_cam_damp) :: visc2cam
 
       real (kind=RKIND) :: flux3, flux4
       real (kind=RKIND) :: q_im2, q_im1, q_i, q_ip1, ua, coef3
@@ -4705,18 +4712,23 @@ module atm_time_integration
 
          end if
 
-         if (config_mpas_cam_coef > 0.0) then
-
-            do iCell = cellStart,cellEnd
-               !
-               ! 2nd-order filter for top absorbing layer as in CAM-SE :  WCS 10 May 2017
-               ! From MPAS-CAM V4.0 code, with addition to config-specified coefficient (V4.0_coef = 0.2; SE_coef = 1.0)
-               !
-               kdiff(nVertLevels-2,iCell) = max(kdiff(nVertLevels-2,iCell),    2.0833*config_len_disp*config_mpas_cam_coef)
-               kdiff(nVertLevels-1,iCell) = max(kdiff(nVertLevels-1,iCell),2.0*2.0833*config_len_disp*config_mpas_cam_coef)
-               kdiff(nVertLevels  ,iCell) = max(kdiff(nVertLevels  ,iCell),4.0*2.0833*config_len_disp*config_mpas_cam_coef)
+         !
+         ! 2nd-order filter for top absorbing layer as in CAM-SE :  WCS 10 May 2017
+         ! From MPAS-CAM V4.0 code, with addition to config-specified coefficient (V4.0_coef = 0.2; SE_coef = 1.0)
+         !
+         if (config_mpas_cam_coef > 0.0 .and. nlevels_cam_damp > 0) then
+            do k = (nVertLevels - nlevels_cam_damp + 1), nVertLevels
+               kk = k - nVertLevels + nlevels_cam_damp
+               visc2cam(kk) = 4.0_RKIND * 2.0833_RKIND * config_len_disp * config_mpas_cam_coef &
+                            * (1.0_RKIND - real(nVertLevels - k, kind=RKIND) / real(nlevels_cam_damp, kind=RKIND))
             end do
 
+            do iCell = cellStart, cellEnd
+               do k = (nVertLevels - nlevels_cam_damp + 1), nVertLevels
+                  kk = k - nVertLevels + nlevels_cam_damp
+                  kdiff(k,iCell) = max(kdiff(k,iCell), visc2cam(kk))
+               end do
+            end do
          end if
             
       end if
