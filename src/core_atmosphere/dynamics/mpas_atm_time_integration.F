@@ -4783,6 +4783,10 @@ module atm_time_integration
 
       real (kind=RKIND), dimension( nVertLevels ) :: rayleigh_damp_coef
 
+      real (kind=RKIND) :: visc2cam
+      integer, parameter :: nlevels_cam_damp = 8 ! number of levels +1 for del2 diffusion in upper 
+                                                 ! absorbing layer
+
       real (kind=RKIND) :: flux3, flux4
       real (kind=RKIND) :: q_im2, q_im1, q_i, q_ip1, ua, coef3
 
@@ -4846,9 +4850,16 @@ module atm_time_integration
                ! 2nd-order filter for top absorbing layer as in CAM-SE :  WCS 10 May 2017
                ! From MPAS-CAM V4.0 code, with addition to config-specified coefficient (V4.0_coef = 0.2; SE_coef = 1.0)
                !
-               kdiff(nVertLevels-2,iCell) = max(kdiff(nVertLevels-2,iCell),    2.0833*config_len_disp*config_mpas_cam_coef)
-               kdiff(nVertLevels-1,iCell) = max(kdiff(nVertLevels-1,iCell),2.0*2.0833*config_len_disp*config_mpas_cam_coef)
-               kdiff(nVertLevels  ,iCell) = max(kdiff(nVertLevels  ,iCell),4.0*2.0833*config_len_disp*config_mpas_cam_coef)
+               ! kdiff(nVertLevels-2,iCell) = max(kdiff(nVertLevels-2,iCell),    2.0833*config_len_disp*config_mpas_cam_coef)
+               ! kdiff(nVertLevels-1,iCell) = max(kdiff(nVertLevels-1,iCell),2.0*2.0833*config_len_disp*config_mpas_cam_coef)
+               ! kdiff(nVertLevels  ,iCell) = max(kdiff(nVertLevels  ,iCell),4.0*2.0833*config_len_disp*config_mpas_cam_coef)
+
+              do k = nVertLevels-nlevels_cam_damp + 1, nVertLevels
+                visc2cam = 4.0*2.0833*config_len_disp*config_mpas_cam_coef
+                visc2cam = visc2cam*(1.0-real(k-nVertLevels)/real(nlevels_cam_damp))
+                kdiff(k  ,iCell) = max(kdiff(nVertLevels  ,iCell),visc2cam)
+              end do
+
             end do
 
          end if
