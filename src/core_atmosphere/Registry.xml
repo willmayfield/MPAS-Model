@@ -261,6 +261,11 @@
                      description="Coefficient for scaling the 2nd-order horizontal mixing in the mpas_cam absorbing layer"
                      possible_values="0 $\leq$ config_mpas_cam_coef $\leq$ 1, standard value is 0.2"/>
 
+                <nml_option name="config_nlevels_cam_damp" type="integer" default_value="3"
+                     units="-"
+                     description="Number of layers at model top over which the mpas_cam absorbing layer is active"
+                     possible_values="0 $\le$ config_nlevels_cam_damp $\le$ nVertLevels"/>
+
                 <nml_option name="config_rayleigh_damp_u" type="logical" default_value="false" in_defaults="false"
                      units="-"
                      description="Whether to apply Rayleigh damping on horizontal velocity in the top-most model levels. The number of levels is specified by the config_number_rayleigh_damp_u_levels option, and the damping timescale is specified by the config_rayleigh_damp_u_timescale_days option."
