@@ -1,3 +1,4 @@
+
 <?xml version="1.0"?>
 <registry model="mpas" core="init_atmosphere" core_abbrev="init_atm" version="7.3">
 
@@ -327,6 +328,12 @@
                 <package name="vertical_stage_out" description="Active only if a vertical grid is being generated"/>
                 <package name="met_stage_in" description="Active only if meteorological fields are being interpolated"/>
                 <package name="met_stage_out" description="Active only if meteorological fields are being interpolated"/>
+                <package name="mp_kessler_in" description="parameterization of kessler microphysics."/>
+                <package name="mp_thompson_in" description="parameterization of Thompson cloud microphysics."/>
+                <package name="mp_wsm6_in" description="parameterization of WSM6 cloud microphysics."/>
+                <package name="mp_nssl2m_in" description="parameterization of NSSL 2-moment microphysics."/>
+                <package name="nssl3m_in" description="variables for NSSL 3-moment microphysics."/>
+
         </packages>
 
 
@@ -335,10 +342,10 @@
 <!-- **************************************************************************************** -->
 
 	<streams>
-		<stream name="input" 
-                        type="input" 
+		<stream name="input"
+                        type="input"
                         filename_template="x1.40962.grid.nc"
-                        input_interval="initial_only" 
+                        input_interval="initial_only"
                         immutable="true">
 
                         <var name="latCell"/>
@@ -430,8 +437,8 @@
                         <var name="dss" packages="met_stage_in"/>
 		</stream>
 
-		<stream name="output" 
-                        type="output" 
+		<stream name="output"
+                        type="output"
                         filename_template="x1.40962.init.nc"
                         output_interval="initial_only"
                         packages="initial_conds"
@@ -565,10 +572,10 @@
                         <var name="t2m" packages="met_stage_out"/>
 		</stream>
 
-		<stream name="surface" 
-                        type="output" 
+		<stream name="surface"
+                        type="output"
                         filename_template="x1.40962.sfc_update.nc"
-                        output_interval="86400" 
+                        output_interval="86400"
                         filename_interval="none"
                         packages="sfc_update"
                         immutable="true">
@@ -909,6 +916,25 @@
 
                         <var name="qr" array_group="moist" units="kg kg^{-1}"
                              description="Rain water mixing ratio"/>
+
+                        <var name="qi" array_group="moist" units="kg kg^{-1}"
+                             description="Ice mixing ratio"/>
+
+                        <var name="qs" array_group="moist" units="kg kg^{-1}"
+                             description="Snow mixing ratio"/>
+
+                        <var name="qg" array_group="moist" units="kg kg^{-1}"
+                             description="Graupel mixing ratio"/>
+
+                        <var name="ni" array_group="number" units="nb kg^{-1}"
+                             description="Cloud ice number concentration"/>
+
+                        <var name="nr" array_group="number" units="nb kg^{-1}"
+                             description="Rain number concentration"/>
+
+                        <var name="nc" array_group="number" units="nb kg^{-1}"
+                             description="Cloud droplet number concentration"/>
+
                 </var_array>
 
                 <!-- Climatology for ocean mixed-layer depth -->
@@ -942,6 +968,24 @@
 
                         <var name="lbc_qr" array_group="moist" units="kg kg^{-1}"
                              description="Rain water mixing ratio on lateral boundary cells"/>
+
+                        <var name="lbc_qi" array_group="moist" units="kg kg^{-1} s^{-1}"
+                             description="Lateral boundary tendency of ice mixing ratio"/>
+
+                        <var name="lbc_qs" array_group="moist" units="kg kg^{-1} s^{-1}"
+                             description="Lateral boundary tendency of snow mixing ratio"/>
+
+                        <var name="lbc_qg" array_group="moist" units="kg kg^{-1} s^{-1}"
+                             description="Lateral boundary tendency of graupel mixing ratio"/>
+
+                        <var name="lbc_nr" array_group="number" units="m^{-3} s^{-1}"
+                             description="Lateral boundary tendency of rain number concentration"/>
+
+                        <var name="lbc_ni" array_group="number" units="m^{-3} s^{-1}"
+                             description="Lateral boundary tendency of ice number concentration"/>
+
+                        <var name="lbc_nc" array_group="number" units="m^{-3} s^{-1}"
+                             description="Lateral boundary tendency of droplet number concentration"/>
                 </var_array>
 
         </var_struct>
@@ -969,6 +1013,30 @@
 
                 <var name="sh_fg" name_in_code="sh" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
                      description="First guess specific humidity"/>
+
+                <var name="qc_fg" name_in_code="qc" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess cloud mixing ratio"/>
+
+                <var name="qr_fg" name_in_code="qr" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Rain Mixing Ratio"/>
+
+                <var name="qi_fg" name_in_code="qi" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Cloud Ice Mixing Ratio"/>
+
+                <var name="qs_fg" name_in_code="qs" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Snow Mixing Ratio"/>
+
+                <var name="qg_fg" name_in_code="qg" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Grauple"/>
+
+                <var name="qnc_fg" name_in_code="qnc" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+                     description="First guess Number Concentration of Cloud Droplets"/>
+
+                <var name="qni_fg" name_in_code="qni" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+                     description="First guess Number Concentration of Cloud Ice"/>
+
+                <var name="qnr_fg" name_in_code="qnr" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+                     description="First guess  Specific Number Concentration of Rain"/>
 
                 <var name="soilz_fg" name_in_code="soilz" type="real" dimensions="nCells Time" units="m"
                      description="First guess soil height"/>
