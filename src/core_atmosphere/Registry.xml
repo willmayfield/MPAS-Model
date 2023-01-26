@@ -402,9 +402,9 @@
 <!-- **************************************************************************************** -->
 
 	<streams>
-		<stream name="input" 
-                        type="input" 
-                        filename_template="x1.40962.init.nc" 
+		<stream name="input"
+                        type="input"
+                        filename_template="x1.40962.init.nc"
                         input_interval="initial_only"
                         immutable="true">
 
@@ -529,11 +529,11 @@
 			<var name="h_oml_initial"/>
 		</stream>
 
-		<stream name="restart" 
-                        type="input;output" 
-                        filename_template="restart.$Y-$M-$D_$h.$m.$s.nc" 
-                        input_interval="initial_only" 
-                        output_interval="1_00:00:00" 
+		<stream name="restart"
+                        type="input;output"
+                        filename_template="restart.$Y-$M-$D_$h.$m.$s.nc"
+                        input_interval="initial_only"
+                        output_interval="1_00:00:00"
                         immutable="true">
 
 			<var name="latCell"/>
@@ -856,9 +856,9 @@
 			<var name="hv_oml"/>
 		</stream>
 
-		<stream name="output" 
-                        type="output" 
-                        filename_template="history.$Y-$M-$D_$h.$m.$s.nc" 
+		<stream name="output"
+                        type="output"
+                        filename_template="history.$Y-$M-$D_$h.$m.$s.nc"
                         output_interval="6:00:00"
                         runtime_format="separate_file">
 
@@ -978,9 +978,9 @@
 			<var name="tslb"/>
 		</stream>
 
-		<stream name="diagnostics" 
-                        type="output" 
-                        filename_template="diag.$Y-$M-$D_$h.$m.$s.nc" 
+		<stream name="diagnostics"
+                        type="output"
+                        filename_template="diag.$Y-$M-$D_$h.$m.$s.nc"
                         output_interval="3:00:00"
                         runtime_format="separate_file">
 
@@ -1086,9 +1086,9 @@
 			<var name="hv_oml"/>
 		</stream>
 
-		<stream name="surface" 
-                        type="input" 
-                        filename_template="x1.40962.sfc_update.nc" 
+		<stream name="surface"
+                        type="input"
+                        filename_template="x1.40962.sfc_update.nc"
                         input_interval="none"
                         filename_interval="none"
                         runtime_format="separate_file">
@@ -1097,9 +1097,9 @@
 			<var name="xice"/>
 		</stream>
 
-	        <stream name="iau" 
-                        type="input" 
-                        filename_template="x1.40962.AmB.$Y-$M-$D_$h.$m.$s.nc" 
+	        <stream name="iau"
+                        type="input"
+                        filename_template="x1.40962.AmB.$Y-$M-$D_$h.$m.$s.nc"
                         input_interval="initial_only"
                         filename_interval="none"
                         immutable="true"
@@ -1113,7 +1113,7 @@
                         type="input"
                         filename_template="lbc.$Y-$M-$D_$h.$m.$s.nc"
                         filename_interval="input_interval"
-                        input_interval="3:00:00" 
+                        input_interval="3:00:00"
                         runtime_format="single_file"
                         immutable="true"
                         packages="limited_area">
@@ -1762,7 +1762,7 @@
 
         <var_struct name="tend" time_levs="1">
 
-                
+
                 <!-- tendencies for prognostic variables -->
                 <var name="tend_u" name_in_code="u" type="real" dimensions="nVertLevels nEdges Time" units="m s^{-2}"
                      description="Tendency of u from dynamics"/>
@@ -1830,47 +1830,47 @@
                              description="Tendency of cloud ice number concentration multiplied by dry air density divided by d(zeta)/dz"
                              packages="bl_mynn_in;mp_thompson_in;mp_nssl2m_in"/>
 
-                        <var name="tend_nr" name_in_code="nr" array_group="number" units="nb m^{-3} s^{-1}" 
+                        <var name="tend_nr" name_in_code="nr" array_group="number" units="nb m^{-3} s^{-1}"
                              description="Tendency of rain number concentration multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_thompson_in;mp_nssl2m_in"/>
 
-                        <var name="tend_nc" name_in_code="nc" array_group="number" units="nb m^{-3} s^{-1}" 
+                        <var name="tend_nc" name_in_code="nc" array_group="number" units="nb m^{-3} s^{-1}"
                              description="Tendency of cloud droplet number concentration multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_nssl2m_in"/>
 
-                        <var name="tend_ns" name_in_code="ns" array_group="number" units="nb m^{-3} s^{-1}" 
+                        <var name="tend_ns" name_in_code="ns" array_group="number" units="nb m^{-3} s^{-1}"
                              description="Tendency of snow number concentration multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_nssl2m_in"/>
 
-                        <var name="tend_ng" name_in_code="ng" array_group="number" units="nb m^{-3} s^{-1}" 
+                        <var name="tend_ng" name_in_code="ng" array_group="number" units="nb m^{-3} s^{-1}"
                              description="Tendency of graupel number concentration multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_nssl2m_in"/>
 
-                        <var name="tend_nh" name_in_code="nh" array_group="number" units="nb m^{-3} s^{-1}" 
+                        <var name="tend_nh" name_in_code="nh" array_group="number" units="nb m^{-3} s^{-1}"
                              description="Tendency of hail number concentration multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_nssl2m_in"/>
 
-                        <var name="tend_nccn" name_in_code="nccn" array_group="number" units="nb m^{-3} s^{-1}" 
+                        <var name="tend_nccn" name_in_code="nccn" array_group="number" units="nb m^{-3} s^{-1}"
                              description="Tendency of CCN number concentration multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_nssl2m_in"/>
 
-                        <var name="tend_volg" name_in_code="volg" array_group="volume" units="m^{3} s^{-1}" 
+                        <var name="tend_volg" name_in_code="volg" array_group="volume" units="m^{3} s^{-1}"
                              description="Tendency of graupel volume multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_nssl2m_in"/>
 
-                        <var name="tend_volh" name_in_code="volh" array_group="volume" units="m^{3} s^{-1}" 
+                        <var name="tend_volh" name_in_code="volh" array_group="volume" units="m^{3} s^{-1}"
                              description="Tendency of hail volume multiplied by dry air density divided by d(zeta)/dz"
                              packages="mp_nssl2m_in"/>
 
-                        <var name="tend_zrw" name_in_code="zrw" array_group="reflectivity" units="m^6 m^{-3} s^{-1}" 
+                        <var name="tend_zrw" name_in_code="zrw" array_group="reflectivity" units="m^6 m^{-3} s^{-1}"
                              description="Tendency of rain reflectivity multiplied by dry air density divided by d(zeta)/dz"
                              packages="nssl3m_in"/>
 
-                        <var name="tend_zgw" name_in_code="zgw" array_group="reflectivity" units="m^6 m^{-3} s^{-1}" 
+                        <var name="tend_zgw" name_in_code="zgw" array_group="reflectivity" units="m^6 m^{-3} s^{-1}"
                              description="Tendency of graupel reflectivity multiplied by dry air density divided by d(zeta)/dz"
                              packages="nssl3m_in"/>
 
-                        <var name="tend_zhw" name_in_code="zhw" array_group="reflectivity" units="m^6 m^{-3} s^{-1}" 
+                        <var name="tend_zhw" name_in_code="zhw" array_group="reflectivity" units="m^6 m^{-3} s^{-1}"
                              description="Tendency of hail reflectivity multiplied by dry air density divided by d(zeta)/dz"
                              packages="nssl3m_in"/>
                 </var_array>
@@ -2004,7 +2004,7 @@
                      possible_values="Positive integers"/>
 
                 <!-- NAMELIST VARIABLES ADDED FOR PHYSICS CONFIGURATION: -->
-                
+
                 <nml_option name="config_frac_seaice" type="logical" default_value="true" in_defaults="false"
                      units="-"
                      description="logical for configuration of fractional sea-ice"
@@ -2177,7 +2177,7 @@
 
                 <nml_option name="config_oml_hml0" type="real" default_value="30.0" in_defaults="false"
                      units="m"
-                     description="If greater than zero, provides the constant, initial mixed-layer depth; if zero, initial mixed-layer depth will be taken from the `oml_initial` field." 
+                     description="If greater than zero, provides the constant, initial mixed-layer depth; if zero, initial mixed-layer depth will be taken from the `oml_initial` field."
                      possible_values="Non-negative real values"/>
 
                 <nml_option name="config_oml_gamma" type="real" default_value="0.14" in_defaults="false"
@@ -2223,7 +2223,7 @@
 
                 <var name="refl10cm" type="real" dimensions="nVertLevels nCells Time" units="dBZ"
                      description="10 cm radar reflectivity"
-                     packages="mp_nssl2m_in"/>
+                     packages="mp_thompson_in;mp_nssl2m_in"/>
 
                 <var name="refl10cm_max" type="real" dimensions="nCells Time" units="dBZ"
                      description="10 cm maximum radar reflectivity"
@@ -2991,7 +2991,7 @@
         </var_struct>
 
         <var_struct name="tend_physics" time_levs="1">
- 
+
                 <!-- ================================================================================================== -->
                 <!-- TENDENCIES FROM PARAMETERIZATION OF CONVECTION:                                                    -->
                 <!-- ================================================================================================== -->
@@ -3230,7 +3230,7 @@
         </var_struct>
 
         <var_struct name="tend_iau" time_levs="1" packages="iau">
-			
+
                 <!-- analysis increments; read from iau input -->
                 <var name="u_amb"     name_in_code="u" type="real" dimensions="nVertLevels nEdges Time" units="m s^{-1}"
                      description="Horizontal normal velocity increment"/>
@@ -3273,3 +3273,4 @@
 #include "diagnostics/Registry_diagnostics.xml"
 
 </registry>
+                                                      

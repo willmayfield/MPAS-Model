@@ -159,6 +159,7 @@
 
           if(.not.allocated(rainprod_p)) allocate(rainprod_p(ims:ime,kms:kme,jms:jme))
           if(.not.allocated(evapprod_p)) allocate(evapprod_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(refl10cm_p)) allocate(refl10cm_p(ims:ime,kms:kme,jms:jme))
 
        case("mp_nssl2m")
           if(.not.allocated(qh_p)        ) allocate(qh_p(ims:ime,kms:kme,jms:jme))
@@ -259,6 +260,7 @@
 
           if(allocated(rainprod_p)) deallocate(rainprod_p)
           if(allocated(evapprod_p)) deallocate(evapprod_p)
+          if(allocated(refl10cm_p)) deallocate(refl10cm_p)
 
        case("mp_nssl2m")
           if(allocated(qh_p)         ) deallocate(qh_p         )
@@ -310,7 +312,7 @@
 !local pointer:
  character(len=StrKIND),pointer:: microp_scheme
  character(len=StrKIND),pointer:: nssl_moments
- 
+
  logical :: outputon = .false.
 
 !-----------------------------------------------------------------------------------------------------------------
@@ -333,7 +335,7 @@
         ELSE
           CALL nssl_2mom_init(ipctmp=5,mixphase=0,ihvol=1, myrank=dminfo % my_proc_id, mpiroot = IO_NODE)
         ENDIF
-     
+
      case default
 
   end select microp_select
@@ -797,7 +799,7 @@
           w2 = 1.0 - w1
           refl10cm_1km(i) = w1*dBZ1d(kp) + w2*dBZ1d(kp+1)
           refl10cm_1km_max(i) = max(refl10cm_1km_max(i),refl10cm_1km(i))
-          
+
         enddo
         enddo
 
@@ -883,6 +885,7 @@
           kp = 1
           do k = kts,kte
              dBZ1d(k) = max(-35._RKIND,dBZ1d(k))
+             refl10cm_p(i,k,j) = dBZ1d(k)
              if(zp(k) .lt. 1000.) kp = k
           enddo
           refl10cm_max(i) = maxval(dBZ1d(:))
