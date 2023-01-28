@@ -935,6 +935,12 @@
                         <var name="nc" array_group="number" units="nb kg^{-1}"
                              description="Cloud droplet number concentration"/>
 
+                        <var name="ns" array_group="number" units="nb kg^{-1}"
+                             description="Snow number concentration"/>
+
+                        <var name="ng" array_group="number" units="nb kg^{-1}"
+                             description="Graupel number concentration"/>
+
                 </var_array>
 
                 <!-- Climatology for ocean mixed-layer depth -->
@@ -969,23 +975,30 @@
                         <var name="lbc_qr" array_group="moist" units="kg kg^{-1}"
                              description="Rain water mixing ratio on lateral boundary cells"/>
 
-                        <var name="lbc_qi" array_group="moist" units="kg kg^{-1} s^{-1}"
+                        <var name="lbc_qi" array_group="moist" units="kg kg^{-1}"
                              description="Lateral boundary tendency of ice mixing ratio"/>
 
-                        <var name="lbc_qs" array_group="moist" units="kg kg^{-1} s^{-1}"
+                        <var name="lbc_qs" array_group="moist" units="kg kg^{-1}"
                              description="Lateral boundary tendency of snow mixing ratio"/>
 
-                        <var name="lbc_qg" array_group="moist" units="kg kg^{-1} s^{-1}"
+                        <var name="lbc_qg" array_group="moist" units="kg kg^{-1}"
                              description="Lateral boundary tendency of graupel mixing ratio"/>
 
-                        <var name="lbc_nr" array_group="number" units="m^{-3} s^{-1}"
+                        <var name="lbc_nr" array_group="number" units="kg^{-1}"
                              description="Lateral boundary tendency of rain number concentration"/>
 
-                        <var name="lbc_ni" array_group="number" units="m^{-3} s^{-1}"
+                        <var name="lbc_ni" array_group="number" units="kg^{-1}"
                              description="Lateral boundary tendency of ice number concentration"/>
 
-                        <var name="lbc_nc" array_group="number" units="m^{-3} s^{-1}"
+                        <var name="lbc_nc" array_group="number" units="kg^{-1}"
                              description="Lateral boundary tendency of droplet number concentration"/>
+
+                        <var name="lbc_ns" array_group="number" units="kg^{-1}"
+                             description="Lateral boundary tendency of snow number concentration"/>
+
+                        <var name="lbc_ng" array_group="number" units="kg^{-1}"
+                             description="Lateral boundary tendency of graupel number concentration"/>
+
                 </var_array>
 
         </var_struct>

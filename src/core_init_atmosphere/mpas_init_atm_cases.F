@@ -1,4 +1,5 @@
 
+
 ! Copyright (c) 2013,  Los Alamos National Security, LLC (LANS)
 ! and the University Corporation for Atmospheric Research (UCAR).
 !
@@ -2611,7 +2612,7 @@ module init_atm_cases
       integer :: nInterpPoints, ndims
 
       integer :: nfglevels_actual
-      integer, pointer :: index_qv, index_qc, index_qr, index_qi, index_qs, index_qg,index_ni, index_nc, index_nr
+      integer, pointer :: index_qv, index_qc, index_qr, index_qi, index_qs, index_qg,index_ni, index_nc, index_nr, index_ns, index_ng
 
       integer, dimension(5) :: interp_list
       real (kind=RKIND) :: maskval
@@ -2919,6 +2920,8 @@ module init_atm_cases
       call mpas_pool_get_dimension(state, 'index_nc', index_nc)
       call mpas_pool_get_dimension(state, 'index_ni', index_ni)
       call mpas_pool_get_dimension(state, 'index_nr', index_nr)
+      call mpas_pool_get_dimension(state, 'index_ns', index_ns)
+      call mpas_pool_get_dimension(state, 'index_ng', index_ng)
 
       xnutr = 0.
       zd = 12000.
@@ -4752,6 +4755,8 @@ call mpas_log_write('Done with soil consistency check')
          scalars(index_nc,:,iCell) = 0._RKIND
          scalars(index_ni,:,iCell) = 0._RKIND
          scalars(index_nr,:,iCell) = 0._RKIND
+         scalars(index_ns,:,iCell) = 0._RKIND
+         scalars(index_ng,:,iCell) = 0._RKIND
          do k = 1, nfglevels_actual
             sorted_arrQ1(1,k) = z_fg(k,iCell)
             sorted_arrQ2(1,k) = z_fg(k,iCell)
@@ -4807,6 +4812,7 @@ call mpas_log_write('Done with soil consistency check')
                                         sorted_arrQ7(:,1:nfglevels_actual-1), order=1, extrap=0)
             scalars(index_nr,k,iCell) = vertical_interp(target_z, nfglevels_actual-1, &
                                         sorted_arrQ8(:,1:nfglevels_actual-1), order=1, extrap=0)
+
          end do
 
          ! GHT
@@ -4985,7 +4991,25 @@ call mpas_log_write('Done with soil consistency check')
             rho_zz(k,iCell) = pressure(k,iCell) / rgas / (p(k,iCell) * t(k,iCell) &
                               * (1.0 + (rvord - 1.0) * scalars(index_qv,k,iCell)))
             rho_zz(k,iCell) = rho_zz(k,iCell) / (1.0 + scalars(index_qv,k,iCell))
+
          end do
+
+! Do not need to do this for initial condition because microphysics handles it on first time step?
+! Just want to get boundary conditions
+!         do k=1,nVertLevels
+!            IF ( scalars(index_qs,k,iCell) > 0.0 ) THEN
+!              ! call function to make ns
+!              IF ( scalars(index_ns,k,iCell) == 0.0 ) THEN
+!                scalars(index_ns,k,iCell) = calcnfromq(qsw=scalars(index_qs,k,iCell),dn=rho_zz(k,iCell) )
+!              ENDIF
+!            ENDIF
+!            IF ( scalars(index_qg,k,iCell) > 0.0 ) THEN
+!              IF ( scalars(index_ng,k,iCell) == 0.0 ) THEN
+!                scalars(index_ng,k,iCell) = calcnfromq(qhw=scalars(index_qg,k,iCell),dn=rho_zz(k,iCell) )
+!              ENDIF
+!              ! call function to make nh
+!            ENDIF
+!         end do
       end do
 
 
@@ -5207,7 +5231,7 @@ call mpas_log_write('Done with soil consistency check')
       integer :: nInterpPoints, ndims
 
       integer :: nfglevels_actual
-      integer, pointer :: index_qv, index_qc, index_qr, index_qi, index_qs, index_qg,index_ni, index_nc, index_nr
+      integer, pointer :: index_qv, index_qc, index_qr, index_qi, index_qs, index_qg,index_ni, index_nc, index_nr, index_ns, index_ng
 
 
       integer, dimension(5) :: interp_list
@@ -5386,6 +5410,8 @@ call mpas_log_write('Done with soil consistency check')
       call mpas_pool_get_dimension(state, 'index_nc', index_nc)
       call mpas_pool_get_dimension(state, 'index_ni', index_ni)
       call mpas_pool_get_dimension(state, 'index_nr', index_nr)
+      call mpas_pool_get_dimension(state, 'index_ns', index_ns)
+      call mpas_pool_get_dimension(state, 'index_ng', index_ng)
 
       etavs = (1.0_RKIND - 0.252_RKIND) * pii / 2.0_RKIND
       rcv = rgas / (cp - rgas)
@@ -5842,6 +5868,8 @@ call mpas_log_write('Done with soil consistency check')
          scalars(index_nc,:,iCell) = 0._RKIND
          scalars(index_ni,:,iCell) = 0._RKIND
          scalars(index_nr,:,iCell) = 0._RKIND
+         scalars(index_ns,:,iCell) = 0._RKIND
+         scalars(index_ng,:,iCell) = 0._RKIND
 
          do k = 1, nfglevels_actual
             sorted_arrQ1(1,k) = z_fg(k,iCell)
@@ -5898,6 +5926,8 @@ call mpas_log_write('Done with soil consistency check')
                                         sorted_arrQ7(:,1:nfglevels_actual-1), order=1, extrap=0)
             scalars(index_nr,k,iCell) = vertical_interp(target_z, nfglevels_actual-1, &
                                         sorted_arrQ8(:,1:nfglevels_actual-1), order=1, extrap=0)
+
+
             if (target_z < z_fg(1,iCell) .and. k < nVertLevels) then
                 scalars(index_qc,k,iCell) = scalars(index_qc,k+1,iCell)
                 scalars(index_qr,k,iCell) = scalars(index_qr,k+1,iCell)
@@ -5907,6 +5937,8 @@ call mpas_log_write('Done with soil consistency check')
                 scalars(index_nc,k,iCell) = scalars(index_nc,k+1,iCell)
                 scalars(index_ni,k,iCell) = scalars(index_ni,k+1,iCell)
                 scalars(index_nr,k,iCell) = scalars(index_nr,k+1,iCell)
+                scalars(index_ns,k,iCell) = scalars(index_ns,k+1,iCell)
+                scalars(index_ng,k,iCell) = scalars(index_ng,k+1,iCell)
             endif
          end do
 
@@ -6015,6 +6047,36 @@ call mpas_log_write('Done with soil consistency check')
             rho_zz(k,iCell) = pressure(k,iCell) / rgas / (p(k,iCell) * t(k,iCell))
             rho_zz(k,iCell) = rho_zz(k,iCell) / (1.0 + scalars(index_qv,k,iCell))
          end do
+
+         do k=1,nVertLevels
+            IF ( scalars(index_qs,k,iCell) > 0.0 ) THEN
+              ! call function to make ns
+              IF ( scalars(index_ns,k,iCell) == 0.0 ) THEN
+                scalars(index_ns,k,iCell) = calcnfromq(qsw=scalars(index_qs,k,iCell),dn=rho_zz(k,iCell) )
+              ENDIF
+            ENDIF
+            IF ( scalars(index_qg,k,iCell) > 0.0 ) THEN
+              IF ( scalars(index_ng,k,iCell) == 0.0 ) THEN
+                scalars(index_ng,k,iCell) = calcnfromq(qhw=scalars(index_qg,k,iCell),dn=rho_zz(k,iCell) )
+              ENDIF
+            ENDIF
+            IF ( scalars(index_qr,k,iCell) > 0.0 ) THEN
+              IF ( scalars(index_nr,k,iCell) == 0.0 ) THEN
+                scalars(index_nr,k,iCell) = calcnfromq(qrw=scalars(index_qr,k,iCell),dn=rho_zz(k,iCell) )
+              ENDIF
+            ENDIF
+            IF ( scalars(index_qc,k,iCell) > 0.0 ) THEN
+              IF ( scalars(index_nc,k,iCell) == 0.0 ) THEN
+                scalars(index_nc,k,iCell) = calcnfromq(qcw=scalars(index_qc,k,iCell),dn=rho_zz(k,iCell) )
+              ENDIF
+            ENDIF
+            IF ( scalars(index_qi,k,iCell) > 0.0 ) THEN
+              IF ( scalars(index_ni,k,iCell) == 0.0 ) THEN
+                scalars(index_ni,k,iCell) = calcnfromq(qci=scalars(index_qi,k,iCell),dn=rho_zz(k,iCell) )
+              ENDIF
+            ENDIF
+         end do
+
       end do
 
 
@@ -6890,6 +6952,182 @@ call mpas_log_write('Done with soil consistency check')
       ierr = 0
 
    end function read_text_array
+
+! ##############################################################################
+! ##############################################################################
+!
+!  Subroutine to calculate number concentrations from initial state that has only mixing ratio.
+!  Output N will be in #/m^3 in 'an' array, since sedimentation is done next.
+!  Output ccw,cci etc. will be in #/kg
+
+!
+! 10.27.2015: Added hail calculation
+!
+    real function calcnfromq(qcw,qrw,qci,qsw,qhw,dn )
+
+
+      implicit none
+
+
+      real(kind=RKIND), optional, intent(in) :: qcw,qrw,qci,qsw,qhw
+      real(kind=RKIND), intent(in) :: dn
+
+      real    alpha
+      real    qmin
+      real    xvmn,xvmx
+      integer ipconc
+      integer lvol ! index for volume
+      integer infall
+
+
+      integer count
+      double precision vr,q,nrx,nrx2,rd,zx,z,znew,zt,zxt,n1,laminv1
+      double precision :: zr, zs, zh, dninv
+      real, parameter :: pi = 3.141592653589793
+      real, parameter :: piinv = 1./pi
+      real, parameter :: xn0s = 3.0e6, xn0r = 8.0e6, xn0h = 2.0e5, xn0hl = 4.0e4
+      real, parameter :: xdnr = 1000., xdns = 100. ,xdnh = 700.0, xdnhl = 900.0
+      real, parameter :: zhlfac = 1./(pi*xdnhl*xn0hl)
+      real, parameter :: zhfac = 1./(pi*xdnh*xn0h)
+      real, parameter :: zrfac = 1./(pi*xdnr*xn0r)
+      real, parameter :: zsfac = 1./(pi*xdns*xn0s)
+      real, parameter :: g0 = (6.0)*(5.0)*(4.0)/((3.0)*(2.0)*(1.0))
+      real, parameter :: xims=900.*0.523599*(2.*50.e-6)**3    ! mks   (100 micron diam solid sphere approx)
+      real, parameter :: xgms=xdnh*0.523599*(300.e-6)**3    ! mks   (300 micron diam  sphere approx)
+      real, parameter :: cwmas09 = 1000.*0.523599*(2.*9.e-6)**3 ! mass of 9-micron radius droplet
+      real, parameter :: alphah = 0.0, alphahl = 1.0, snu = -0.8, alphar = 0.0
+      real, parameter :: g1h = (6.0 + alphah)*(5.0 + alphah)*(4.0 + alphah)/  &
+     &        ((3.0 + alphah)*(2.0 + alphah)*(1.0 + alphah))
+      real, parameter :: g1hl = (6.0 + alphahl)*(5.0 + alphahl)*(4.0 + alphahl)/  &
+     &        ((3.0 + alphahl)*(2.0 + alphahl)*(1.0 + alphahl))
+      real, parameter :: g1s = (snu+2.0)/(snu+1.0)
+      real, parameter :: cxmin = 1.e-11, qxmin = 1.e-12
+      real, parameter :: qccn = 0.6e9/1.225
+      real, parameter :: cwmasinv = 1./cwmas09
+      real, parameter :: g1r = (6.0 + alphar)*(5.0 + alphar)*(4.0 + alphar)/  &
+     &        ((3.0 + alphar)*(2.0 + alphar)*(1.0 + alphar))
+
+      real xv,xdn
+      integer :: ndbz, nmwgt, nnwgt, nwlessthanz
+      double precision :: mixconv, mixconvqv, qsmax,qsmax2,qsmax3,qsmax4
+      logical :: invertccn_local
+      real :: outputval
+
+! ------------------------------------------------------------------
+
+
+
+        outputval = 0.0
+        count = 0
+        qsmax = 0
+        qsmax2 = 0
+        qsmax3 = 0
+        qsmax4 = 0
+!      IF ( .not. present( qcw ) ) THEN
+
+!         qv_mp = spechum/(1.0_kind_phys-spechum)
+!         IF ( convertdry ) THEN
+!         qc_mp = qc/(1.0_kind_phys-spechum)
+
+!        IF ( .not. present( qcw ) ) THEN
+
+        !  Cloud droplets
+
+        IF ( present( qcw ) ) THEN
+          IF ( qcw >= qxmin  ) THEN
+
+            outputval = Min(qccn, qcw*cwmasinv )
+          ELSE
+            outputval = 0.0
+          ENDIF
+        ENDIF
+
+        !  Cloud ice
+
+        IF ( present( qci ) ) THEN
+          IF ( qci >= qxmin  ) THEN
+            outputval = qci/xims
+
+          ELSE
+            outputval = 0
+          ENDIF
+        ENDIF
+
+        !  rain
+
+        IF ( present( qrw ) ) THEN
+          IF ( qrw > qxmin ) THEN
+
+            q = qrw
+
+            laminv1 = (dn * q * zrfac)**(0.25)  ! inverse of slope
+
+            n1 = laminv1*xn0r  ! number concentration for inv. exponential single moment input
+
+            nrx =  n1*g1r/g0   ! number concentration for different shape parameter
+
+            outputval = nrx/dn ! *dninv ! convert to number mixing ratio
+
+          ENDIF
+        ENDIF
+
+        ! snow
+        IF ( present( qsw ) ) THEN
+          IF ( qsw > qxmin ) THEN
+
+            q = qsw
+
+            laminv1 = (dn * q * zsfac)**(0.25)  ! inverse of slope
+
+            n1 = laminv1*xn0s  ! number concentration for inv. exponential single moment input
+
+            nrx =  n1*g1s/g0   ! number concentration for different shape parameter
+
+            outputval = nrx/dn ! *dninv ! convert to number mixing ratio
+
+          ENDIF
+        ENDIF
+
+        ! graupel
+
+        IF ( present( qhw ) ) THEN
+          IF ( qhw > qxmin ) THEN
+
+            q = qhw
+
+            laminv1 = (dn * q * zhfac)**(0.25)  ! inverse of slope
+
+            n1 = laminv1*xn0h  ! number concentration for inv. exponential single moment input
+
+            nrx =  n1*g1h/g0   ! number concentration for different shape parameter
+
+            nrx2 = dn * q / xgms
+
+            nrx = Min( nrx, nrx2 )
+
+            outputval = nrx/dn ! *dninv ! convert to number mixing ratio
+
+          ENDIF
+        ENDIF
+
+
+
+
+!      ELSE
+!        write(0,*) 'calcnfromq: lv = ',lv,lc,lr,li,ls,lh,lvh,lhl,lccn,lccna
+!        write(0,*) 'calcnfromq: nx,ny,nz,na = ',nx,ny,nz,na
+!
+!      ENDIF
+
+!      IF ( present( qsw ) ) THEN
+!      write(0,*) 'calcnfromq: qsmax = ',qsmax,qsmax2,qsmax3,qsmax4
+!      ENDIF
+
+        calcnfromq = outputval
+
+        RETURN
+
+    END function calcnfromq
 
 
 end module init_atm_cases
