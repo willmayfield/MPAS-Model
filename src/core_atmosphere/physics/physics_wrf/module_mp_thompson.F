@@ -5043,22 +5043,22 @@
 
 !..Reflectivity contributed by melting graupel
 
-          if (L_qg(k) .and. L_qg(k_0) ) then
-           fmelt_g = MAX(0.05d0, MIN(1.0d0-rg(k)/rg(k_0), 0.99d0))
-           eta = 0.d0
-           lamg = 1./ilamg(k)
-           do n = 1, nrbins
-              x = am_g * xxDg(n)**bm_g
-              call rayleigh_soak_wetgraupel (x, DBLE(ocmg), DBLE(obmg), &
-     &              fmelt_g, melt_outside_g, m_w_0, m_i_0, lamda_radar, &
-     &              CBACK, mixingrulestring_g, matrixstring_g,          &
-     &              inclusionstring_g, hoststring_g,                    &
-     &              hostmatrixstring_g, hostinclusionstring_g)
-              f_d = N0_g(k)*xxDg(n)**mu_g * DEXP(-lamg*xxDg(n))
-              eta = eta + f_d * CBACK * simpson(n) * xdtg(n)
-           enddo
-           ze_graupel(k) = SNGL(lamda4 / (pi5 * K_w) * eta)
-          endif
+!          if (L_qg(k) .and. L_qg(k_0) ) then
+!           fmelt_g = MAX(0.05d0, MIN(1.0d0-rg(k)/rg(k_0), 0.99d0))
+!           eta = 0.d0
+!           lamg = 1./ilamg(k)
+!           do n = 1, nrbins
+!              x = am_g * xxDg(n)**bm_g
+!              call rayleigh_soak_wetgraupel (x, DBLE(ocmg), DBLE(obmg), &
+!     &              fmelt_g, melt_outside_g, m_w_0, m_i_0, lamda_radar, &
+!     &              CBACK, mixingrulestring_g, matrixstring_g,          &
+!     &              inclusionstring_g, hoststring_g,                    &
+!     &              hostmatrixstring_g, hostinclusionstring_g)
+!              f_d = N0_g(k)*xxDg(n)**mu_g * DEXP(-lamg*xxDg(n))
+!              eta = eta + f_d * CBACK * simpson(n) * xdtg(n)
+!           enddo
+!           ze_graupel(k) = SNGL(lamda4 / (pi5 * K_w) * eta)
+!          endif
 
        enddo
       endif
