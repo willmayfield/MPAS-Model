@@ -75,12 +75,14 @@
  character(len=StrKIND+1) :: geog_data_path      ! same as config_geog_data_path, but guaranteed to have a trailing slash
  character(len=StrKIND+1) :: geog_sub_path       ! subdirectory names in config_geog_data_path, with trailing slash
 
- integer:: ismax_lu
+ integer, pointer :: ismax_lu
+ integer, pointer :: nscat
 
  integer(c_int):: nx,ny,nz
  integer(c_int):: endian,isigned,istatus,wordsize
  integer:: i,j,k
  integer :: ii, jj
+ integer :: lu_sum
  integer:: iCell,iEdge,iVtx,iPoint,iTileStart,iTileEnd,jTileStart,jTileEnd
  integer,dimension(5) :: interp_list
  integer,dimension(:),allocatable  :: nhs
@@ -128,7 +130,9 @@
  real (kind=RKIND), dimension(:,:), pointer :: albedo12m
  real (kind=RKIND) :: msgval, fillval
  integer, dimension(:), pointer :: lu_index
+ real, dimension(:,:), pointer  :: landusef
  integer, dimension(:), pointer :: soilcat_top
+ real, dimension(:,:), pointer  :: soilf 
  integer, dimension(:), pointer :: landmask
  integer, dimension(:), pointer :: bdyMaskCell
  character(len=StrKIND), pointer :: mminlu
@@ -190,10 +194,12 @@
 
  call mpas_pool_get_array(mesh, 'ter', ter)
  call mpas_pool_get_array(mesh, 'lu_index', lu_index)
+ call mpas_pool_get_array(mesh, 'landusef', landusef)
  call mpas_pool_get_array(mesh, 'mminlu', mminlu)
  call mpas_pool_get_array(mesh, 'isice_lu', isice_lu)
  call mpas_pool_get_array(mesh, 'iswater_lu', iswater_lu)
  call mpas_pool_get_array(mesh, 'soilcat_top', soilcat_top)
+ call mpas_pool_get_array(mesh, 'soilf', soilf)
  call mpas_pool_get_array(mesh, 'landmask', landmask)
  call mpas_pool_get_array(mesh, 'soiltemp', soiltemp)
  call mpas_pool_get_array(mesh, 'snoalb', snoalb)
@@ -209,6 +215,8 @@
  call mpas_pool_get_dimension(dims, 'nEdges', nEdges)
  call mpas_pool_get_dimension(dims, 'nVertices', nVertices)
  call mpas_pool_get_dimension(dims, 'maxEdges', maxEdges)
+ call mpas_pool_get_dimension(dims, 'nlcat',ismax_lu)
+ call mpas_pool_get_dimension(dims, 'nscat', nscat)
 
  xCell = xCell * sphere_radius
  yCell = yCell * sphere_radius
@@ -251,12 +259,12 @@
     case('USGS')
        isice_lu = 24
        iswater_lu = 16
-       ismax_lu = 24
+       !ismax_lu = 24
        write(mminlu,'(a)') 'USGS'
     case('MODIFIED_IGBP_MODIS_NOAH')
        isice_lu = 15
        iswater_lu = 17
-       ismax_lu = 20
+       !ismax_lu = 20
        write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
     case default
          call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
@@ -398,6 +406,7 @@
  allocate(ncat(ismax_lu,nCells))
  ncat(:,:) = 0
  lu_index(:) = 0.0
+ landusef(:,:) = 0.0
 
  rarray_ptr = c_loc(rarray)
 
@@ -461,11 +470,14 @@ if (rarray(i,j,1) == 0) cycle
 
  do iCell = 1,nCells
     lu_index(iCell) = 1
+    lu_sum = ncat(1,iCell)
     do i = 2,ismax_lu
        if(ncat(i,iCell) > ncat(lu_index(iCell),iCell)) then
           lu_index(iCell) = i
        end if
+       lu_sum = lu_sum + ncat(i,iCell)
     end do
+    landusef(:,iCell) = ncat(:,iCell) / real(lu_sum)
  end do
  deallocate(rarray)
  deallocate(ncat)
@@ -483,9 +495,10 @@ if (rarray(i,j,1) == 0) cycle
  wordsize    = 1
  scalefactor = 1.0
  allocate(rarray(nx,ny,nz))
- allocate(ncat(16,nCells))
+ allocate(ncat(nscat,nCells))
  ncat(:,:) = 0
  soilcat_top(:) = 0.0
+ soilf(:,:) = 0.0
 
  rarray_ptr = c_loc(rarray)
 
@@ -544,11 +557,14 @@ if (rarray(i,j,1) == 0) cycle
 
  do iCell = 1,nCells
     soilcat_top(iCell) = 1
-    do i = 2,16
+    lu_sum = ncat(1,iCell)
+    do i = 2,nscat
        if(ncat(i,iCell) > ncat(soilcat_top(iCell),iCell)) then
           soilcat_top(iCell) = i
        end if
+       lu_sum = lu_sum + ncat(i,iCell)
     end do
+    soilf(:,iCell) = ncat(:,iCell) / real(lu_sum)
  end do
  deallocate(rarray)
  deallocate(ncat)

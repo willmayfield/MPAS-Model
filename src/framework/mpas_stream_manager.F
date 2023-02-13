@@ -137,7 +137,7 @@ module mpas_stream_manager
            manager % allStructs => allStructs
            manager % streamClock => clock
            manager % numStreams = 0
-           manager % errorLevel = MPAS_STREAM_ERR_SILENT
+           manager % errorLevel = MPAS_STREAM_ERR_WARN
 
            !
            ! Set up linked list of streams

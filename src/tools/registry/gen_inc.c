@@ -556,9 +556,11 @@ int parse_namelist_records_from_registry(ezxml_t registry)/*{{{*/
 	fortprintf(fd2, "\n");
 	fortprintf(fd2, "      iErr = 0\n");
 	fortprintf(fd2, "      unitNumber = 21\n");
+	fortprintf(fd2, "      print*, 'Read namelist from file '//trim(namelistFilename)\n");
 	fortprintf(fd2, "      call mpas_log_write('Reading namelist from file '//trim(namelistFilename))\n");
 	fortprintf(fd2, "      inquire(file=trim(namelistFilename), exist=nmlExists)\n");
 	fortprintf(fd2, "      if ( .not. nmlExists ) then\n");
+	fortprintf(fd2, "         print*, 'ERROR: Namelist file '//trim(namelistFilename)//' does not exist.'\n");
 	fortprintf(fd2, "         call mpas_dmpar_global_abort('ERROR: Namelist file '//trim(namelistFilename)//' does not exist.')\n");
 	fortprintf(fd2, "      end if\n");
 	fortprintf(fd2, "      open(unitNumber,file=trim(namelistFilename),status='old',form='formatted')\n");

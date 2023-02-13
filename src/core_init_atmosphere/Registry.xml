@@ -40,6 +40,10 @@
                      description="The number of atmospheric levels, always one more than the number of layers"/>
                 <dim name="nMonths" definition="namelist:config_months"
                      description="The number of months in a year"/>
+		<dim name="nlcat" definition="namelist:config_nlandcat" 
+                     description="The number of landuse categories used in the land surface model"/>
+		<dim name="nscat" definition="namelist:config_nsoilcat"
+                     description="The number of soil categories used in the land surface model"/>
         </dims>
 
 
@@ -121,6 +125,14 @@
                      units="-"
                      description="The number of months in a year"
                      possible_values="Positive integer values"/>
+		<nml_option name="config_nlandcat"              type="integer"       default_value="20"
+		     units='-'
+		     description="The number of landuse categories used by the LSM. 20 with USGS landuse data, 24 with MODIFIED_IGBP_MODIS_NOAH"
+		     possible_values="24 or 40"/>
+		<nml_option name="config_nsoilcat"              type="integer"       default_value="16"
+                     units='-'
+                     description="The number of landuse categories used by the LSM."
+                     possible_values="16"/> 
 
         </nml_record>
 
@@ -742,11 +754,17 @@
                 <var name="ivgtyp" name_in_code="lu_index" type="integer"  dimensions="nCells" units="unitless"
                      description="dominant vegetation category"/>
 
+		<var name="landusef" name_in_code="landusef" type="real"  dimensions="nlcat nCells" units="unitless"
+                     description="fraction of each landuse category present in each cell"/>
+
                 <var name="mminlu" type="text" dimensions="" units="unitless"
                      description="land use classification"/>
 
                 <var name="isltyp" name_in_code="soilcat_top"  type="integer"  dimensions="nCells" units="unitless"
                      description="dominate soil category"/>
+
+		<var name="soilf" name_in_code="soilf" type="real"  dimensions="nscat nCells" units="unitless"
+                     description="fraction of each soil type present in each cell"/>
 
                 <var name="snoalb" type="real" dimensions="nCells" units="unitless"
                      description="annual maximum snow albedo"/>

@@ -547,7 +547,7 @@ module atm_core
          end do
       end if
       call mpas_atm_diag_reset()
-      call mpas_atm_diag_update()
+      call mpas_atm_diag_update(domain % streamManager,dt)
       call mpas_atm_diag_compute()
 
       call mpas_dmpar_get_time(diag_stop_time)
@@ -697,7 +697,7 @@ module atm_core
            end do
          end if
 
-         call mpas_atm_diag_update()
+         call mpas_atm_diag_update(domain % streamManager,dt)
          call mpas_atm_diag_compute()
          call mpas_dmpar_get_time(diag_stop_time)
 

@@ -628,7 +628,7 @@
 !local pointers:
  character(len=StrKIND),pointer:: microp_scheme
  real(kind=RKIND),dimension(:),pointer:: refl10cm_max,refl10cm_1km,refl10cm_1km_max
-
+ real(kind=RKIND),dimension(:,:),pointer :: refl10cm
 !local variables and arrays:
  integer:: i,j,k,kp
  real(kind=RKIND),dimension(:),allocatable:: qv1d,qc1d,qr1d,qs1d,qg1d,t1d,p1d,nr1d,dBZ1d,zp
@@ -638,6 +638,7 @@
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
 
+ call mpas_pool_get_array(diag_physics,'refl10cm',refl10cm)
  call mpas_pool_get_array(diag_physics,'refl10cm_max',refl10cm_max)
  call mpas_pool_get_array(diag_physics,'refl10cm_1km',refl10cm_1km)
  call mpas_pool_get_array(diag_physics,'refl10cm_1km_max',refl10cm_1km_max)
@@ -728,6 +729,7 @@
           do k = kts,kte
              dBZ1d(k) = max(-35._RKIND,dBZ1d(k))
              if(zp(k) .lt. 1000.) kp = k
+             refl10cm(i,k) = dBZ1d(k) 
           enddo
           refl10cm_max(i) = maxval(dBZ1d(:))
           w1 = (zp(kp+1)-1000.)/(zp(kp+1)-zp(kp))
