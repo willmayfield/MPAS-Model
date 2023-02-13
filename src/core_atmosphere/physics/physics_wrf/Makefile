@@ -18,6 +18,7 @@ OBJS = \
 	module_cu_ntiedtke.o           \
 	module_cu_kfeta.o              \
 	module_mp_kessler.o            \
+	module_mp_nssl_2mom.o          \
 	module_mp_radar.o              \
 	module_mp_thompson.o           \
 	module_mp_thompson_cldfra3.o   \
@@ -105,7 +106,7 @@ clean:
 .F.o:
 ifeq "$(GEN_F90)" "true"
 	$(CPP) $(CPPFLAGS) $(COREDEF) $(CPPINCLUDES) $< > $*.f90
-	$(FC) $(FFLAGS) -c $*.f90 $(FCINCLUDES) -I.. -I../../../framework -I../../../external/esmf_time_f90
+	$(FC) $(FFLAGS) -c $*.f90 $(FCINCLUDES) -I.. -I../../../framework -I../../../external/esmf_time_f90 -I../../../external/SMIOL
 else
-	$(FC) $(CPPFLAGS) $(COREDEF) $(FFLAGS) -c $*.F $(CPPINCLUDES) $(FCINCLUDES) -I.. -I../../../framework -I../../../external/esmf_time_f90
+	$(FC) $(CPPFLAGS) $(COREDEF) $(FFLAGS) -c $*.F $(CPPINCLUDES) $(FCINCLUDES) -I.. -I../../../framework -I../../../external/esmf_time_f90 -I../../../external/SMIOL
 endif
