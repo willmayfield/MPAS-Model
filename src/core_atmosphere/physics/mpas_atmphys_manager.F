@@ -229,7 +229,7 @@
     if(mpas_is_alarm_ringing(clock,greenAlarmID,ierr=ierr)) then
        call mpas_reset_clock_alarm(clock,greenAlarmID,ierr=ierr)
        call mpas_log_write('--- time to update background surface albedo, greeness fraction.')
-       call physics_update_surface(timeStamp,config_sfc_albedo,mesh,sfc_input)
+       call physics_update_surface(timeStamp,config_sfc_albedo,mesh,sfc_input,diag_physics)
     endif
 
     !update surface boundary conditions with input sea-surface temperatures and fractional

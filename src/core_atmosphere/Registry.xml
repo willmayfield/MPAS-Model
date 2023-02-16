@@ -46,6 +46,10 @@
                      description="dimension of CAM radiation absorption save array"/>
                 <dim name="nVertLevelsP2"      definition="nVertLevels+2"
                      description="Two more than the number of atmospheric layers"/>
+		<dim name="nlcat"
+		    description="Number of landuse categories in the input data"/>
+		<dim name="nscat"
+                    description="Number of soil categories in the input data"/>
         </dims>
 
 
@@ -486,7 +490,9 @@
 			<var name="theta_base"/>
 			<var name="surface_pressure"/>
 			<var name="isltyp"/>
+			<var name="soilf"/>
 			<var name="ivgtyp"/>
+			<var name="landusef"/>
 			<var name="mminlu"/>
 			<var name="isice_lu"/>
 			<var name="iswater_lu"/>
@@ -496,6 +502,7 @@
 			<var name="snoalb"/>
 			<var name="albedo12m"/>
 			<var name="greenfrac"/>
+			<var name="lai"/>
 			<var name="sfc_albbck"/>
 			<var name="skintemp"/>
 			<var name="snow"/>
@@ -3111,9 +3118,15 @@
 
                 <var name="isltyp" type="integer" dimensions="nCells" units="unitless"
                      description="dominant soil category"/>
+	
+		<var name="soilf" type="real" dimensions="nscat nCells" units="unitless"
+                     description="fraction of each soil category present"/>
 
                 <var name="ivgtyp" type="integer" dimensions="nCells" units="unitless"
                      description="dominant vegetation category"/>
+
+		<var name="landusef" type="real" dimensions="nlcat nCells" units="unitless"
+		     description="fraction of each vegetation category present"/>
 
                 <var name="mminlu" type="text" dimensions="" units="unitless"
                      description="land use classification"/>
@@ -3141,6 +3154,9 @@
 
                 <var name="albedo12m" type="real" dimensions="nMonths nCells" units="unitless"
                      description="monthly-mean climatological surface albedo"/>
+
+		<var name="lai12m" type="real" dimensions="nMonths nCells" units="unitless"
+                     description="monthly-mean climatological leaf area index"/>
 
                 <var name="greenfrac" type="real" dimensions="nMonths nCells" units="unitless"
                      description="monthly-mean climatological greeness fraction"/>
