@@ -55,9 +55,6 @@ module convective_diagnostics
     logical :: is_needed_lml_wsp_max
     logical :: is_needed_wind02_max
     logical :: is_needed_wind02_integral_max
-    logical :: is_needed_prec_acc_c
-    logical :: is_needed_prec_acc_nc
-    logical :: is_needed_snow_acc_nc
     logical :: do_any_uh, do_any_diags 
 
     contains
@@ -118,9 +115,6 @@ module convective_diagnostics
         is_needed_lml_wsp_max = .false.
         is_needed_wind02_max  = .false.
         is_needed_wind02_integral_max = .false.
-        is_needed_prec_acc_c = .false.
-        is_needed_prec_acc_nc = .false.
-        is_needed_snow_acc_nc = .false.
         do_any_uh = .false.
         do_any_diags = .false.
         ! - UH Variables
@@ -221,22 +215,7 @@ module convective_diagnostics
          if (mpas_stream_inclusion_count('w_velocity_mean', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_w_mean = .true.
         end if
-
-        ! - Precipitation accumulation
-        if (mpas_stream_inclusion_count('prec_acc_c', direction=MPAS_STREAM_OUTPUT) > 0) then
-            is_needed_prec_acc_c = .true.
-        endif
-        do_any_diags = do_any_diags .or. is_needed_prec_acc_c
-
-        if (mpas_stream_inclusion_count('prec_acc_nc', direction=MPAS_STREAM_OUTPUT) > 0) then
-            is_needed_prec_acc_nc = .true.
-        endif
-        do_any_diags = do_any_diags .or. is_needed_prec_acc_nc
-
-        if (mpas_stream_inclusion_count('snow_acc_nc', direction=MPAS_STREAM_OUTPUT) > 0) then
-            is_needed_snow_acc_nc = .true.
-        endif
-        do_any_diags = do_any_diags .or. is_needed_snow_acc_nc
+        do_any_diags = do_any_diags .or. is_needed_w_mean
 
 
         ! - Horizontal wind speed
@@ -342,10 +321,8 @@ module convective_diagnostics
         real (kind=RKIND), dimension(:), pointer :: updraft_helicity_min_03
         real (kind=RKIND), dimension(:,:), pointer :: uzonal, umeridional
         real (kind=RKIND), dimension(:,:), pointer :: pressure_base, pressure_p
-        real (kind=RKIND), dimension(:), pointer :: u10m, v10m, t2m
+        real (kind=RKIND), dimension(:), pointer :: u10m, v10m
         real (kind=RKIND), dimension(:,:), pointer :: refl10cm
-        real (kind=RKIND), dimension(:), pointer :: rainncv, snowncv, graupelncv
-        real (kind=RKIND), dimension(:), pointer :: prec_acc_c, prec_acc_nc, snow_acc_nc
         real (kind=RKIND) :: uph, pb, pt
 
         type (MPAS_timeinterval_type) :: dt_interval, diag_interval, extra
@@ -402,16 +379,8 @@ module convective_diagnostics
             call mpas_pool_get_array(diag_physics, 'refl10cm', refl10cm)
             call mpas_pool_get_array(diag_physics, 'u10', u10m)
             call mpas_pool_get_array(diag_physics, 'v10', v10m)
-            call mpas_pool_get_array(diag_physics, 't2m', t2m)
-            call mpas_pool_get_array(diag_physics, 'rainncv', rainncv)
-            call mpas_pool_get_array(diag_physics, 'snowncv', snowncv)
-            call mpas_pool_get_array(diag_physics, 'graupelncv', graupelncv)
-
             call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
             call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
-            call mpas_pool_get_array(diag, 'prec_acc_c', prec_acc_c)
-            call mpas_pool_get_array(diag, 'prec_acc_nc', prec_acc_nc)
-            call mpas_pool_get_array(diag, 'snow_acc_nc', snow_acc_nc)
 
             call mpas_pool_get_array(state, 'w', w, 1)
 
@@ -499,27 +468,6 @@ module convective_diagnostics
                   wind_speed_level1_max(iCell) = max(wind_speed_level1_max(iCell), sqrt(uzonal(1,iCell)**2+umeridional(1,iCell)**2))
                 end do
             end if
-
-            if (is_needed_prec_acc_c .or. is_needed_prec_acc_nc .or. is_needed_snow_acc_nc) then
-                do iCell=1, nCellsSolve
-                    if (is_needed_prec_acc_c) then
-                        prec_acc_c(iCell)  = prec_acc_c(iCell)  +  rainncv(iCell)
-                        prec_acc_c(iCell)  = MAX (prec_acc_c(iCell), 0.0)
-                    endif
-                    if (is_needed_prec_acc_nc) then
-                        prec_acc_nc(iCell) = prec_acc_nc(iCell) + rainncv(iCell)
-                        prec_acc_nc(iCell) = MAX (prec_acc_nc(iCell), 0.0)
-                    endif
-                    if (is_needed_snow_acc_nc) then
-                        snow_acc_nc(iCell)   = snow_acc_nc(iCell) + snowncv(iCell)
-               ! add convective precip to snow bucket if t2m < 273.15
-                        IF ( t2m(iCell) .lt. 273.15 ) THEN
-                          snow_acc_nc(iCell)   = snow_acc_nc(iCell) +  rainncv(iCell)
-                          snow_acc_nc(iCell)   = MAX (snow_acc_nc(iCell), 0.0)
-                        ENDIF
-                    endif
-                enddo
-            endif
 
             if (do_any_uh) then
                 allocate(updraft_helicity(nVertLevels,nCells+1))
@@ -942,7 +890,6 @@ module convective_diagnostics
         real (kind=RKIND), dimension(:), pointer :: updraft_helicity_min05_15
         real (kind=RKIND), dimension(:), pointer :: updraft_helicity_min_02
         real (kind=RKIND), dimension(:), pointer :: updraft_helicity_min_03
-        real (kind=RKIND), dimension(:), pointer :: prec_acc_c, prec_acc_nc, snow_acc_nc
 
         if (MPAS_field_will_be_written('updraft_helicity_max')) then
             call mpas_pool_get_array(diag, 'updraft_helicity_max', updraft_helicity_max)
@@ -1040,18 +987,6 @@ module convective_diagnostics
             call mpas_pool_get_array(diag, 'v10m_mean', v10m_mean)
             v10m_mean(:) = 0.
         end if
-        if (MPAS_field_will_be_written('prec_acc_nc')) then
-            call mpas_pool_get_array(diag, 'prec_acc_nc', prec_acc_nc)
-            prec_acc_nc(:) = 0.
-        endif
-         if (MPAS_field_will_be_written('prec_acc_c')) then
-            call mpas_pool_get_array(diag, 'prec_acc_c', prec_acc_c)
-            prec_acc_c(:) = 0.
-        endif
-         if (MPAS_field_will_be_written('snow_acc_nc')) then
-            call mpas_pool_get_array(diag, 'snow_acc_nc', snow_acc_nc)
-            snow_acc_nc(:) = 0.
-        endif
 
     end subroutine convective_diagnostics_reset
 

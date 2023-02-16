@@ -117,15 +117,5 @@
 
         <var name="v10m_mean"  type="real"     dimensions="nCells Time" units="m s^{-1}"
              description="Mean 10 m meridional wind speed since last output"/>
-
-	<var name="prec_acc_nc"  type="real"   dimensions="nCells Time" units="mm"
-	     description="Accumulated grid scale precipitation over prec_acc_dt periods of time"/>
-
-	<var name="prec_acc_c"  type="real"   dimensions="nCells Time" units="mm"
-	    description="Accumulated cumulus precipitation over prec_acc_dt periods of time"/>
-
-	<var name="snow_acc_nc"  type="real"  dimensions="nCells Time"  units="mm"
-	    description="Accumulated snow water equivalent over prec_acc_dt periods of time"/>
-
 </var_struct>
 
