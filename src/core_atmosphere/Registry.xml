@@ -394,6 +394,7 @@
                 <package name="cu_tiedtke_in" description="parameterization of Tiedtke convection."/>
                 <package name="bl_ysu_in" description="parameterization of YSU Planetary Boundary Layer."/>
                 <package name="bl_mynn_in" description="parameterization of MYNN Planetary Boundary Layer."/>
+                <package name="lsm_ruc_in" description="parameterization of the RUC land surface."/>
 
                 <package name="iau" description="Incremental Analysis Update"/>
                 <package name="limited_area" description="Limited-area simulations, which have lateral boundaries"/>
@@ -788,6 +789,16 @@
 			<var name="xicem"/>
 			<var name="z0"/>
 			<var name="zs"/>
+			<var name="rhosnf"/>
+                        <var name="precipfr"/>
+                        <var name="qsg"/>
+                        <var name="qvg"/>
+                        <var name="dew"/>
+                        <var name="soilt1"/>
+                        <var name="tsnav"/>
+                        <var name="acrunoff"/>
+                        <var name="snowfallac"/>
+                        <var name="smfr3d"/>
 			<var name="k22_shallow"/>
 			<var name="kbcon_shallow"/>
 			<var name="ktop_shallow"/>
@@ -983,6 +994,11 @@
 			<var name="sh2o"/>
 			<var name="smois"/>
 			<var name="tslb"/>
+			<var name="soilt1"/>
+			<var name="rhosnf"/>
+			<var name="snowfallac"/>
+			<var name="acrunoff"/>
+
 		</stream>
 
 		<stream name="diagnostics"
@@ -2254,11 +2270,11 @@
 
                 <var name="snowncv" type="real" dimensions="nCells Time" units="mm"
                      description="time-step grid-scale precipitation of snow"
-                     packages="mp_thompson_in;mp_wsm6_in;mp_nssl2m_in"/>
+                     packages="mp_thompson_in;mp_wsm6_in;mp_nssl2m_in;lsm_ruc_in"/>
 
                 <var name="graupelncv" type="real" dimensions="nCells Time" units="mm"
                      description="time-step grid-scale precipitation of graupel"
-                     packages="mp_thompson_in;mp_wsm6_in;mp_nssl2m_in"/>
+                     packages="mp_thompson_in;mp_wsm6_in;mp_nssl2m_in;lsm_ruc_in"/>
 
                 <var name="rainnc" type="real" dimensions="nCells Time" units="mm"
                      description="accumulated total grid-scale precipitation"
@@ -2545,11 +2561,11 @@
 
                 <var name="flhc" type="real" dimensions="nCells Time" units="W m^{-2} K^{-1}"
                      description="exchange coefficient for heat"
-                     packages="bl_mynn_in;bl_ysu_in"/>
+                     packages="bl_mynn_in;bl_ysu_in;lsm_ruc_in"/>
 
                 <var name="flqc" type="real" dimensions="nCells Time" units="kg m^{-2} s^{-1}"
                      description="exchange coefficient for moisture"
-                     packages="bl_mynn_in;bl_ysu_in"/>
+                     packages="bl_mynn_in;bl_ysu_in;lsm_ruc_in"/>
 
                 <var name="gz1oz0" type="real" dimensions="nCells Time" units="unitless"
                      description="log(z/z0) where z0 is roughness length"
@@ -2601,7 +2617,7 @@
 
                 <var name="qcg" type="real" dimensions="nCells Time" units="kg kg^{-1}"
                      description="cloud water mixing ratio at the ground surface"
-                     packages="bl_mynn_in"/>
+                     packages="bl_mynn_in;lsm_ruc_in"/>
 
                 <var name="sh3d" type="real" dimensions="nVertLevels nCells Time" units="unitless"
                      description="stability function for heat"
@@ -2969,6 +2985,46 @@
 
                 <var name="zs" type="real" dimensions="nCells Time" units="m"
                      description="depth of centers of soil layers"/>
+
+		<var name="rhosnf" type="real" dimensions="nCells Time" units="kg m^{-3}"
+		    description="density of snowfall"
+		    packages="lsm_ruc_in"/>
+
+		<var name="precipfr" type="real" dimensions="nCells Time" units="mm"
+                    description="time step water equivalent of frozen precipitation"
+                    packages="lsm_ruc_in"/>
+
+		<var name="qsg" type="real" dimensions="nCells Time" units="kg kg^{-1}"
+                    description="saturated mixing ratio at the surface"
+                    packages="lsm_ruc_in"/>
+
+                <var name="qvg" type="real" dimensions="nCells Time" units="kg kg^{-1}"
+                    description="water vapor mixing ratio at the surface"
+                    packages="lsm_ruc_in"/>
+
+                <var name="dew" type="real" dimensions="nCells Time" units="kg m^{-2}"
+                    description="dew"
+                    packages="lsm_ruc_in"/>
+
+                <var name="soilt1" type="real" dimensions="nCells Time" units="K"
+                    description="snow temperature at 7.5cm depth"
+                    packages="lsm_ruc_in"/>
+
+                <var name="tsnav" type="real" dimensions="nCells Time" units="C"
+                    description="average temperature of snowpack"
+                    packages="lsm_ruc_in"/>
+
+                <var name="acrunoff" type="real" dimensions="nCells Time" units="kg m^{-2}"
+                    description="run total accumulated runoff"
+                    packages="lsm_ruc_in"/>
+
+                <var name="snowfallac" type="real" dimensions="nCells Time" units="mm"
+                    description="run total snowfall accumulated taking in to account melting"
+                    packages="lsm_ruc_in"/>
+
+                <var name="smfr3d" type="real" dimensions="nSoilLevels nCells Time" units=""
+                    description="fraction frozen soil moisture"
+                    packages="lsm_ruc_in"/>
 
                 <!-- ================================================================================================== -->
                 <!-- ... PARAMETERIZATION OF THE 1D OCEAN MIXED LAYER                                                   -->

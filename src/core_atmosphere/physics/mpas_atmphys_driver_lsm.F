@@ -108,10 +108,10 @@
 
 
 !=================================================================================================================
- subroutine allocate_lsm(config_frac_seaice)
+ subroutine allocate_lsm(config_frac_seaice,config_lsm_scheme)
 !=================================================================================================================
-
- logical,intent(in):: config_frac_seaice
+ logical,intent(in)                         :: config_frac_seaice
+ character(len=StrKIND),pointer, intent(in) :: config_lsm_scheme
 !-----------------------------------------------------------------------------------------------------------------
 
 !arrays for soil layer properties:
@@ -193,13 +193,37 @@
     if(.not.allocated(snowsi_p)  ) allocate(snowsi_p(ims:ime,jms:jme)  )
  endif
 
+ if(config_lsm_scheme=='ruc') then
+    if(.not.allocated(rhosnf_p)   )  allocate(rhosnf_p(ims:ime,jms:jme)    )
+    if(.not.allocated(precipfr_p) )  allocate(precipfr_p(ims:ime,jms:jme)  )
+    if(.not.allocated(qcg_p)      )  allocate(qcg_p(ims:ime,jms:jme)       )
+    if(.not.allocated(qsg_p)      )  allocate(qsg_p(ims:ime,jms:jme)       )
+    if(.not.allocated(qvg_p)      )  allocate(qvg_p(ims:ime,jms:jme)       )
+    if(.not.allocated(dew_p)      )  allocate(dew_p(ims:ime,jms:jme)       )
+    if(.not.allocated(soilt1_p)   )  allocate(soilt1_p(ims:ime,jms:jme)    )
+    if(.not.allocated(tsnav_p)    )  allocate(tsnav_p(ims:ime,jms:jme)     )
+    if(.not.allocated(acrunoff_p) )  allocate(acrunoff_p(ims:ime,jms:jme) )
+    if(.not.allocated(snowfallac_p)) allocate(snowfallac_p(ims:ime,jms:jme))
+    if(.not.allocated(graupelncv_p)) allocate(graupelncv_p(ims:ime,jms:jme))
+    if(.not.allocated(snowncv_p)  )  allocate(snowncv_p(ims:ime,jms:jme)   )
+    if(.not.allocated(rainncv_p)  )  allocate(rainncv_p(ims:ime,jms:jme)   )
+    if(.not.allocated(flqc_p)     )  allocate(flqc_p(ims:ime,jms:jme)      )
+    if(.not.allocated(flhc_p)     )  allocate(flhc_p(ims:ime,jms:jme)      )
+
+    if(.not.allocated(smfr3d_p)   )  allocate(smfr3d_p(ims:ime,1:num_soils,jms:jme)       )
+    if(.not.allocated(landusef_p) )  allocate(landusef_p(ims:ime,1:num_landcat,jms:jme)   )
+    if(.not.allocated(soilf_p)    )  allocate(soilf_p(ims:ime,1:num_soilcat,jms:jme)      )
+ endif
+
  end subroutine allocate_lsm
 
 !=================================================================================================================
- subroutine deallocate_lsm(config_frac_seaice)
+ subroutine deallocate_lsm(config_frac_seaice,config_lsm_scheme)
 !=================================================================================================================
 
- logical,intent(in):: config_frac_seaice
+ logical,intent(in)                         :: config_frac_seaice
+ character(len=StrKIND),pointer, intent(in) :: config_lsm_scheme
+
 !-----------------------------------------------------------------------------------------------------------------
 
 !arrays for soil layer properties:
@@ -288,6 +312,26 @@
     if(allocated(albsi_p)   ) deallocate(albsi_p   )
     if(allocated(icedepth_p)) deallocate(icedepth_p)
     if(allocated(snowsi_p)  ) deallocate(snowsi_p  )
+ endif
+
+ if (config_lsm_scheme == "ruc") then
+    if(allocated(rhosnf_p)    ) deallocate(rhosnf_p    )
+    if(allocated(precipfr_p)  ) deallocate(precipfr_p  )
+    if(allocated(qsg_p)       ) deallocate(qsg_p       )
+    if(allocated(qvg_p)       ) deallocate(qvg_p       )
+    if(allocated(qcg_p)       ) deallocate(qcg_p       )
+    if(allocated(dew_p)       ) deallocate(dew_p       )
+    if(allocated(soilt1_p)    ) deallocate(soilt1_p    )
+    if(allocated(tsnav_p)     ) deallocate(tsnav_p     )
+    if(allocated(acrunoff_p)  ) deallocate(acrunoff_p  )
+    if(allocated(smfr3d_p)    ) deallocate(smfr3d_p    )
+    if(allocated(graupelncv_p)) deallocate(graupelncv_p)
+    if(allocated(snowncv_p)   ) deallocate(snowncv_p   )
+    if(allocated(rainncv_p)   ) deallocate(rainncv_p   )
+    if(allocated(flqc_p)      ) deallocate(flqc_p      )
+    if(allocated(flhc_p)      ) deallocate(flhc_p      )
+    if(allocated(landusef_p)  ) deallocate(landusef_p  )
+    if(allocated(soilf_p)     ) deallocate(soilf_p     )
  endif
 
  end subroutine deallocate_lsm

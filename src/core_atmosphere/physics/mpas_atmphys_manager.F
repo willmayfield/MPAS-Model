@@ -404,7 +404,7 @@
  integer,pointer:: cam_dim1
  integer,pointer:: nMonths
  integer,pointer:: nAerosols,nAerLevels,nOznLevels
- integer,pointer:: nCellsSolve,nSoilLevels,nVertLevels
+ integer,pointer:: nCellsSolve,nSoilLevels,nVertLevels,nlcat,nscat
 
  real(kind=RKIND),pointer:: config_dt
 
@@ -446,7 +446,8 @@
  call mpas_pool_get_dimension(mesh,'nCellsSolve',nCellsSolve)
  call mpas_pool_get_dimension(mesh,'nSoilLevels',nSoilLevels)
  call mpas_pool_get_dimension(mesh,'nVertLevels',nVertLevels)
-
+ call mpas_pool_get_dimension(mesh,'nlcat'      ,nlcat      )
+ call mpas_pool_get_dimension(mesh,'nscat'      , nscat     )
  call mpas_pool_get_dimension(state,'num_aerosols',nAerosols)
 
 !initialization of gmt, julian day, and alarms:
@@ -671,6 +672,8 @@
 !initialization local physics variables:
  num_months = nMonths
  num_soils  = nSoilLevels
+ num_landcat = nlcat
+ num_soilcat = nscat
 
  if(trim(config_lsm_scheme) .eq. "noah") sf_surface_physics = 2 
 
