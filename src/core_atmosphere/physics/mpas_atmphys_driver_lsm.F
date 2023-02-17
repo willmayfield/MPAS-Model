@@ -351,7 +351,8 @@
  logical,pointer:: config_frac_seaice
 
  character(len=StrKIND),pointer:: config_microp_scheme,    &
-                                  config_convection_scheme
+                                  config_convection_scheme, &
+                                  config_lsm_scheme
 
  integer,dimension(:),pointer:: isltyp,ivgtyp
 
@@ -360,11 +361,14 @@
                                            br,sfc_albedo,sfc_albedo_seaice,sfc_emibck,sfc_emiss, &
                                            sfcrunoff,smstav,smstot,snotime,snopcx,sr,udrunoff,   &
                                            z0,znt
+  real(kind=RKIND),dimension(:),pointer  :: rhosnf,precipfr,qsg,qvg,dew,soilt1,tsnav,acrunoff,   &
+                                           snowfallac,graupelncv,snowncv,qcg,                    &
+                                           flqc,flhc
  real(kind=RKIND),dimension(:),pointer  :: shdmin,shdmax,snoalb,sfc_albbck,snow,snowc,snowh,tmn, &
                                            skintemp,vegfra,xice,xland
  real(kind=RKIND),dimension(:),pointer  :: t2m,th2m,q2
  real(kind=RKIND),dimension(:),pointer  :: raincv,rainncv
- real(kind=RKIND),dimension(:,:),pointer:: sh2o,smcrel,smois,tslb,dzs
+ real(kind=RKIND),dimension(:,:),pointer:: sh2o,smcrel,smois,tslb,dzs,smfr3d,landusef,soilf
 
 !local variables and arrays:
  logical:: do_fill
@@ -376,6 +380,7 @@
  call mpas_pool_get_config(configs,'config_frac_seaice'      ,config_frac_seaice      )
  call mpas_pool_get_config(configs,'config_convection_scheme',config_convection_scheme)
  call mpas_pool_get_config(configs,'config_microp_scheme'    ,config_microp_scheme    )
+ call mpas_pool_get_config(configs,'config_lsm_scheme'       ,config_lsm_scheme       )
 
  call mpas_pool_get_array(diag_physics,'acsnom'           ,acsnom           )
  call mpas_pool_get_array(diag_physics,'acsnow'           ,acsnow           )
@@ -412,6 +417,24 @@
  call mpas_pool_get_array(diag_physics,'t2m'              ,t2m              )
  call mpas_pool_get_array(diag_physics,'th2m'             ,th2m             )
  call mpas_pool_get_array(diag_physics,'q2'               ,q2               )
+ if (config_lsm_scheme .eq. "ruc") then
+   call mpas_pool_get_array(diag_physics,'rhosnf'         ,rhosnf           )
+   call mpas_pool_get_array(diag_physics,'precipfr'       ,precipfr         )
+   call mpas_pool_get_array(diag_physics,'qsg'            ,qsg              )
+   call mpas_pool_get_array(diag_physics,'qvg'            ,qvg              )
+   call mpas_pool_get_array(diag_physics,'dew'            ,dew              )
+   call mpas_pool_get_array(diag_physics,'soilt1'         ,soilt1           )
+   call mpas_pool_get_array(diag_physics,'tsnav'          ,tsnav            )
+   call mpas_pool_get_array(diag_physics,'acrunoff'       ,acrunoff         )
+   call mpas_pool_get_array(diag_physics,'snowfallac'     ,snowfallac       )
+   call mpas_pool_get_array(diag_physics,'smfr3d'         ,smfr3d           )
+   call mpas_pool_get_array(diag_physics,'graupelncv'     ,graupelncv       )
+   call mpas_pool_get_array(diag_physics,'snowncv'        ,snowncv          )
+   call mpas_pool_get_array(diag_physics,'rainncv'        ,rainncv          )
+   call mpas_pool_get_array(diag_physics,'qcg'            ,qsg              )
+   call mpas_pool_get_array(diag_physics,'flqc'           ,flqc             )
+   call mpas_pool_get_array(diag_physics,'flhc'           ,flhc             )
+ endif
 
  call mpas_pool_get_array(sfc_input,'isltyp'    ,isltyp    )
  call mpas_pool_get_array(sfc_input,'ivgtyp'    ,ivgtyp    )
@@ -432,6 +455,10 @@
  call mpas_pool_get_array(sfc_input,'smcrel'    ,smcrel    )
  call mpas_pool_get_array(sfc_input,'smois'     ,smois     )
  call mpas_pool_get_array(sfc_input,'tslb'      ,tslb      )
+ if(config_lsm_scheme .eq. "ruc") then
+   call mpas_pool_get_array(sfc_input,'landusef'       ,landusef         )
+   call mpas_pool_get_array(sfc_input,'soilf'          ,soilf            )
+ endif
 
 !In Registry.xml, dzs is a function of nCells. In the Noah lsm scheme, dzs is independent
 !of cell locations:
@@ -446,9 +473,30 @@
     smcrel_p(i,n,j) = smcrel(n,i)
     smois_p(i,n,j)  = smois(n,i)
     tslb_p(i,n,j)   = tslb(n,i)
+    if(config_lsm_scheme .eq. "ruc") then
+        smfr3d_p(i,n,j) = smfr3d(n,i)
+    endif
  enddo
  enddo
  enddo
+
+ if (config_lsm_scheme .eq. "ruc") then
+     do j = jts,jte
+     do n = 1,num_landcat
+     do i = its,ite
+        landusef_p(j,n,i) = landusef(n,i)
+     enddo
+     enddo
+     enddo
+
+     do j = jts,jte
+     do n = 1,num_soilcat
+     do i = its,ite
+        soilf_p(j,n,i) = soilf(n,i)
+     enddo
+     enddo
+     enddo
+ endif
 
  do j = jts,jte
  do i = its,ite
@@ -520,8 +568,28 @@
     infxsrt_p(i,j)    = 0._RKIND
     sfcheadrt_p(i,j)  = 0._RKIND
     soldrain_p(i,j)   = 0._RKIND
+
+    if (config_lsm_scheme == 'ruc') then
+        rhosnf_p(i,j) = rhosnf(i)
+        precipfr_p(i,j) = precipfr(i)
+        qsg_p(i,j) = qsg(i)
+        qvg_p(i,j) = qvg(i)
+        dew_p(i,j) = dew(i)
+        soilt1_p(i,j) = soilt1(i)
+        tsnav_p(i,j) = tsnav(i)
+        acrunoff_p(i,j) = acrunoff(i)
+        snowfallac_p(i,j) = snowfallac(i)
+        graupelncv_p(i,j) = graupelncv(i)
+        snowncv_p(i,j) = snowncv(i)
+        rainncv_p(i,j) = rainncv(i)
+        qcg_p(i,j) = qcg(i)
+        flqc_p(i,j) = flqc(i)
+        flhc_p(i,j) = flhc(i)
+    endif
  enddo
  enddo
+
+
 
  if(config_frac_seaice) then
     do j = jts,jte
@@ -609,19 +677,23 @@
 !local pointers:
  logical,pointer:: config_frac_seaice
 
- character(len=StrKIND),pointer:: config_microp_scheme
+ character(len=StrKIND),pointer:: config_microp_scheme, &
+                                  config_lsm_scheme
 
  integer,dimension(:),pointer:: isltyp,ivgtyp
 
- real(kind=RKIND),dimension(:),pointer  :: acsnom,acsnow,canwat,chs,chs2,chklowq,cpm,cqs2,glw, &
-                                           grdflx,gsw,hfx,lai,lh,noahres,potevp,qfx,qgh,qsfc,  &
-                                           br,sfc_albedo,sfc_emibck,sfc_emiss,sfcrunoff,       &
+ real(kind=RKIND),dimension(:),pointer  :: acsnom,acsnow,canwat,chs,chs2,chklowq,cpm,cqs2,glw,  &
+                                           grdflx,gsw,hfx,lai,lh,noahres,potevp,qfx,qgh,qsfc,   &
+                                           br,sfc_albedo,sfc_emibck,sfc_emiss,sfcrunoff,        &
                                            smstav,smstot,snotime,snopcx,sr,udrunoff,z0,znt
+ real(kind=RKIND),dimension(:),pointer  :: rhosnf,precipfr,qsg,qvg,dew,soilt1,tsnav,acrunoff,   &
+                                           snowfallac,graupelncv,snowncv,qcg,                   &
+                                           flqc,flhc
  real(kind=RKIND),dimension(:),pointer  :: shdmin,shdmax,snoalb,sfc_albbck,snow,snowc,snowh,tmn, &
                                            skintemp,vegfra,xice,xland
  real(kind=RKIND),dimension(:),pointer  :: t2m,th2m,q2                                           
  real(kind=RKIND),dimension(:),pointer  :: raincv,rainncv
- real(kind=RKIND),dimension(:,:),pointer:: sh2o,smcrel,smois,tslb
+ real(kind=RKIND),dimension(:,:),pointer:: sh2o,smcrel,smois,tslb,smfr3d
 
 !local variables and arrays:
  integer:: ip,iEdg
@@ -631,6 +703,7 @@
 
  call mpas_pool_get_config(configs,'config_frac_seaice'  ,config_frac_seaice  )
  call mpas_pool_get_config(configs,'config_microp_scheme',config_microp_scheme)
+ call mpas_pool_get_config(configs,'config_lsm_scheme',config_lsm_scheme)
 
  call mpas_pool_get_array(diag_physics,'acsnom'    ,acsnom    )
  call mpas_pool_get_array(diag_physics,'acsnow'    ,acsnow    )
@@ -668,6 +741,24 @@
  call mpas_pool_get_array(diag_physics,'t2m'       ,t2m       )
  call mpas_pool_get_array(diag_physics,'th2m'      ,th2m      )
  call mpas_pool_get_array(diag_physics,'q2'        ,q2        )
+ if (config_lsm_scheme .eq. "ruc") then
+   call mpas_pool_get_array(diag_physics,'rhosnf'         ,rhosnf     )
+   call mpas_pool_get_array(diag_physics,'precipfr'       ,precipfr   )
+   call mpas_pool_get_array(diag_physics,'qsg'            ,qsg        )
+   call mpas_pool_get_array(diag_physics,'qvg'            ,qvg        )
+   call mpas_pool_get_array(diag_physics,'dew'            ,dew        )
+   call mpas_pool_get_array(diag_physics,'soilt1'         ,soilt1     )
+   call mpas_pool_get_array(diag_physics,'tsnav'          ,tsnav      )
+   call mpas_pool_get_array(diag_physics,'acrunoff'       ,acrunoff   )
+   call mpas_pool_get_array(diag_physics,'snowfallac'     ,snowfallac )
+   call mpas_pool_get_array(diag_physics,'smfr3d'         ,smfr3d     )
+   call mpas_pool_get_array(diag_physics,'graupelncv'     ,graupelncv )
+   call mpas_pool_get_array(diag_physics,'snowncv'        ,snowncv    )
+   call mpas_pool_get_array(diag_physics,'rainncv'        ,rainncv    )
+   call mpas_pool_get_array(diag_physics,'qcg'            ,qsg        )
+   call mpas_pool_get_array(diag_physics,'flqc'           ,flqc       )
+   call mpas_pool_get_array(diag_physics,'flhc'           ,flhc       )
+ endif
 
  call mpas_pool_get_array(sfc_input,'isltyp'       ,isltyp    )
  call mpas_pool_get_array(sfc_input,'ivgtyp'       ,ivgtyp    )
@@ -695,6 +786,9 @@
     smcrel(n,i) = smcrel_p(i,n,j)
     smois(n,i)  = smois_p(i,n,j)
     tslb(n,i)   = tslb_p(i,n,j)
+    if(config_lsm_scheme == 'ruc') then
+        smfr3d(n,i) = smfr3d_p(i,n,j)
+    endif
  enddo
  enddo
  enddo
@@ -746,8 +840,28 @@
     vegfra(i)     = vegfra_p(i,j)
     xice(i)       = xice_p(i,j)
     xland(i)      = xland_p(i,j)
+
+    if(config_lsm_scheme .eq. "ruc") then
+        rhosnf(i) = rhosnf_p(i,j)
+        precipfr(i) = precipfr_p(i,j)
+        qsg(i) = qsg_p(i,j)
+        qvg(i) = qvg_p(i,j)
+        dew(i) = dew_p(i,j)
+        soilt1(i) = soilt1_p(i,j)
+        tsnav(i) = tsnav_p(i,j)
+        acrunoff(i) = acrunoff_p(i,j)
+        snowfallac(i) = snowfallac_p(i,j)
+        graupelncv(i) = graupelncv_p(i,j)
+        snowncv(i) = snowncv_p(i,j)
+        rainncv(i) = rainncv_p(i,j)
+        qcg(i) = qcg_p(i,j)
+        flqc(i) = flqc_p(i,j)
+        flhc(i) = flhc_p(i,j)
+    endif
  enddo
  enddo
+
+ 
 
  if(config_frac_seaice) then
     do j = jts,jte
