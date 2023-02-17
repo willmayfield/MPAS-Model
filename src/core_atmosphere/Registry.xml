@@ -2136,7 +2136,7 @@
                 <nml_option name="config_lsm_scheme" type="character" default_value="suite" in_defaults="false"
                      units="-"
                      description="configuration for land-surface schemes"
-                     possible_values="`suite',`noah',`off'"/>
+                     possible_values="`suite',`noah',`ruc',`off'"/>
 
                 <nml_option name="config_pbl_scheme" type="character" default_value="suite" in_defaults="false"
                      units="-"
@@ -2986,15 +2986,15 @@
                 <var name="zs" type="real" dimensions="nCells Time" units="m"
                      description="depth of centers of soil layers"/>
 
-		<var name="rhosnf" type="real" dimensions="nCells Time" units="kg m^{-3}"
-		    description="density of snowfall"
-		    packages="lsm_ruc_in"/>
+                <var name="rhosnf" type="real" dimensions="nCells Time" units="kg m^{-3}"
+                   description="density of snowfall"
+                    packages="lsm_ruc_in"/>
 
-		<var name="precipfr" type="real" dimensions="nCells Time" units="mm"
+                <var name="precipfr" type="real" dimensions="nCells Time" units="mm"
                     description="time step water equivalent of frozen precipitation"
                     packages="lsm_ruc_in"/>
 
-		<var name="qsg" type="real" dimensions="nCells Time" units="kg kg^{-1}"
+                <var name="qsg" type="real" dimensions="nCells Time" units="kg kg^{-1}"
                     description="saturated mixing ratio at the surface"
                     packages="lsm_ruc_in"/>
 
