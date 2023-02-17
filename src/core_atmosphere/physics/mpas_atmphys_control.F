@@ -279,7 +279,8 @@
                              'set config_sfclayer_scheme different than off')
     
  elseif(.not. (config_lsm_scheme .eq. 'off ' .or. &
-               config_lsm_scheme .eq. 'noah')) then
+               config_lsm_scheme .eq. 'noah' .or. &
+               config_lsm_scheme .eq. 'ruclsm')) then
  
     write(mpas_err_message,'(A,A10)') 'illegal value for land surface scheme: ', &
           trim(config_lsm_scheme)
@@ -358,6 +359,8 @@
              dzs(3,iCell) = 0.60_RKIND
              dzs(4,iCell) = 1.00_RKIND
           enddo
+
+       case("ruclsm")
 
        case default
     
