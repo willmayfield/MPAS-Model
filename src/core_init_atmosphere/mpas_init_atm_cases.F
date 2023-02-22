@@ -6415,18 +6415,21 @@ call mpas_log_write('Done with soil consistency check')
       type (mpas_pool_type), intent(inout) :: fg
 
       !local variables:
-      integer :: iCell, iMonth, iSoil
-      integer, pointer :: nCells, nSoilLevels, nMonths
+      integer :: iCell, iMonth, iSoil, iCat
+      integer, pointer :: nCells, nSoilLevels, nMonths, nLandCat, nSoilCat
       integer, dimension(:), pointer :: landmask, lu_index, soilcat_top
       real (kind=RKIND), dimension(:), pointer :: ter, xice, shdmin, shdmax, vegfra, sfc_albbck, xland, seaice
       real (kind=RKIND), dimension(:), pointer :: snow, snowc, snoalb, snowh, skintemp, sst, tmn
       real (kind=RKIND), dimension(:,:), pointer :: tslb, smcrel, sh2o, smois, dzs, albedo12m, greenfrac
+      real(kind=RKIND), dimension(:,:), pointer :: landusef, soilf
 
       !---------------------------------------------------------------------------------------------
 
       call mpas_pool_get_dimension(mesh, 'nCells', nCells)
       call mpas_pool_get_dimension(mesh, 'nSoilLevels', nSoilLevels)
       call mpas_pool_get_dimension(mesh, 'nMonths', nMonths)
+      call mpas_pool_get_dimension(mesh, 'nlcat', nLandCat)
+      call mpas_pool_get_dimension(mesh, 'nscat', nSoilCat)
 
       call mpas_pool_get_array(mesh, 'ter', ter)
       call mpas_pool_get_array(mesh, 'landmask', landmask)
@@ -6437,6 +6440,9 @@ call mpas_log_write('Done with soil consistency check')
       call mpas_pool_get_array(mesh, 'snoalb', snoalb)
       call mpas_pool_get_array(mesh, 'albedo12m', albedo12m)
       call mpas_pool_get_array(mesh, 'greenfrac', greenfrac)
+      call mpas_pool_get_array(mesh, 'landusef', landusef)
+      call mpas_pool_get_array(mesh,' soilf', soilf)
+
 
       call mpas_pool_get_array(fg, 'xice', xice)
       call mpas_pool_get_array(fg, 'vegfra', vegfra)
@@ -6473,6 +6479,14 @@ call mpas_log_write('Done with soil consistency check')
          sfc_albbck(iCell) = 0.0
          xland(iCell) = 0.0
          seaice(iCell) = 0.0
+         do iCat = 1, nLandCat
+             landusef(iCat,iCell) = 0.0
+         enddo
+           
+         do iCat = 1,nSoilCat
+             soilf(iCat,iCell) = 0.0
+         enddo
+
 
          !snow coverage:
          snow(iCell) = 0.0

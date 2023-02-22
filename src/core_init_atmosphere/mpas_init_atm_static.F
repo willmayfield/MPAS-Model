@@ -85,6 +85,7 @@
  integer :: ii, jj
  integer :: lu_sum
  integer:: iCell,iEdge,iVtx,iPoint,iTileStart,iTileEnd,jTileStart,jTileEnd
+ integer:: tile_max_i, tile_max_j
  integer,dimension(5) :: interp_list
  integer,dimension(:),allocatable  :: nhs
  integer,dimension(:,:),allocatable:: ncat
@@ -388,19 +389,33 @@
     case('USGS')
        call mpas_log_write('Using 24-class USGS 30-arc-second land cover dataset')
        geog_sub_path = 'landuse_30s/'
+       tile_max_j = 20401
+       tile_max_i = 42001
+       nx = 1200
+       ny = 1200
     case('MODIFIED_IGBP_MODIS_NOAH')
        call mpas_log_write('Using 20-class MODIS 30-arc-second land cover dataset')
        geog_sub_path = 'modis_landuse_20class_30s/'
+       tile_max_j = 20401
+       tile_max_i = 42001
+       nx = 1200
+       ny = 1200
+    case('MODIFIED_IGBP_MODIS_NOAH_15S')
+       call mpas_log_write('Using 20-class MODIS 15-arc-second land cover dataset')
+       geog_sub_path = 'modis_landuse_20class_15s/'
+       tile_max_j = 40801
+       tile_max_i = 84001
+       nx = 2400
+       ny = 2400
     case default
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
                                      //''' selected for config_landuse_data',                   messageType=MPAS_LOG_ERR)
-       call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH''',   messageType=MPAS_LOG_ERR)
+       call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH'''// &
+                                    ' ''MODIFIED_IGBP_MODIS_NOAH_15S'' ',                       messageType=MPAS_LOG_ERR)
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
  end select surface_input_select1
- nx = 1200
- ny = 1200
  nz = 1
  isigned  = 1
  endian   = 0
@@ -414,10 +429,10 @@
 
  rarray_ptr = c_loc(rarray)
 
- do jTileStart = 1,20401,ny
+ do jTileStart = 1,tile_max_j,ny
     jTileEnd = jTileStart + ny - 1
 
-    do iTileStart = 1,42001,nx
+    do iTileStart = 1,tile_max_i,nx
        iTileEnd = iTileStart + nx - 1
        write(fname,'(a,i5.5,a1,i5.5,a1,i5.5,a1,i5.5)') trim(geog_data_path)// &
              trim(geog_sub_path),iTileStart,'-',iTileEnd,'.',jTileStart,'-',jTileEnd
