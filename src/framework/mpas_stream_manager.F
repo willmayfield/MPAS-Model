@@ -3648,6 +3648,7 @@ module mpas_stream_manager
            !
            if ( stream % filename_interval /= 'none' ) then
                call mpas_set_time(now_time, dateTimeString=when, ierr=local_ierr)
+              
                call mpas_set_timeInterval(filename_interval, timeString=stream % filename_interval)
                
                call mpas_build_stream_filename(stream % referenceTime, now_time, filename_interval, stream % filename_template, blockID_local, temp_filename, ierr=local_ierr)

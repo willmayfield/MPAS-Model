@@ -84,6 +84,7 @@
  integer:: i,j,k
  integer :: ii, jj
  integer :: lu_sum
+ integer :: imax,jmax
  integer:: iCell,iEdge,iVtx,iPoint,iTileStart,iTileEnd,jTileStart,jTileEnd
  integer,dimension(5) :: interp_list
  integer,dimension(:),allocatable  :: nhs
@@ -139,7 +140,7 @@
  integer, dimension(:), pointer :: bdyMaskCell
  character(len=StrKIND), pointer :: mminlu
 
- real (kind=RKIND) :: xPixel, yPixel, zPixel
+ real (kind=RKIND) :: xPixel, yPixel, zPixel, dx
 
 !--------------------------------------------------------------------------------------------------
 
@@ -255,7 +256,6 @@
  call atm_initialize_advection_rk(mesh, nCells, nEdges, maxEdges, on_a_sphere, sphere_radius) 
  call atm_initialize_deformation_weights(mesh, nCells, on_a_sphere, sphere_radius) 
 
-
 !
 ! Set land use and soil category parameters for water and ice
 !
@@ -263,25 +263,33 @@
     case('USGS')
        isice_lu = 24
        iswater_lu = 16
+       dx = 0.0083333333
        !ismax_lu = 24
        write(mminlu,'(a)') 'USGS'
     case('MODIFIED_IGBP_MODIS_NOAH')
        isice_lu = 15
        iswater_lu = 17
+       dx = 0.0083333333
+       !ismax_lu = 20
+       write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
+    case('MODIFIED_IGBP_MODIS_NOAH_15s')
+       isice_lu = 15
+       iswater_lu = 17
+       dx = 0.0083333333 / 2.0
        !ismax_lu = 20
        write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
     case default
          call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
          call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
                                        //''' selected for config_landuse_data',                   messageType=MPAS_LOG_ERR)
-         call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH''',   messageType=MPAS_LOG_ERR)
+         call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH'',',  messageType=MPAS_LOG_ERR)
+         call mpas_log_write('   '' MODIFIED_IGBP_MODIS_NOAH_15s''',                             messageType=MPAS_LOG_ERR)
          call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
          call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
  end select surface_input_select0
 
 
 !
-! Interpolate HGT
 !
 !nx = 126
 !ny = 126
@@ -388,19 +396,38 @@
     case('USGS')
        call mpas_log_write('Using 24-class USGS 30-arc-second land cover dataset')
        geog_sub_path = 'landuse_30s/'
+       nx = 1200
+       ny = 1200
+       dx = 0.0083333333
+       jmax = 21600
+       imax = 43200
     case('MODIFIED_IGBP_MODIS_NOAH')
        call mpas_log_write('Using 20-class MODIS 30-arc-second land cover dataset')
        geog_sub_path = 'modis_landuse_20class_30s/'
+       nx = 1200
+       ny = 1200
+       dx = 0.0083333333
+       jmax = 21600
+       imax = 43200
+    case('MODIFIED_IGBP_MODIS_NOAH_15s')
+       call mpas_log_write('Using 20-class MODIS 15-arc-second land cover dataset')
+       geog_sub_path = 'modis_landuse_20class_15s/'
+       nx = 2400
+       ny = 2400
+       dx = 0.0083333333 / 2.0
+       imax = 86400
+       jmax = 43200
     case default
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
                                      //''' selected for config_landuse_data',                   messageType=MPAS_LOG_ERR)
-       call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH''',   messageType=MPAS_LOG_ERR)
+       call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH'',',  messageType=MPAS_LOG_ERR)
+       call mpas_log_write('   '' MODIFIED_IGBP_MODIS_NOAH_15s''',                              messageType=MPAS_LOG_ERR)
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
  end select surface_input_select1
- nx = 1200
- ny = 1200
+ !nx = 1200
+ !ny = 1200
  nz = 1
  isigned  = 1
  endian   = 0
@@ -414,10 +441,10 @@
 
  rarray_ptr = c_loc(rarray)
 
- do jTileStart = 1,20401,ny
+ do jTileStart = 1,jmax-ny+1,ny
     jTileEnd = jTileStart + ny - 1
 
-    do iTileStart = 1,42001,nx
+    do iTileStart = 1,imax-nx+1,nx
        iTileEnd = iTileStart + nx - 1
        write(fname,'(a,i5.5,a1,i5.5,a1,i5.5,a1,i5.5)') trim(geog_data_path)// &
              trim(geog_sub_path),iTileStart,'-',iTileEnd,'.',jTileStart,'-',jTileEnd
@@ -431,13 +458,13 @@
        iPoint = 1
        do j=1,ny
        do i=1,nx
-!
+!0.0083333333
 ! The MODIS dataset appears to have zeros at the South Pole, possibly other places, too
 !
 if (rarray(i,j,1) == 0) cycle
 
-          lat_pt = -89.99583  + (jTileStart + j - 2) * 0.0083333333
-          lon_pt = -179.99583 + (iTileStart + i - 2) * 0.0083333333
+          lat_pt = -90.0 + dx/2.0  + (jTileStart + j - 2) * dx
+          lon_pt = -180.0 + dx/2.0 + (iTileStart + i - 2) * dx
           lat_pt = lat_pt * PI / 180.0
           lon_pt = lon_pt * PI / 180.0
 
@@ -484,7 +511,6 @@ if (rarray(i,j,1) == 0) cycle
     do i = 1,ismax_lu
         landusef(i,iCell) = real(ncat(i,iCell)) / real(lu_sum)
     enddo
-    if (mod(real(iCell),1.0E6) == 0.0) print*, iCell, lu_sum, ncat(:,iCell), landusef(:,iCell)
  end do
  deallocate(rarray)
  deallocate(ncat)

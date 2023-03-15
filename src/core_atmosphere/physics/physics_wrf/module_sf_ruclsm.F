@@ -16,7 +16,8 @@ MODULE module_sf_ruclsm
 
 #if defined(mpas)
 use mpas_atmphys_constants, g => gravity,RHOWATER=>rho_w, piconst => pii
-use mpas_atmphys_utilities, only: physics_error_fatal
+use mpas_atmphys_utilities, only: physics_error_fatal,physics_message
+#define EM_CORE 1
 #define FATAL_ERROR(M) call physics_error_fatal( M )
 #define wrf_at_debug_level(LSMRUC_DBG_LVL) .false.
 #else
@@ -406,6 +407,7 @@ CONTAINS
    CHARACTER (LEN=132) :: message
 
    REAL,DIMENSION(ims:ime,1:nsl,jms:jme) :: rstoch 
+   REAL,DIMENSION(1:nsl)::rstoch_temp,field_sf_temp
 !beka
    REAL,DIMENSION(ims:ime,jms:jme)::EMISSO,VEGFRAO,ALBO,SNOALBO
    REAL,DIMENSION(its:ite,jts:jte)::EMISSLO
@@ -429,7 +431,7 @@ CONTAINS
          enddo 
        endif  
 #endif
-!---- table TBQ is for resolution of balance equation in VILKA
+!---- table TBQ is for resolution of balance equation in VILKA)'
         CQ=173.15-.05
         R273=1./273.15
         R61=6.1153*0.62198
@@ -450,7 +452,7 @@ CONTAINS
 
         END DO
 
-!--- Initialize soil/vegetation parameters
+!--- Initialize soil/vegetation parameters'
 !--- This is temporary until SI is added to mass coordinate ---!!!!!
 
 #if ( NMM_CORE == 1 )
@@ -463,24 +465,25 @@ CONTAINS
             do k=1,nsl
        keepfr3dflag(i,k,j)=0.
             enddo
-!--- initializing snow fraction, thereshold = 32 mm of snow water 
+!--- initializing snow fraction, thereshold = 32 mm of snow water '
 !    or ~100 mm of snow height
 !
            snowc(i,j) = min(1.,snow(i,j)/32.)
           if(snow(i,j).le.32.) soilt1(i,j)=tso(i,1,j)
-!--- initializing inside snow temp if it is not defined
+call physics_message('!--- initializing inside snow temp if it is not defined')
         IF((soilt1(i,j) .LT. 170.) .or. (soilt1(i,j) .GT.400.)) THEN
             IF(snow(i,j).gt.32.) THEN
            soilt1(i,j)=0.5*(soilt(i,j)+tso(i,1,j))
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
         WRITE ( message , FMT='(A,F8.3,2I6)' ) &
        'Temperature inside snow is initialized in RUCLSM ', soilt1(i,j),i,j
-        CALL wrf_debug ( 0 , message )
+        !CALL wrf_debug ( 0 , message )
     ENDIF
             ELSE
            soilt1(i,j) = tso(i,1,j)
             ENDIF
         ENDIF
+! --temperature inside snow initialized
            tsnav(i,j) =0.5*(soilt(i,j)+tso(i,1,j))-273.15
            qcg  (i,j) =0.
            patmb=P8w(i,kms,j)*1.e-2
@@ -490,7 +493,7 @@ CONTAINS
           IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
            WRITE ( message , FMT='(A,3F8.3,2I6)' ) &
           'QVG is initialized in RUCLSM ', qvg(i,j),mavail(i,j),qsg(i,j),i,j
-           CALL wrf_debug ( 0 , message )
+           !CALL wrf_debug ( 0 , message )
           ENDIF
         ENDIF
            qsfc(i,j) = qvg(i,j)/(1.+qvg(i,j))
@@ -556,6 +559,7 @@ CONTAINS
       DO i=its,ite
 
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+     !IF (MAVAIL(I,J) == 0.0_RKIND) then
       print *,' IN LSMRUC ','ims,ime,jms,jme,its,ite,jts,jte,nzs', &
                 ims,ime,jms,jme,its,ite,jts,jte,nzs
       print *,' IVGTYP, ISLTYP ', ivgtyp(i,j),isltyp(i,j)
@@ -564,9 +568,10 @@ CONTAINS
       print *, 'LSMRUC, I,J,xland, QFX,HFX from SFCLAY',i,j,xland(i,j), &
                   qfx(i,j),hfx(i,j)
       print *, ' GSW, GLW =',gsw(i,j),glw(i,j)
-      print *, 'SOILT, TSO start of time step =',soilt(i,j),(tso(i,k,j),k=1,nsl)
-      print *, 'SOILMOIS start of time step =',(soilmois(i,k,j),k=1,nsl)
-      print *, 'SMFROZEN start of time step =',(smfr3d(i,k,j),k=1,nsl)
+      print *, 'SOILT, TSO  =',soilt(i,j),(tso(i,k,j),k=1,nsl)
+      print *, 'SOILMOIS  =',(soilmois(i,k,j),k=1,nsl)
+      print *, 'SMFROZEN  =',(smfr3d(i,k,j),k=1,nsl)
+      print*,  'XICE =', xice(i,j)
       print *, ' I,J=, after SFCLAY CHS,FLHC ',i,j,chs(i,j),flhc(i,j)
       print *, 'LSMRUC, IVGTYP,ISLTYP,ALB = ', ivgtyp(i,j),isltyp(i,j),alb(i,j),i,j
       print *, 'LSMRUC  I,J,DT,RAINBL =',I,J,dt,RAINBL(i,j)
@@ -933,8 +938,10 @@ CONTAINS
       print *,'before SFCTMP, spp_lsm, rstoch, field_sf_loc',      &
       i,j,spp_lsm,(rstoch(i,k,j),k=1,nzs),(field_sf_loc(i,k,j),k=1,nzs)
     ENDIF
+    rstoch_temp = rstoch(i,:,j)
+    field_sf_temp = field_sf_loc(i,:,j)
 !-----------------------------------------------------------------
-         CALL SFCTMP (spp_lsm,rstoch(i,:,j),field_sf_loc(i,:,j), & 
+         CALL SFCTMP (spp_lsm,rstoch_temp,field_sf_temp, & 
                 dt,ktau,conflx,i,j,                              &
 !--- input variables
                 nzs,nddzs,nroot,meltfactor,                      &   !added meltfactor
@@ -966,6 +973,8 @@ CONTAINS
                 lh(I,J),hfx(I,J),sflx(I,J),sublim(I,J),          &
                 evapl(I,J),prcpl(I,J),budget(i,j),runoff1(i,j),  &
                 runoff2(I,J),soilice,soiliqw,infiltrp,smf(i,j))
+
+       field_sf_loc(i,:,j) = field_sf_temp
 !-----------------------------------------------------------------
 
 ! Fraction of cropland category in the grid box should not have soil moisture below 
@@ -7040,7 +7049,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
       endif
         MMINSL='STAS-RUC'
 !     CALL  RUCLSM_PARM_INIT
-    print *,'RUCLSMINIT uses ',mminluruc
+!    print *,'RUCLSMINIT uses ',mminluruc
      call RUCLSM_SOILVEGPARM( MMINLURUC, MMINSL)   
    ENDIF
 

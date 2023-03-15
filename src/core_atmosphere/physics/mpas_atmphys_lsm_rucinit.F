@@ -93,21 +93,26 @@
  character(len=StrKIND),pointer:: mminlu,mminsl
 
  integer,pointer:: nCells,nSoilLevels
+ integer,pointer:: spp_lsm_loc,mosaic_lu,mosaic_soil
  integer,dimension(:),pointer:: ivgtyp,isltyp
 
- real(kind=RKIND),dimension(:),pointer:: snoalb,snow,snowh
- real(kind=RKIND),dimension(:,:),pointer:: tslb,smois,sh2o
+ real(kind=RKIND),dimension(:),pointer:: snoalb,snow,snowh,znt,xice,mavail
+ real(kind=RKIND),dimension(:,:),pointer:: tslb,smois,sh2o,smfr3d
 
 !local variables:
  logical,parameter:: fndsnowh = .true.
 
- integer:: iCell
+ integer:: iCell, l
  integer:: errflag,ns
 
- real(kind=RKIND):: bx,fk,smcmax,psisat,free
+ real(kind=RKIND):: bx,fk,smcmax,psisat,free,tln
+ real(kind=RKIND):: dqm, ref, psis, qmin, bclh
+ real(kind=RKIND), allocatable:: soiliqw(:)
  real(kind=RKIND),parameter:: blim = 5.5
  real(kind=RKIND),parameter:: hlice = 3.335e5
  real(kind=RKIND),parameter:: t0 = 273.15
+ real(kind=RKIND),parameter:: xlmelt=3.35E5
+ real(kind=RKIND),parameter:: riw=900.E-3
 
   character*8 :: MMINLURUC
 
@@ -129,7 +134,21 @@
  call mpas_pool_get_array(sfc_input,'snoalb', snoalb)
  call mpas_pool_get_array(sfc_input,'snow'  , snow  )
  call mpas_pool_get_array(sfc_input,'snowh' , snowh )
+ call mpas_pool_get_array(sfc_input,'xice'  , xice  )
+ call mpas_pool_get_array(diag_physics,'spp_lsm_loc', spp_lsm_loc)
+ call mpas_pool_get_array(diag_physics,'mosaic_lu', mosaic_lu)
+ call mpas_pool_get_array(diag_physics,'mosaic_soil', mosaic_soil)
 
+ call mpas_pool_get_array(diag_physics,'mavail', mavail )
+ call mpas_pool_get_array(diag_physics,'smfr3d', smfr3d )
+ call mpas_pool_get_array(diag_physics,'znt'   , znt    )
+
+ allocate(soiliqw(nSoilLevels))
+
+!hardcode these flags for now
+ spp_lsm_loc = 0
+ mosaic_lu = 1
+ mosaic_soil = 1
 
 !reads the RUC LSM tables:
  call mpas_log_write('')
@@ -137,7 +156,7 @@
 
 ! initialize three  LSM related tables
 !   IF ( allowed_to_read ) THEN
-     CALL wrf_message( 'INITIALIZE THREE LSM RELATED TABLES' )
+     CALL physics_message( 'INITIALIZE THREE LSM RELATED TABLES' )
       if(mminlu == 'USGS') then
         MMINLURUC='USGS-RUC'
       elseif(mminlu == 'MODIS' .OR. &
@@ -146,7 +165,6 @@
       endif
         MMINSL='STAS-RUC'
 !     CALL  RUCLSM_PARM_INIT
-    print *,'RUCLSMINIT uses ',mminluruc
 !   ENDIF
 
  call RUCLSM_SOILVEGPARM(dminfo,mminluruc,mminsl)
@@ -154,77 +172,75 @@
  call mpas_log_write('')
 
 
-!if(.not.restart) then
-!
-!   errflag = 0
-!   do iCell = 1, nCells
-!      if(isltyp(iCell) .lt. 1) then
-!         errflag = 1
-!         write(err_message,*) "module_sf_ruclsm.F: lsminit: out of range ISLTYP ", &
-!                              iCell,isltyp(iCell)
-!         call physics_message(err_message)
-!      endif
-!      if(.not. input_sfc_albedo) snoalb(iCell) = maxalb(ivgtyp(iCell))*0.01
-!   enddo
-!   if(errflag .eq. 1) &
-!      call physics_error_fatal("module_sf_ruclsm.F: lsminit: out of range value "// &
-!                           "of ISLTYP. Is this field in the input?" )
-!
-!!initializes soil liquid water content SH2O:
-!   do iCell = 1, nCells
-!      bx = bb(isltyp(iCell))
-!      smcmax = maxsmc(isltyp(iCell))
-!      psisat = satpsi(isltyp(iCell))
-!      if((bx > 0.0).and.(smcmax > 0.0).and.(psisat > 0.0)) then
-!         do ns = 1, nSoilLevels
-!! ----------------------------------------------------------------------
-!!SH2O  <= SMOIS for T < 273.149K (-0.001C)
-!            if(tslb(ns,iCell) < 273.149) then
-!! ----------------------------------------------------------------------
-!! first guess following explicit solution for Flerchinger Eqn from Koren
-!! et al, JGR, 1999, Eqn 17 (KCOUNT=0 in FUNCTION FRH2O).
-!! ISLTPK is soil type
-!               bx = bb(isltyp(iCell))
-!               smcmax = maxsmc(isltyp(iCell))
-!               psisat = satpsi(isltyp(iCell))
-!               if(bx >  blim) bx = blim
-!               fk = (((hlice/(gravity*(-psisat))) * &
-!                    ((tslb(ns,iCell)-t0)/tslb(ns,iCell)) )**(-1/bx) )*smcmax
-!               if (fk < 0.02) fk = 0.02
-!               sh2o(ns,iCell) = min(fk,smois(ns,iCell))
-!! ----------------------------------------------------------------------
-!! now use iterative solution for liquid soil water content using
-!! FUNCTION FRH2O with the initial guess for SH2O from above explicit
-!! first guess.
-!               call frh2o(free,tslb(ns,iCell),smois(ns,iCell),sh2o(ns,iCell), &
-!                          smcmax,bx,psisat)
-!               sh2o(ns,iCell) = free
-!            else         ! of if (tslb(i,ns,j)
-!! ----------------------------------------------------------------------
-!! SH2O = SMOIS ( for T => 273.149K (-0.001C)
-!               sh2o(ns,iCell)=smois(ns,iCell)
-!! ----------------------------------------------------------------------
-!            endif        ! of if (tslb(i,ns,j)
-!         enddo
-!      else                  ! of if ((bx > 0.0)
-!         do ns = 1, nSoilLevels
-!            sh2o(ns,iCell)=smois(ns,iCell)
-!         enddo
-!      endif ! of if ((bx > 0.0)
-!   enddo    ! do iCell
-!
-!!initialize physical snow height SNOWH:
-!   if(.not.fndsnowh)then
-!!if no snowh do the following:
-!      call physics_message( 'SNOW HEIGHT NOT FOUND - VALUE DEFINED IN LSMINIT' )
-!      do iCell = 1, nCells
-!         snowh(iCell)=snow(iCell)*0.005 ! snow in mm and snowh in m
-!      enddo
-!   endif
-!   110 continue
-!
-!endif
+if(.not.restart) then
 
+   errflag = 0
+   do iCell = 1, nCells
+      if(isltyp(iCell) .lt. 1) then
+         errflag = 1
+         write(err_message,*) "module_sf_ruclsm.F: lsminit: out of range ISLTYP ", &
+                              iCell,isltyp(iCell)
+         call physics_message(err_message)
+      endif
+   enddo
+   if(errflag .eq. 1) &
+      call physics_error_fatal("module_sf_ruclsm.F: lsminit: out of range value "// &
+                           "of ISLTYP. Is this field in the input?" )
+   do iCell = 1, nCells
+        znt(iCell) = z0tbl(ivgtyp(iCell))
+
+!--- Computation of volumetric content of ice in soil
+!--- and initialize MAVAIL
+        dqm    = maxsmc(isltyp(iCell)) -&
+                 drysmc(isltyp(iCell))
+        ref    = refsmc(isltyp(iCell))
+        psis   = - satpsi(isltyp(iCell))
+        qmin   = drysmc(isltyp(iCell))
+        bclh   = bb(isltyp(iCell))
+
+        if(xice(iCell) .gt. 0.) then
+          do l=1,nSoilLevels
+            smfr3d(l,iCell) = 1.
+            sh2o(l,iCell) = 0.
+            mavail(iCell) = 1.
+          enddo
+        else
+          if(isltyp(iCell) .ne. 14) then
+!-- land
+            mavail(iCell) = max(0.00001,min(1.,(smois(1,iCell)-qmin)/(ref-qmin)))
+            do l=1,nSoilLevels
+              tln = log(tslb(l,iCell) / 273.15 )
+              if( tln .lt. 0. ) then
+                 soiliqw(l) = (dqm+qmin)*(xlmelt * (tslb(l,iCell)-273.15) &
+                        /tslb(l,iCell)/9.81/psis) **(-1./bclh)
+                 soiliqw(l)=max(0.,soiliqw(l))
+                 soiliqw(l)=min(soiliqw(l),smois(l,iCell))
+                 sh2o(l,iCell)=soiliqw(l)
+                 smfr3d(l,iCell)=(smois(l,iCell)-soiliqw(l))/RIW
+
+              else
+                smfr3d(l,iCell)=0.
+                sh2o(l,iCell)=smois(l,iCell)
+              endif
+            enddo
+          else
+            do l = 1,nSoilLevels
+              smfr3d(l,iCell) = 0.
+              sh2o(l,iCell)   = 1.
+              mavail(iCell) = 1.
+            enddo
+          endif
+        endif
+
+!initialize physical snow height SNOWH:
+       if(.not.fndsnowh)then
+!if no snowh do the following:
+          call physics_message( 'SNOW HEIGHT NOT FOUND - VALUE DEFINED IN LSMINIT')
+          snowh(iCell)=snow(iCell)*0.005 ! snow in mm and snowh in m
+       endif
+   enddo
+endif
+ deallocate(soiliqw)
  end subroutine ruclsminit
 
 !=================================================================================================================
@@ -265,15 +281,15 @@
 !-----READ IN VEGETATION PROPERTIES FROM VEGPARM.TBL
 
 !-----------------------------------------------------------------------------------------------------------------
-!call mpas_log_write('')
-!call mpas_log_write('       enter subroutine soil_veg_gen_parm:')
+call mpas_log_write('')
+call mpas_log_write('       enter subroutine soil_veg_gen_parm:')
 
 !read in the vegetation properties from vegparm.tbl:
 
  if(dminfo % my_proc_id == IO_NODE) then
     open(16,file='VEGPARM.TBL',form='FORMATTED',status='OLD',iostat=istat)
     if(istat /= open_ok) &
-       call physics_error_fatal('subroutine soil_veg_gen_arm: ' // &
+       call physics_error_fatal('subroutine RUCLSM_SOILVEGPARM: ' // &
                                 'failure opening VEGPARM.TBL')
 
     lumatch=0
@@ -287,6 +303,11 @@
                         lucats, ' categories'
           call physics_message(mess)
           lumatch=1
+       elseif(trim(lutype) .eq. 'USGS-RUC' .or. lutype .eq. 'MODI-RUC') then
+         call physics_message('    skipping over lutype = ' // trim ( lutype ))
+          do lc = 1, lucats+16
+             read(16,*)
+          enddo
        else
           call physics_message('    skipping over lutype = ' // trim ( lutype ))
           do lc = 1, lucats+20
@@ -296,38 +317,28 @@
     enddo find_lutype
 
 !prevent possible array overwrite, Bill Bovermann, IBM, May 6, 2008:
-!   if(size(shdtbl)       < lucats .or. &
-!      size(nrotbl)       < lucats .or. &
-!      size(rstbl)        < lucats .or. &
-!      size(rgltbl)       < lucats .or. &
-!      size(hstbl)        < lucats .or. &
-!      size(snuptbl)      < lucats .or. &
-!      size(maxalb)       < lucats .or. &
-!      size(laimintbl)    < lucats .or. &
-!      size(laimaxtbl)    < lucats .or. &
-!      size(z0mintbl)     < lucats .or. &
-!      size(z0maxtbl)     < lucats .or. &
-!      size(albedomintbl) < lucats .or. &
-!      size(albedomaxtbl) < lucats .or. &
-!      size(ztopvtbl)     < lucats .or. &
-!      size(zbotvtbl)     < lucats .or. &
-!      size(emissmintbl ) < lucats .or. &
-!      size(emissmaxtbl ) < lucats) then
+!   if(size(albtbl)       < lucats .or. &
+!      size(z0tbl)       < lucats .or. &
+!      size(lemitbl)        < lucats .or. &
+!      size(pctbl)       < lucats .or. &
+!      size(shdtbl)        < lucats .or. &
+!      size(ifortbl)      < lucats .or. &
+!      size(rstbl)       < lucats .or. &
+!      size(rgltbl)    < lucats .or. &
+!      size(hstbl)    < lucats .or. &
+!      size(snuptbl)     < lucats .or. &
+!      size(laitbl)     < lucats .or. &
+!      size(maxalb) < lucats) then 
 !      call physics_error_fatal('table sizes too small for value of lucats in module_sf_rucdrv.f')
 !   endif
 
-    if(lutype.eq.mminluruc)then
+    if(lutype.eq.trim(mminluruc))then
+       call physics_message('Reading ' // trim(lutype) // 'table' )
        do lc = 1, lucats
-! replace with arrays for RUC
-!              READ (16,*)IINDEX,ALBTBL(LC),Z0TBL(LC),LEMITBL(LC),PCTBL(LC), &
-!                         SHDTBL(LC),IFORTBL(LC),RSTBL(LC),RGLTBL(LC),         &
-!                         HSTBL(LC),SNUPTBL(LC),LAITBL(LC),MAXALB(LC)
+           READ (16,*)IINDEX,ALBTBL(LC),Z0TBL(LC),LEMITBL(LC),PCTBL(LC), &
+                         SHDTBL(LC),IFORTBL(LC),RSTBL(LC),RGLTBL(LC),         &
+                         HSTBL(LC),SNUPTBL(LC),LAITBL(LC),MAXALB(LC)
 
-! NOAH:
-!         read(16,*) iindex,shdtbl(lc),nrotbl(lc),rstbl(lc),rgltbl(lc),hstbl(lc),snuptbl(lc),  &
-!                    maxalb(lc),laimintbl(lc),laimaxtbl(lc),emissmintbl(lc),emissmaxtbl(lc),   &
-!                    albedomintbl(lc),albedomaxtbl(lc),z0mintbl(lc),z0maxtbl(lc),ztopvtbl(lc), &
-!                    zbotvtbl(lc)
        enddo
        read (16,*)
        read (16,*) topt_data
@@ -359,59 +370,51 @@
  endif ! end dminfo
 
 !distribute data to all processors: 
-!DM_BCAST_CHAR(lutype)
-!DM_BCAST_INTEGER(lucats)
-!DM_BCAST_INTEGER(iindex)
-!DM_BCAST_INTEGER(lumatch)
-!DM_BCAST_REALS(shdtbl)
-!DM_BCAST_INTEGERS(nrotbl)
-!DM_BCAST_REALS(rstbl)
-!DM_BCAST_REALS(rgltbl)
-!DM_BCAST_REALS(hstbl)
-!DM_BCAST_REALS(snuptbl)
-!DM_BCAST_REALS(laimintbl)
-!DM_BCAST_REALS(laimaxtbl)
-!DM_BCAST_REALS(z0mintbl)
-!DM_BCAST_REALS(z0maxtbl)
-!DM_BCAST_REALS(emissmintbl)
-!DM_BCAST_REALS(emissmaxtbl)
-!DM_BCAST_REALS(albedomintbl)
-!DM_BCAST_REALS(albedomaxtbl)
-!DM_BCAST_REALS(ztopvtbl)
-!DM_BCAST_REALS(zbotvtbl)
-!DM_BCAST_REALS(maxalb)
-!DM_BCAST_REAL(topt_data)
-!DM_BCAST_REAL(cmcmax_data)
-!DM_BCAST_REAL(cfactr_data)
-!DM_BCAST_REAL(rsmax_data)
-!DM_BCAST_INTEGER(bare)
-!DM_BCAST_INTEGER(natural)
-!DM_BCAST_INTEGER(low_density_residential)
-!DM_BCAST_INTEGER(high_density_residential)
-!DM_BCAST_INTEGER(high_intensity_industrial)
+DM_BCAST_CHAR(lutype)
+DM_BCAST_INTEGER(lucats)
+DM_BCAST_INTEGER(iindex)
+DM_BCAST_INTEGER(lumatch)
+DM_BCAST_REALS(albtbl)
+DM_BCAST_REALS(z0tbl)
+DM_BCAST_REALS(lemitbl)
+DM_BCAST_REALS(pctbl)
+DM_BCAST_REALS(shdtbl)
+DM_BCAST_INTEGERS(ifortbl)
+DM_BCAST_REALS(rstbl)
+DM_BCAST_REALS(rgltbl)
+DM_BCAST_REALS(hstbl)
+DM_BCAST_REALS(snuptbl)
+DM_BCAST_REALS(laitbl)
+DM_BCAST_REALS(maxalb)
+DM_BCAST_REAL(topt_data)
+DM_BCAST_REAL(cmcmax_data)
+DM_BCAST_REAL(cfactr_data)
+DM_BCAST_REAL(rsmax_data)
+DM_BCAST_INTEGER(bare)
+DM_BCAST_INTEGER(natural)
+DM_BCAST_INTEGER(crop)
+DM_BCAST_INTEGER(urban)
 
-!call mpas_log_write(' LUTYPE  = '//trim(lutype))
-!call mpas_log_write(' LUCATS  = $i',intArgs=(/lucats/))
-!call mpas_log_write(' IINDEX  = $i',intArgs=(/iindex/))
-!call mpas_log_write(' LUMATCH = $i',intArgs=(/lumatch/))
+call mpas_log_write(' LUTYPE  = '//trim(lutype))
+call mpas_log_write(' LUCATS  = $i',intArgs=(/lucats/))
+call mpas_log_write(' IINDEX  = $i',intArgs=(/iindex/))
+call mpas_log_write(' LUMATCH = $i',intArgs=(/lumatch/))
 
-!call mpas_log_write(' TOPT_DATA   = $r',realArgs=(/topt_data/))
-!call mpas_log_write(' CMCMAX_DATA = $r',realArgs=(/cmcmax_data/))
-!call mpas_log_write(' CFACTR_DATA = $r',realArgs=(/cfactr_data/))
-!call mpas_log_write(' RSMAX_DATA  = $r',realArgs=(/rsmax_data/))
-!call mpas_log_write(' BARE        = $i',intArgs=(/bare/))
-!call mpas_log_write(' NATURAL     = $i',intArgs=(/natural/))
-!call mpas_log_write(' LOW_DENSITY_RESIDENTIAL   = $i , intArgs=(/low_density_residential/))
-!call mpas_log_write(' HIGH_DENSITY_RESIDENTIAL  = $i , intArgs=(/high_density_residential/))
-!call mpas_log_write(' HIGH_DENSITY_INDUSTRIAL   = $i , intArgs=(/high_density_industrial/))
-!call mpas_log_write('')
-!do lc = 1, lucats
-!   call mpas_log_write('$i $r $r $r $r $r $r $r $r $r $r $r $r $r $r $r $r $r', intArgs=(/lc/),     &
-!                realArgs=(/shdtbl(lc),float(nrotbl(lc)),rstbl(lc),rgltbl(lc),hstbl(lc),snuptbl(lc), &
-!                maxalb(lc),laimintbl(lc),laimaxtbl(lc),emissmintbl(lc),emissmaxtbl(lc),             &
-!                albedomintbl(lc),albedomaxtbl(lc),z0mintbl(lc),z0maxtbl(lc),ztopvtbl(lc),           &
-!                zbottvtbl(lc)/))
-!enddo
+call mpas_log_write(' TOPT_DATA   = $r',realArgs=(/topt_data/))
+call mpas_log_write(' CMCMAX_DATA = $r',realArgs=(/cmcmax_data/))
+call mpas_log_write(' CFACTR_DATA = $r',realArgs=(/cfactr_data/))
+call mpas_log_write(' RSMAX_DATA  = $r',realArgs=(/rsmax_data/))
+call mpas_log_write(' BARE        = $i',intArgs=(/bare/))
+call mpas_log_write(' NATURAL     = $i',intArgs=(/natural/))
+call mpas_log_write(' CROP   = $i ', intArgs=(/crop/))
+call mpas_log_write(' URBAN  = $i ', intArgs=(/urban/))
+call mpas_log_write('')
+do lc = 1, lucats
+   call mpas_log_write('$i $r $r $r $r $r $r $r $r $r $r $r $r $r $r $r $r $r', intArgs=(/lc/),     &
+                realArgs=(/albtbl(lc),z0tbl(lc),lemitbl(lc),pctbl(lc),shdtbl(lc),real(ifortbl(lc),kind=RKIND), &
+                rstbl(lc),rgltbl(lc),hstbl(lc),snuptbl(lc),laitbl(lc),             &
+                maxalb(lc)/))
+enddo
  call mpas_log_write('    end read VEGPARM.TBL')
 
 !read in soil properties from soilparm.tbl:
@@ -419,28 +422,36 @@
  if(dminfo % my_proc_id == IO_NODE) then
     open(16,file='SOILPARM.TBL',form='FORMATTED',status='OLD',iostat=istat)
     if(istat /= open_ok) &
-       call physics_error_fatal('module_sf_ruclsm.F: soil_veg_gen_parm: ' // &
+       call physics_error_fatal('mpas_atmphys_lsm_rucinit.F: RUCLSM_SOILVEGPARM: ' // &
                                 'failure opening SOILPARM.TBL' )
 
     write(mess,*) '   input soil texture classification = ', trim (mminsl)
     call physics_message(mess)
 
+
     lumatch=0
-    read(16,*)
-    read(16,2000,end=2003) sltype
-    2000 format(a4)
-    read(16,*)slcats,iindex
-    if(sltype.eq.mminsl)then
-       write(mess,*) '   soil texture classification = ', trim ( sltype ) , ' found', &
-                  slcats,' categories'
-       call physics_message ( mess )
-       lumatch=1
-    endif
+    do while  (lumatch == 0)
+      read(16,*)
+      read(16,*,end=2003) sltype
+      !2000 format(a4)
+      read(16,*)slcats,iindex
+      if(trim(sltype).eq.trim(mminsl))then
+         write(mess,*) '   soil texture classification = ', trim ( sltype ) , ' found', &
+                    slcats,' categories'
+         call physics_message ( mess )
+         lumatch=1
+      else
+         call physics_message('    skipping over sltype = ' // trim ( sltype ))
+         do lc = 1, slcats
+            read(16,*)
+         enddo
+       endif
+    enddo
 
 !prevent possible array overwrite, Bill Bovermann, IBM, May 6, 2008:
 !   if(size(bb) < slcats .or. &
 !      size(drysmc) < slcats .or. &
-!      size(f11   ) < slcats .or. &
+!      size(hc    ) < slcats .or. &
 !      size(maxsmc) < slcats .or. &
 !      size(refsmc) < slcats .or. &
 !      size(satpsi) < slcats .or. &
@@ -448,13 +459,14 @@
 !      size(satdw ) < slcats .or. &
 !      size(wltsmc) < slcats .or. &
 !      size(qtz   ) < slcats) then
-!!      call wrf_error_fatal('table sizes too small for value of slcats in module_sf_noahdrv.f')
-!   endif
-    if(sltype.eq.mminsl) then
-!       do lc = 1, slcats
-!          read(16,*) iindex,bb(lc),drysmc(lc),f11(lc),maxsmc(lc),refsmc(lc),satpsi(lc), &
-!                      satdk(lc),satdw(lc),wltsmc(lc),qtz(lc)
-!       enddo
+!      call physics_error_fatal('table sizes too small for value of slcats in module_sf_noahdrv.f')
+!  endif
+
+    if(sltype.eq.trim(mminsl)) then
+       do lc = 1, slcats
+          read(16,*) iindex,bb(lc),drysmc(lc),hc(lc),maxsmc(lc),refsmc(lc),satpsi(lc), &
+                      satdk(lc),satdw(lc),wltsmc(lc),qtz(lc)
+       enddo
     endif
 
     2003 continue
@@ -468,33 +480,33 @@
  endif
 
 !distribute data to all processors: 
-!DM_BCAST_INTEGER(lumatch)
-!DM_BCAST_CHAR(sltype)
-!DM_BCAST_CHAR(mminsl)
-!DM_BCAST_INTEGER(slcats)
-!DM_BCAST_INTEGER(iindex)
-!DM_BCAST_REALS(bb)
-!DM_BCAST_REALS(drysmc)
-!DM_BCAST_REALS(f11)
-!DM_BCAST_REALS(maxsmc)
-!DM_BCAST_REALS(refsmc)
-!DM_BCAST_REALS(satpsi)
-!DM_BCAST_REALS(satdk)
-!DM_BCAST_REALS(satdw)
-!DM_BCAST_REALS(wltsmc)
-!DM_BCAST_REALS(qtz)
+DM_BCAST_INTEGER(lumatch)
+DM_BCAST_CHAR(sltype)
+DM_BCAST_CHAR(mminsl)
+DM_BCAST_INTEGER(slcats)
+DM_BCAST_INTEGER(iindex)
+DM_BCAST_REALS(bb)
+DM_BCAST_REALS(drysmc)
+DM_BCAST_REALS(hc)
+DM_BCAST_REALS(maxsmc)
+DM_BCAST_REALS(refsmc)
+DM_BCAST_REALS(satpsi)
+DM_BCAST_REALS(satdk)
+DM_BCAST_REALS(satdw)
+DM_BCAST_REALS(wltsmc)
+DM_BCAST_REALS(qtz)
 
-!call mpas_log_write(' LUMATCH=$i',intArgs=(/lumatch/))
-!call mpas_log_write(' SLTYPE ='//trim(sltype))
-!call mpas_log_write(' MMINSL ='//mminsl)
-!call mpas_log_write(' SLCATS =$i',intArgs=(/slcats/))
-!call mpas_log_write(' IINDEX =$i',intArgs=(/iindex/))
-!call mpas_log_write('')
-!do lc = 1, slcats
-!   call mpas_log_write('$i $r $r $r $r $r $r $r $r $r $r', intArgs=(/lc/), &
-!                realArgs=(/bb(lc),drysmc(lc),f11(lc),maxsmc(lc),refsmc(lc),satpsi(lc), &
-!                satdk(lc),satdw(lc),wltsmc(lc),qtz(lc)/))
-!enddo
+call mpas_log_write(' LUMATCH=$i',intArgs=(/lumatch/))
+call mpas_log_write(' SLTYPE ='//trim(sltype))
+call mpas_log_write(' MMINSL ='//mminsl)
+call mpas_log_write(' SLCATS =$i',intArgs=(/slcats/))
+call mpas_log_write(' IINDEX =$i',intArgs=(/iindex/))
+call mpas_log_write('')
+do lc = 1, slcats
+   call mpas_log_write('$i $r $r $r $r $r $r $r $r $r $r', intArgs=(/lc/), &
+                realArgs=(/bb(lc),drysmc(lc),hc(lc),maxsmc(lc),refsmc(lc),satpsi(lc), &
+                satdk(lc),satdw(lc),wltsmc(lc),qtz(lc)/))
+enddo
  call mpas_log_write('    end read SOILPARM.TBL')
 
 !read in general parameters from genparm.tbl:
@@ -557,14 +569,14 @@
  DM_BCAST_REAL(smlow_data)
  DM_BCAST_REAL(smhigh_data)
 
-!call mpas_log_write('')
-!write(mess,*) 'input general parameters'
-!call physics_message(mess)
-!call mpas_log_write('NUM_SLOPE=$i',intArgs=(/num_slope/))
-!do lc = 1, slpcats
-!   call mpas_log_write('$i $r', intArgs=(/lc/),realArgs=(/slope_data(lc)/))
-!enddo
-!call mpas_log_write('       end subroutine soil_veg_gen_parm:')
+call mpas_log_write('')
+write(mess,*) 'input general parameters'
+call physics_message(mess)
+call mpas_log_write('NUM_SLOPE=$i',intArgs=(/num_slope/))
+do lc = 1, slpcats
+   call mpas_log_write('$i $r', intArgs=(/lc/),realArgs=(/slope_data(lc)/))
+enddo
+! call mpas_log_write('       end subroutine soil_veg_gen_parm:')
  call mpas_log_write('    end read GENPARM.TBL')
 
  end subroutine RUCLSM_SOILVEGPARM

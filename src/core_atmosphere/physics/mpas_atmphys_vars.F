@@ -744,12 +744,16 @@
     soilt1_p,           &!snow temperature at 7.5cm depth                                                      [K]
     tsnav_p,            &!average temperature of snowpack                                                      [C]
     acrunoff_p,         &!run total accumulated runoff                                                    [kg m-2]
-    snowfallac_p         !run total accumulated snowfall taking in to account melting                         [mm] 
+    snowfallac_p,       &!run total accumulated snowfall taking in to account melting                         [mm] 
+    sfcexc_p,           &!Surface exhcange coefficient for heat                                            [m s-1]
+    sfcevp_p,           &!total evaporation                                                               [kg m-2]
+    lakemask_p           !lakemask
 
  real(kind=RKIND), dimension(:,:,:), allocatable:: &
     smfr3d_p ,          &!fraction of frozen soil moisture                                                     [-]
     landusef_p,         &!fraction of each landuse category                                                    [-]
-    soilf_p              !fraction of each soil category                                                       [-] 
+    soilf_p,            &!fraction of each soil category                                                       [-]
+    keepfr3d_p           !flag to keep frozen soil moisture information
 
 !=================================================================================================================
 !.. variables and arrays related to surface characteristics:

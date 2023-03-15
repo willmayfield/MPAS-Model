@@ -157,7 +157,7 @@ module mpas_io_streams
       type (MPAS_Time_type) :: time0, time1, time2, timeGuess, timeGuessData
       type (MPAS_TimeInterval_type) :: timeInterval
 
-!      call mpas_log_write('Called MPAS_seekStream')
+      call mpas_log_write('Called MPAS_seekStream')
 
       !
       ! Initialize output arguments
@@ -183,7 +183,7 @@ module mpas_io_streams
 
       if (present(maxRecords)) maxRecords = timeDim
 
-!call mpas_log_write('Found $i times in file', intArgs=(/timeDim/))
+call mpas_log_write('Found $i times in file', intArgs=(/timeDim/))
 
       call MPAS_io_inq_var(stream % fileHandle, 'xtime', ierr=io_err)
       if (io_err /= MPAS_IO_NOERR) then
@@ -192,7 +192,7 @@ module mpas_io_streams
          return
       end if
 
-!call mpas_log_write('Found xtime variable')
+call mpas_log_write('Found xtime variable')
 
       ! the following section of code improves performance for forcing files
       ! that have large numbers of evenly spaced times by reducing the number
@@ -233,7 +233,6 @@ module mpas_io_streams
 
                call MPAS_io_set_frame(stream % fileHandle, i, io_err)
                call MPAS_io_get_var(stream % fileHandle, 'xtime', xtimeGuess, io_err)
-
                call mpas_set_time(curr_time=timeGuessData, dateTimeString=trim(xtimeGuess(1:32)))
                if (timeGuessData == timeGuess) then
                   ! found the correct time
@@ -254,7 +253,7 @@ module mpas_io_streams
       do i=1,timeDim
          call MPAS_io_set_frame(stream % fileHandle, i, io_err)
          call MPAS_io_get_var(stream % fileHandle, 'xtime', xtimes(i), io_err)
-!call mpas_log_write('... just read in xtime='//xtimes(i))
+call mpas_log_write('... just read in xtime='//xtimes(i))
       end do
 
       if (len(seekTime) > 32) then
@@ -263,12 +262,13 @@ module mpas_io_streams
          write(strTemp, '(a)') trim(seekTime)
       end if
 
+      
       call mpas_set_timeInterval(interval=minTimeDiff, DD=10000)
       call mpas_set_time(curr_time=startTime, dateTimeString=strTemp)
 
       do i=1,timeDim
          write(strTemp, '(a)') trim(xtimes(i)(1:32))
-!call mpas_log_write('... converted strTemp='//strTemp)
+call mpas_log_write('... converted strTemp='//trim(xtimes(i)(1:32)))
          call mpas_set_time(curr_time=sliceTime, dateTimeString=strTemp)
          if (seekPosition == MPAS_STREAM_EXACT_TIME) then
             if (sliceTime == startTime) then

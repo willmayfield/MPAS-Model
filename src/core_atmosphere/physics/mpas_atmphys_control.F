@@ -360,7 +360,18 @@
              dzs(4,iCell) = 1.00_RKIND
           enddo
 
-       case("ruclsm")
+       case("ruc")
+         do iCell = 1,nCells
+             dzs(1,iCell) = 0.005_RKIND
+             dzs(2,iCell) = 0.025_RKIND
+             dzs(3,iCell) = 0.045_RKIND
+             dzs(4,iCell) = 0.13_RKIND
+             dzs(5,iCell) = 0.25_RKIND
+             dzs(6,iCell) = 0.35_RKIND
+             dzs(7,iCell) = 0.50_RKIND
+             dzs(8,iCell) = 1.00_RKIND
+             dzs(9,iCell) = 0.70_RKIND
+        enddo
 
        case default
     

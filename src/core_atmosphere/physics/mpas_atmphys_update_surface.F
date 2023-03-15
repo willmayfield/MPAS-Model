@@ -89,7 +89,7 @@
 
  call mpas_pool_get_array(sfc_input,'greenfrac' , greenfrac )
  call mpas_pool_get_array(sfc_input,'lai12m'    , lai12m    )
- call mpas_pool_get_array(diag_physics,'lai   '    , lai       )
+ call mpas_pool_get_array(diag_physics,'lai   '    , lai    )
  call mpas_pool_get_array(sfc_input,'vegfra'    , vegfra    )
  call mpas_pool_get_array(sfc_input,'shdmin'    , shdmin    )
  call mpas_pool_get_array(sfc_input,'shdmax'    , shdmax    )

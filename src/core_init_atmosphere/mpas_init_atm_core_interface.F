@@ -56,7 +56,6 @@ module init_atm_core_interface
       core % Conventions = 'MPAS'
       core % source = 'MPAS'
 
-        print*, "end init_atm_setup_core"
 
 #include "core_variables.inc"
 
@@ -82,7 +81,6 @@ module init_atm_core_interface
       implicit none
 
       type (domain_type), pointer :: domain
-      print*, "end init_atm_setup_domain"
 #include "domain_variables.inc"
 
    end subroutine init_atm_setup_domain

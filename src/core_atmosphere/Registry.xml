@@ -395,6 +395,7 @@
                 <package name="bl_ysu_in" description="parameterization of YSU Planetary Boundary Layer."/>
                 <package name="bl_mynn_in" description="parameterization of MYNN Planetary Boundary Layer."/>
                 <package name="lsm_ruc_in" description="parameterization of the RUC land surface."/>
+                <package name="lsm_noah_in" description="parameterization of the Noah land surface."/>
 
                 <package name="iau" description="Incremental Analysis Update"/>
                 <package name="limited_area" description="Limited-area simulations, which have lateral boundaries"/>
@@ -503,7 +504,7 @@
 			<var name="snoalb"/>
 			<var name="albedo12m"/>
 			<var name="greenfrac"/>
-			<var name="lai"/>
+			<var name="lai12m"/>
 			<var name="sfc_albbck"/>
 			<var name="skintemp"/>
 			<var name="snow"/>
@@ -998,6 +999,10 @@
 			<var name="rhosnf"/>
 			<var name="snowfallac"/>
 			<var name="acrunoff"/>
+			<var name="grdflx"/>
+			<var name="ivgtyp"/>
+			<var name="isltyp"/>
+			<var name="sfc_albedo"/>
 
 		</stream>
 
@@ -2138,6 +2143,11 @@
                      description="configuration for land-surface schemes"
                      possible_values="`suite',`noah',`ruc',`off'"/>
 
+		<nml_option name="config_lakemodel" type="integer" default_value="0" in_defaults="false"
+		    units="-"
+		    description="configuration option to use lake model with RUC lsm"
+		    possible_values="0"/>
+
                 <nml_option name="config_pbl_scheme" type="character" default_value="suite" in_defaults="false"
                      units="-"
                      description="configuration for planetary boundary layer schemes"
@@ -2497,7 +2507,7 @@
 
                 <var name="mavail" type="real" dimensions="nCells Time" units="unitless"
                      description="surface moisture availability (between 0 and 1)"
-                     packages="bl_mynn_in;bl_ysu_in"/>
+                     packages="bl_mynn_in;bl_ysu_in;lsm_ruc_in"/>
 
                 <var name="mol" type="real" dimensions="nCells Time" units="K"
                      description="T* in similarity theory"
@@ -3025,6 +3035,30 @@
                 <var name="smfr3d" type="real" dimensions="nSoilLevels nCells Time" units=""
                     description="fraction frozen soil moisture"
                     packages="lsm_ruc_in"/>
+
+		<var name="spp_lsm_loc" type="integer" dimensions="" units=""
+		    description="use spoil property perturbations; 1 or 0; Hardcoded to 0 for now"
+		    packages="lsm_ruc_in"/>
+
+		<var name="mosaic_lu" type="integer" dimensions="" units=""
+	 	    description="use fractional landuse categories; 1 or 0; Hardcoded to 1 for now"
+		    packages="lsm_ruc_in"/>
+
+		<var name="mosaic_soil" type="integer" dimensions="" units=""
+		    desciption="use fractional soil categories; 1 or 0; Hardcoded to 1 for now"
+                    packages="lsm_ruc_in"/>
+
+		<var name="keepfr3d" type="real" dimensions="nSoilLevels nCells Time" units=""
+		    description="keep 3d frozen soil categorization for next time step"
+		    packages="lsm_ruc_in"/>
+
+		<var name="sfcexc" type="real" dimensions="nCells Time" units="m s^{-1}"
+		    desciption="surface exchange coefficient for heat"
+		    packages="lsm_ruc_in"/>
+	
+		<var name="sfcevp" type="real" dimensions="nCells Time" units="kg m^{-2}"
+		    description="total evaporation"
+		    packages="lsm_ruc_in"/>
 
                 <!-- ================================================================================================== -->
                 <!-- ... PARAMETERIZATION OF THE 1D OCEAN MIXED LAYER                                                   -->
