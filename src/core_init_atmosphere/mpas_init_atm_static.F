@@ -439,17 +439,10 @@
 
  rarray_ptr = c_loc(rarray)
 
-<<<<<<< HEAD
  do jTileStart = 1,jmax-ny+1,ny
     jTileEnd = jTileStart + ny - 1
 
     do iTileStart = 1,imax-nx+1,nx
-=======
- do jTileStart = 1,tile_max_j,ny
-    jTileEnd = jTileStart + ny - 1
-
-    do iTileStart = 1,tile_max_i,nx
->>>>>>> 9ddd08ba5bf81c27cb03b83a966ad94fa5b96eaa
        iTileEnd = iTileStart + nx - 1
        write(fname,'(a,i5.5,a1,i5.5,a1,i5.5,a1,i5.5)') trim(geog_data_path)// &
              trim(geog_sub_path),iTileStart,'-',iTileEnd,'.',jTileStart,'-',jTileEnd

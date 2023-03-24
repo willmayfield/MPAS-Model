@@ -118,6 +118,7 @@
 
 !arrays for soil layer properties:
  if(.not.allocated(dzs_p)   ) allocate(dzs_p(1:num_soils)                   )
+ if(.not.allocated(zs_p)    ) allocate(zs_p(1:num_soils)                    )
  if(.not.allocated(smcrel_p)) allocate(smcrel_p(ims:ime,1:num_soils,jms:jme))
  if(.not.allocated(sh2o_p)  ) allocate(sh2o_p(ims:ime,1:num_soils,jms:jme)  )
  if(.not.allocated(smois_p) ) allocate(smois_p(ims:ime,1:num_soils,jms:jme) )
@@ -234,6 +235,7 @@
 
 !arrays for soil layer properties:
  if(allocated(dzs_p)   ) deallocate(dzs_p   )
+ if(allocated(zs_p)    ) deallocate(zs_p    )
  if(allocated(smcrel_p)) deallocate(smcrel_p)
  if(allocated(sh2o_p)  ) deallocate(sh2o_p  )
  if(allocated(smois_p) ) deallocate(smois_p )
@@ -380,7 +382,7 @@
                                            skintemp,vegfra,xice,xland,mavail
  real(kind=RKIND),dimension(:),pointer  :: t2m,th2m,q2
  real(kind=RKIND),dimension(:),pointer  :: raincv,rainncv
- real(kind=RKIND),dimension(:,:),pointer:: sh2o,smcrel,smois,tslb,dzs
+ real(kind=RKIND),dimension(:,:),pointer:: sh2o,smcrel,smois,tslb,dzs,zs
  real(kind=RKIND),dimension(:,:),pointer:: smfr3d,landusef,soilf,keepfr3d
 
 !local variables and arrays:
@@ -470,6 +472,7 @@
  call mpas_pool_get_array(sfc_input,'xice'      ,xice      )
  call mpas_pool_get_array(sfc_input,'xland'     ,xland     )
  call mpas_pool_get_array(sfc_input,'dzs'       ,dzs       )
+ call mpas_pool_get_array(sfc_input,'zs'        ,zs        )
  call mpas_pool_get_array(sfc_input,'sh2o'      ,sh2o      )
  call mpas_pool_get_array(sfc_input,'smcrel'    ,smcrel    )
  call mpas_pool_get_array(sfc_input,'smois'     ,smois     )
@@ -478,11 +481,11 @@
    call mpas_pool_get_array(sfc_input,'landusef'       ,landusef         )
    call mpas_pool_get_array(sfc_input,'soilf'          ,soilf            )
  endif
-
 !In Registry.xml, dzs is a function of nCells. In the Noah lsm scheme, dzs is independent
-!of cell locations:
+!of cell locations
  do n = 1,num_soils
     dzs_p(n) = dzs(n,its)
+    zs_p(n) = zs(n,its)
  enddo
 
  do j = jts,jte
@@ -983,7 +986,7 @@
  character(len=StrKIND),pointer:: mminlu
  integer,pointer:: isice,lakemodel,iswater
  integer,pointer:: spp_lsm_loc ,mosaic_lu,mosaic_soil
-
+ integer,pointer:: globalCells(:)
 !local variables
  logical:: myjpbl
 !-----------------------------------------------------------------------------------------------------------------
@@ -1001,7 +1004,7 @@
  call mpas_pool_get_array(diag_physics,'spp_lsm_loc', spp_lsm_loc)
  call mpas_pool_get_array(diag_physics,'mosaic_lu', mosaic_lu)
  call mpas_pool_get_array(diag_physics,'mosaic_soil', mosaic_soil)
-
+ call mpas_pool_get_array(mesh,'indexToCellID',globalCells)
 !copy MPAS arrays to local arrays:
  call lsm_from_MPAS(configs,mesh,diag_physics,sfc_input,its,ite)
 !write(0,*) '--- end lsm_from_MPAS'
@@ -1129,8 +1132,8 @@
                     qfx            = qfx_p         , lh           = lh_p        , sfcrunoff = sfcrunoff_p, &
                     udrunoff       = udrunoff_p    , grdflx       = grdflx_p    , acsnow    = acsnow_p,    &
                     snom           = acsnom_p      , shdmin       = shdmin_p    , rdlai2d   = rdlai2d,     &
-                    mosaic_soil    = mosaic_soil   , zs           = dzs_p       , smfr3d    = smfr3d_p,    &
-                    shdmax         = shdmax_p,                                                             &
+                    mosaic_soil    = mosaic_soil   , zs           = zs_p        , smfr3d    = smfr3d_p,    &
+                    shdmax         = shdmax_p      ,                                                       &
                     ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde ,  &
                     ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme ,  &
                     its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte    &

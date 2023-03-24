@@ -774,24 +774,28 @@ end subroutine init_soil_layers_properties
 
  ELSEIF (nFGSoilLevels == 9) THEN ! RUC SOIL LEVELS INPUT
    DO iCell = 1,nCellsSolve
-     DO iFGSoil = 1,nFGSoilLevels
-       zhave(iFGSoil,iCell) = zs_fg(iFGSoil,iCell)
-     ENDDO
+     !DO iFGSoil = 1,nFGSoilLevels
+     !  zhave(iFGSoil,iCell) = zs_fg(iFGSoil,iCell)
+     !ENDDO
 
-     ruc2 : DO iSoil = 1 , nSoilLevels
-         input2 : DO iFGSoil = 1 , nFGSoilLevels -1
-            IF ( ( zs(iSoil,iCell) .GE. zhave(iFGSoil,iCell  ) ) .AND. &
-                 ( zs(iSoil,iCell) .LE. zhave(iFGSoil+1,iCell) ) ) THEN
-                   tslb(iSoil,iCell)= ( st_fg(iFGSoil,iCell ) * ( zhave(iFGSoil+1,iCell) - zs(iSoil,iCell) ) + &
-                                        st_fg(iFGSoil+1,iCell) * ( zs (iSoil,iCell) - zhave(iFGSoil,iCell) ) ) / &
-                                                                ( zhave(iFGSoil+1,iCell) - zhave(iFGSoil,iCell) )
-                   smois(iSoil,iCell)= ( sm_fg(iFGSoil,iCell ) * ( zhave(iFGSoil+1,iCell) - zs(iSoil,iCell) ) + &
-                                        sm_fg(iFGSoil+1,iCell) * ( zs (iSoil,iCell) - zhave(iFGSoil,iCell) ) ) / &
-                                                                (zhave(iFGSoil+1,iCell) - zhave(iFGSoil,iCell) )
-               EXIT input2
-            END IF
-         END DO input2
-     END DO ruc2
+     !ruc2 : DO iSoil = 1 , nSoilLevels
+     !    input2 : DO iFGSoil = 1 , nFGSoilLevels -1
+     !       IF ( ( zs(iSoil,iCell) .GE. zhave(iFGSoil,iCell  ) ) .AND. &
+     !            ( zs(iSoil,iCell) .LE. zhave(iFGSoil+1,iCell) ) ) THEN
+     !              tslb(iSoil,iCell)= ( st_fg(iFGSoil,iCell ) * ( zhave(iFGSoil+1,iCell) - zs(iSoil,iCell) ) + &
+     !                                   st_fg(iFGSoil+1,iCell) * ( zs (iSoil,iCell) - zhave(iFGSoil,iCell) ) ) / &
+     !                                                           ( zhave(iFGSoil+1,iCell) - zhave(iFGSoil,iCell) )
+     !              smois(iSoil,iCell)= ( sm_fg(iFGSoil,iCell ) * ( zhave(iFGSoil+1,iCell) - zs(iSoil,iCell) ) + &
+     !                                   sm_fg(iFGSoil+1,iCell) * ( zs (iSoil,iCell) - zhave(iFGSoil,iCell) ) ) / &
+     !                                                           (zhave(iFGSoil+1,iCell) - zhave(iFGSoil,iCell) )
+     !          EXIT input2
+     !       END IF
+     !    END DO input2
+     !END DO ruc2
+     DO iSoil = 1,nSoilLevels
+         tslb(iSoil,iCell) = st_fg(iSoil,iCell)
+         smois(iSoil,iCell) = sm_fg(iSoil,iCell)
+     ENDDO
    ENDDO !iCell
  END IF
 

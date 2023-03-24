@@ -522,6 +522,7 @@
 			<var name="t2m"/>
 			<var name="precipw"/>
 			<var name="dzs"/>
+		        <var name="zs"/>
 			<var name="sh2o"/>
 			<var name="smois"/>
 			<var name="tslb"/>
@@ -2993,9 +2994,6 @@
                 <var name="znt" type="real" dimensions="nCells Time" units="m"
                      description="roughness length"/>
 
-                <var name="zs" type="real" dimensions="nCells Time" units="m"
-                     description="depth of centers of soil layers"/>
-
                 <var name="rhosnf" type="real" dimensions="nCells Time" units="kg m^{-3}"
                    description="density of snowfall"
                     packages="lsm_ruc_in"/>
@@ -3253,6 +3251,9 @@
 
                 <var name="dzs" type="real" dimensions="nSoilLevels nCells Time" units="m"
                      description="soil layer thickness"/>
+
+		<var name="zs" type="real" dimensions="nSoilLevels nCells Time" units="m"
+                     description="depth of centers of soil layers"/>
 
                 <var name="sfc_albbck" type="real" dimensions="nCells Time" units="unitless"
                      description="background surface albedo"/>

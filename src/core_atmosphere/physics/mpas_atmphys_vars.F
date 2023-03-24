@@ -672,7 +672,9 @@
     ivgtyp_p           !dominant vegetation category                                                           [-]
 
  real(kind=RKIND),dimension(:),allocatable:: &
-    dzs_p              !thickness of soil layers                                                               [m]
+    dzs_p,            &!thickness of soil layers                                                               [m]
+    zs_p               !depth of soil layer bottom                                                             [m]
+
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     smcrel_p,         &!soil moisture threshold below which transpiration starts to stress                     [-]
     sh2o_p,           &!unfrozen soil moisture content                                       [volumetric fraction]
