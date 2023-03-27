@@ -132,7 +132,7 @@
  else if (trim(config_physics_suite) == 'convection_permitting') then
 
     if (trim(config_microp_scheme)     == 'suite') config_microp_scheme     = 'mp_thompson'
-    if (trim(config_convection_scheme) == 'suite') config_convection_scheme = 'off'
+    if (trim(config_convection_scheme) == 'suite') config_convection_scheme = 'cu_grell_freitas'
     if (trim(config_pbl_scheme)        == 'suite') config_pbl_scheme        = 'bl_mynn'
     if (trim(config_gwdo_scheme)       == 'suite') config_gwdo_scheme       = 'bl_ysu_gwdo'
     if (trim(config_radt_lw_scheme)    == 'suite') config_radt_lw_scheme    = 'rrtmg_lw'
