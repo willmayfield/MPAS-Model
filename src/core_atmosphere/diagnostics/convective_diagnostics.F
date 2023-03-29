@@ -360,6 +360,7 @@ module convective_diagnostics
         call mpas_get_timeInterval(diag_interval, ref_time, S=diag_tmp)
         
         call mpas_interval_division(ref_time, diag_interval, dt_interval, nsteps, extra)
+        
         if (do_any_diags) then
             call mpas_pool_get_dimension(mesh, 'nCells', nCells)
             call mpas_pool_get_dimension(mesh, 'nVertLevels', nVertLevels)

@@ -183,7 +183,6 @@ module mpas_io_streams
 
       if (present(maxRecords)) maxRecords = timeDim
 
-call mpas_log_write('Found $i times in file', intArgs=(/timeDim/))
 
       call MPAS_io_inq_var(stream % fileHandle, 'xtime', ierr=io_err)
       if (io_err /= MPAS_IO_NOERR) then
@@ -192,7 +191,6 @@ call mpas_log_write('Found $i times in file', intArgs=(/timeDim/))
          return
       end if
 
-call mpas_log_write('Found xtime variable')
 
       ! the following section of code improves performance for forcing files
       ! that have large numbers of evenly spaced times by reducing the number
@@ -253,7 +251,6 @@ call mpas_log_write('Found xtime variable')
       do i=1,timeDim
          call MPAS_io_set_frame(stream % fileHandle, i, io_err)
          call MPAS_io_get_var(stream % fileHandle, 'xtime', xtimes(i), io_err)
-call mpas_log_write('... just read in xtime='//xtimes(i))
       end do
 
       if (len(seekTime) > 32) then
@@ -268,7 +265,6 @@ call mpas_log_write('... just read in xtime='//xtimes(i))
 
       do i=1,timeDim
          write(strTemp, '(a)') trim(xtimes(i)(1:32))
-call mpas_log_write('... converted strTemp='//trim(xtimes(i)(1:32)))
          call mpas_set_time(curr_time=sliceTime, dateTimeString=strTemp)
          if (seekPosition == MPAS_STREAM_EXACT_TIME) then
             if (sliceTime == startTime) then
