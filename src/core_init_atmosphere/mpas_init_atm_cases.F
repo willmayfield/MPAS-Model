@@ -259,14 +259,6 @@ module init_atm_cases
                   write(mminlu,'(a)') 'USGS'
             end if
 
-            !call mpas_log_write("mminlu = "//trim(mminlu))
-            !call mpas_log_write("len mminlu = $i",intArgs=(/len_trim(mminlu)/))
-            !if (len_trim(mminlu) == 28) then
-            !   mminlu = ""
-            !    write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
-            !    call mpas_log_write('mminlu = '//trim(mminlu))
-            !endif
-
             call init_atm_case_gfs(block_ptr, mesh, nCells, nEdges, nVertLevels, fg, state, &
                                    diag, diag_physics, config_init_case, block_ptr % dimensions, block_ptr % configs)
 
@@ -3458,7 +3450,7 @@ module init_atm_cases
          msgval = -1.e30
 
          mask_array => landmask
-         call mpas_log_write('Reading field from ungribbed data '//trim(field % field))
+
          if (trim(field % field) == 'UU' .or. &
              trim(field % field) == 'VV' .or. &
              trim(field % field) == 'TT' .or. &

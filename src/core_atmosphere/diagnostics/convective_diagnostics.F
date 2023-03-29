@@ -221,7 +221,7 @@ module convective_diagnostics
          if (mpas_stream_inclusion_count('w_velocity_mean', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_w_mean = .true.
         end if
-
+        do_any_diags = do_any_diags .or. is_needed_w_mean
         ! - Precipitation accumulation
         if (mpas_stream_inclusion_count('prec_acc_c', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_prec_acc_c = .true.
