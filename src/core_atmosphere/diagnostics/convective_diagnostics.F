@@ -1023,7 +1023,7 @@ module convective_diagnostics
         if(z(k) >= z_top) kzt = k
       end do
       kzb = min(kzb,n-1)
-      kzt = min(kzb,n-1)
+      kzt = min(kzt,n-1)
 
       if (kzt <= kzb) call mpas_log_write('col_depth_max: top height not above bottom height', messageType=MPAS_LOG_ERR) 
 
