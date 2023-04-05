@@ -72,6 +72,7 @@
  character(len=StrKIND), pointer :: config_vegfrac_data
  character(len=StrKIND), pointer :: config_albedo_data
  character(len=StrKIND), pointer :: config_maxsnowalbedo_data
+ character(len=StrKIND), pointer :: config_lai_data
  character(len=StrKIND+1) :: geog_data_path      ! same as config_geog_data_path, but guaranteed to have a trailing slash
  character(len=StrKIND+1) :: geog_sub_path       ! subdirectory names in config_geog_data_path, with trailing slash
 
@@ -83,6 +84,7 @@
  integer:: i,j,k
  integer :: ii, jj
  integer :: lu_sum
+ integer :: imax,jmax
  integer:: iCell,iEdge,iVtx,iPoint,iTileStart,iTileEnd,jTileStart,jTileEnd
  integer,dimension(5) :: interp_list
  integer,dimension(:),allocatable  :: nhs
@@ -127,6 +129,7 @@
  real (kind=RKIND), dimension(:), pointer :: snoalb
  real (kind=RKIND), dimension(:), pointer :: shdmin, shdmax
  real (kind=RKIND), dimension(:,:), pointer :: greenfrac
+ real (kind=RKIND), dimension(:,:), pointer :: lai12m
  real (kind=RKIND), dimension(:,:), pointer :: albedo12m
  real (kind=RKIND) :: msgval, fillval
  integer, dimension(:), pointer :: lu_index
@@ -137,7 +140,7 @@
  integer, dimension(:), pointer :: bdyMaskCell
  character(len=StrKIND), pointer :: mminlu
 
- real (kind=RKIND) :: xPixel, yPixel, zPixel
+ real (kind=RKIND) :: xPixel, yPixel, zPixel, dx
 
 !--------------------------------------------------------------------------------------------------
 
@@ -152,6 +155,7 @@
  call mpas_pool_get_config(configs, 'config_albedo_data', config_albedo_data)
  call mpas_pool_get_config(configs, 'config_maxsnowalbedo_data', config_maxsnowalbedo_data)
  call mpas_pool_get_config(configs, 'config_supersample_factor', supersample_fac)
+ call mpas_pool_get_config(configs, 'config_lai_data', config_lai_data)
 
  write(geog_data_path, '(a)') config_geog_data_path
  i = len_trim(geog_data_path)
@@ -204,6 +208,7 @@
  call mpas_pool_get_array(mesh, 'soiltemp', soiltemp)
  call mpas_pool_get_array(mesh, 'snoalb', snoalb)
  call mpas_pool_get_array(mesh, 'greenfrac', greenfrac)
+ call mpas_pool_get_array(mesh, 'lai12m', lai12m)
  call mpas_pool_get_array(mesh, 'albedo12m', albedo12m)
  call mpas_pool_get_array(mesh, 'shdmin', shdmin)
  call mpas_pool_get_array(mesh, 'shdmax', shdmax)
@@ -251,7 +256,6 @@
  call atm_initialize_advection_rk(mesh, nCells, nEdges, maxEdges, on_a_sphere, sphere_radius) 
  call atm_initialize_deformation_weights(mesh, nCells, on_a_sphere, sphere_radius) 
 
-
 !
 ! Set land use and soil category parameters for water and ice
 !
@@ -259,25 +263,33 @@
     case('USGS')
        isice_lu = 24
        iswater_lu = 16
+       dx = 0.0083333333
        !ismax_lu = 24
        write(mminlu,'(a)') 'USGS'
     case('MODIFIED_IGBP_MODIS_NOAH')
        isice_lu = 15
        iswater_lu = 17
+       dx = 0.0083333333
+       !ismax_lu = 20
+       write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
+    case('MODIFIED_IGBP_MODIS_NOAH_15s')
+       isice_lu = 15
+       iswater_lu = 17
+       dx = 0.0083333333 / 2.0
        !ismax_lu = 20
        write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
     case default
          call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
          call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
                                        //''' selected for config_landuse_data',                   messageType=MPAS_LOG_ERR)
-         call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH''',   messageType=MPAS_LOG_ERR)
+         call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH'',',  messageType=MPAS_LOG_ERR)
+         call mpas_log_write('   '' MODIFIED_IGBP_MODIS_NOAH_15s''',                             messageType=MPAS_LOG_ERR)
          call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
          call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
  end select surface_input_select0
 
 
 !
-! Interpolate HGT
 !
 !nx = 126
 !ny = 126
@@ -384,19 +396,36 @@
     case('USGS')
        call mpas_log_write('Using 24-class USGS 30-arc-second land cover dataset')
        geog_sub_path = 'landuse_30s/'
+       nx = 1200
+       ny = 1200
+       dx = 0.0083333333
+       jmax = 21600
+       imax = 43200
     case('MODIFIED_IGBP_MODIS_NOAH')
        call mpas_log_write('Using 20-class MODIS 30-arc-second land cover dataset')
        geog_sub_path = 'modis_landuse_20class_30s/'
+       nx = 1200
+       ny = 1200
+       dx = 0.0083333333
+       jmax = 21600
+       imax = 43200
+    case('MODIFIED_IGBP_MODIS_NOAH_15s')
+       call mpas_log_write('Using 20-class MODIS 15-arc-second land cover dataset')
+       geog_sub_path = 'modis_landuse_20class_15s/'
+       nx = 2400
+       ny = 2400
+       dx = 0.0083333333 / 2.0
+       imax = 86400
+       jmax = 43200
     case default
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
                                      //''' selected for config_landuse_data',                   messageType=MPAS_LOG_ERR)
-       call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH''',   messageType=MPAS_LOG_ERR)
+       call mpas_log_write('   Possible options are: ''USGS'', ''MODIFIED_IGBP_MODIS_NOAH'',',  messageType=MPAS_LOG_ERR)
+       call mpas_log_write('   '' MODIFIED_IGBP_MODIS_NOAH_15s''',                              messageType=MPAS_LOG_ERR)
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
  end select surface_input_select1
- nx = 1200
- ny = 1200
  nz = 1
  isigned  = 1
  endian   = 0
@@ -410,10 +439,10 @@
 
  rarray_ptr = c_loc(rarray)
 
- do jTileStart = 1,20401,ny
+ do jTileStart = 1,jmax-ny+1,ny
     jTileEnd = jTileStart + ny - 1
 
-    do iTileStart = 1,42001,nx
+    do iTileStart = 1,imax-nx+1,nx
        iTileEnd = iTileStart + nx - 1
        write(fname,'(a,i5.5,a1,i5.5,a1,i5.5,a1,i5.5)') trim(geog_data_path)// &
              trim(geog_sub_path),iTileStart,'-',iTileEnd,'.',jTileStart,'-',jTileEnd
@@ -427,13 +456,13 @@
        iPoint = 1
        do j=1,ny
        do i=1,nx
-!
+!0.0083333333
 ! The MODIS dataset appears to have zeros at the South Pole, possibly other places, too
 !
 if (rarray(i,j,1) == 0) cycle
 
-          lat_pt = -89.99583  + (jTileStart + j - 2) * 0.0083333333
-          lon_pt = -179.99583 + (iTileStart + i - 2) * 0.0083333333
+          lat_pt = -90.0 + dx/2.0  + (jTileStart + j - 2) * dx
+          lon_pt = -180.0 + dx/2.0 + (iTileStart + i - 2) * dx
           lat_pt = lat_pt * PI / 180.0
           lon_pt = lon_pt * PI / 180.0
 
@@ -477,7 +506,9 @@ if (rarray(i,j,1) == 0) cycle
        end if
        lu_sum = lu_sum + ncat(i,iCell)
     end do
-    landusef(:,iCell) = ncat(:,iCell) / real(lu_sum)
+    do i = 1,ismax_lu
+        landusef(i,iCell) = real(ncat(i,iCell)) / real(lu_sum)
+    enddo
  end do
  deallocate(rarray)
  deallocate(ncat)
@@ -564,7 +595,7 @@ if (rarray(i,j,1) == 0) cycle
        end if
        lu_sum = lu_sum + ncat(i,iCell)
     end do
-    soilf(:,iCell) = ncat(:,iCell) / real(lu_sum)
+    soilf(:,iCell) = real(ncat(:,iCell)) / real(lu_sum)
  end do
  deallocate(rarray)
  deallocate(ncat)
@@ -1267,6 +1298,123 @@ if (rarray(i,j,1) == 0) cycle
 
  call mpas_log_write('--- end interpolate ALBEDO12M')
 
+!
+! Interpolate LAI
+!
+ if (trim(config_lai_data) == 'MODIS') then
+
+    call mpas_log_write('Using MODIS FPAR 30-arc-second data for climatological monthly leaf area index')
+
+    nx = 1200
+    ny = 1200
+    nz = 12
+    isigned  = 0
+    endian   = 0
+    wordsize = 1
+    scalefactor = 1.0
+    msgval = 200.0
+    fillval = 0.0
+    allocate(rarray(nx,ny,nz))
+    allocate(nhs(nCells))
+    nhs(:) = 0
+    lai12m(:,:) = 0.0
+
+    rarray_ptr = c_loc(rarray)
+
+    start_lat = -89.99583
+    start_lon = -179.99583
+    geog_sub_path = 'lai_modis_30s/'
+
+    do jTileStart = 1,20401,ny
+       jTileEnd = jTileStart + ny - 1
+
+       do iTileStart=1,42001,nx
+          iTileEnd = iTileStart + nx - 1
+          write(fname,'(a,i5.5,a1,i5.5,a1,i5.5,a1,i5.5)')trim(geog_data_path)//trim(geog_sub_path), &
+                       iTileStart,'-',iTileEnd,'.',jTileStart,'-',jTileEnd
+          call mpas_log_write(trim(fname))
+          call mpas_f_to_c_string(fname, c_fname)
+
+          call read_geogrid(c_fname,rarray_ptr,nx,ny,nz,isigned,endian, &
+                            scalefactor,wordsize,istatus)
+          call init_atm_check_read_error(istatus, fname)
+
+          iPoint = 1
+          do j=1,ny
+          do i=1,nx
+             lat_pt = start_lat + (jTileStart + j - 2) * 0.0083333333
+             lon_pt = start_lon + (iTileStart + i - 2) * 0.0083333333
+             lat_pt = lat_pt * PI / 180.0
+             lon_pt = lon_pt * PI / 180.0
+
+             iPoint = nearest_cell(lat_pt,lon_pt,iPoint,nCells,maxEdges, &
+                                   nEdgesOnCell,cellsOnCell, &
+                                   latCell,lonCell)
+
+             !
+             ! This field only matters for land cells, and for all but the
+             ! outermost boundary cells,
+             ! we can safely assume that the nearest model grid cell contains
+             ! the pixel (else, a different
+             ! cell would be nearest)
+             !
+             if (landmask(iPoint) == 1 .and. bdyMaskCell(iPoint) < nBdyLayers)then
+                do k=1,nz
+                   if (rarray(i,j,k) == msgval) then
+                      rarray(i,j,k) = fillval
+                   end if
+                   lai12m(k,iPoint) = lai12m(k,iPoint) + rarray(i,j,k)
+                end do
+                nhs(iPoint) = nhs(iPoint) + 1
+
+             ! For outermost land cells, additional work is needed to verify
+             ! that the pixel
+             ! actually lies within the nearest cell
+             else if (landmask(iPoint) == 1) then
+                zPixel = sphere_radius * sin(lat_pt)                  ! Modelcell coordinates assume a "full" sphere radius
+                xPixel = sphere_radius * cos(lon_pt) * cos(lat_pt)    ! at thispoint, so we need to ues the same radius
+                yPixel = sphere_radius * sin(lon_pt) * cos(lat_pt)    ! forsource pixel coordinates
+
+                if (in_cell(xPixel, yPixel, zPixel, xCell(iPoint),yCell(iPoint), zCell(iPoint), &
+                            nEdgesOnCell(iPoint), verticesOnCell(:,iPoint),xVertex, yVertex, zVertex)) then
+                   do k=1,nz
+                      if (rarray(i,j,k) == msgval) then
+                         rarray(i,j,k) = fillval
+                      end if
+                      lai12m(k,iPoint) = lai12m(k,iPoint) + rarray(i,j,k)
+                   end do
+                   nhs(iPoint) = nhs(iPoint) + 1
+                end if
+            end if
+          end do
+          end do
+
+       end do
+    end do
+
+    do iCell = 1,nCells
+       ! For land points that have no overlap with valid data, and for water
+       ! points,
+       ! just use the fill value...
+       if (nhs(iCell) == 0) then
+          lai12m(:,iCell) = fillval
+       else
+          lai12m(:,iCell) = lai12m(:,iCell) / real(nhs(iCell))
+       end if
+    end do
+    deallocate(rarray)
+    deallocate(nhs)
+
+  else
+
+    call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('Invalid monthly leaf area index dataset '''//trim(config_albedo_data) &
+                                  //''' selected for config_lai_data', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('   Possible options are: ''MODIS''', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
+
+   end if
 
  end subroutine init_atm_static
 

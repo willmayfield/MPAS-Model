@@ -556,7 +556,6 @@ int parse_namelist_records_from_registry(ezxml_t registry)/*{{{*/
 	fortprintf(fd2, "\n");
 	fortprintf(fd2, "      iErr = 0\n");
 	fortprintf(fd2, "      unitNumber = 21\n");
-	fortprintf(fd2, "      print*, 'Read namelist from file '//trim(namelistFilename)\n");
 	fortprintf(fd2, "      call mpas_log_write('Reading namelist from file '//trim(namelistFilename))\n");
 	fortprintf(fd2, "      inquire(file=trim(namelistFilename), exist=nmlExists)\n");
 	fortprintf(fd2, "      if ( .not. nmlExists ) then\n");
@@ -728,7 +727,7 @@ int parse_dimensions_from_registry(ezxml_t registry)/*{{{*/
 	ezxml_t nmlrec_xml, nmlopt_xml;
 
 	const char *nmlrecname, *nmlrecinsub, *nmloptname, *nmlopttype;
-	const char *dimname, *dimunits, *dimdesc, *dimdef, *dimdecomp;
+	const char *dimname, *dimunits, *dimdesc, *dimdef, *dimdecomp, *dimcalc;
 	const char *corename;
 
 	char option_name[1024];
@@ -852,6 +851,7 @@ int parse_dimensions_from_registry(ezxml_t registry)/*{{{*/
 		for (dim_xml = ezxml_child(dims_xml, "dim"); dim_xml; dim_xml = dim_xml->next) {
 			dimname = ezxml_attr(dim_xml, "name");
 			dimdef = ezxml_attr(dim_xml, "definition");
+			dimcalc = ezxml_attr(dim_xml, "calculation");
 
 			/* If dimension has a definition, check if the value of the dim is NaN, then write the definition */
 			if ( dimdef != NULL ) {
@@ -860,9 +860,16 @@ int parse_dimensions_from_registry(ezxml_t registry)/*{{{*/
 				fortprintf(fd, "         allocate(%s)\n", dimname);
 				// Namelist defined dimension
 				if(strncmp(dimdef, "namelist:", 9) == 0){
+					if(dimcalc != NULL){
+					    snprintf(option_name, 1024, "%s", dimcalc);
+                                            fortprintf(fd, "         %s = %s\n", dimname, option_name);
+                                            fortprintf(fd, "call mpas_log_write('       %s = $i ', intArgs=(/%s/))\n", dimname, option_name);
+
+					} else{
 					snprintf(option_name, 1024, "%s", (dimdef)+9);
 					fortprintf(fd, "         %s = %s\n", dimname, option_name);
 					fortprintf(fd, "call mpas_log_write('       %s = $i (%s)', intArgs=(/%s/))\n", dimname, option_name, option_name);
+					}
 				} else {
 					fortprintf(fd, "         %s = %s\n", dimname, dimdef);
 					fortprintf(fd, "call mpas_log_write('       %s = $i', intArgs=(/%s/))\n", dimname, dimdef);
@@ -872,8 +879,13 @@ int parse_dimensions_from_registry(ezxml_t registry)/*{{{*/
 				fortprintf(fd, "          else if ( %s == MPAS_MISSING_DIM ) then\n", dimname, dimname);
 				// Namelist defined dimension
 				if(strncmp(dimdef, "namelist:", 9) == 0){
+				    if(dimcalc!= NULL){
+				        snprintf(option_name, 1024, "%s", dimcalc);
+                                        fortprintf(fd, "         %s = %s\n", dimname, option_name);
+				    } else{
 					snprintf(option_name, 1024, "%s", (dimdef)+9);
 					fortprintf(fd, "         %s = %s\n", dimname, option_name);
+				    }
 				} else {
 					fortprintf(fd, "         %s = %s\n", dimname, dimdef);
 				}

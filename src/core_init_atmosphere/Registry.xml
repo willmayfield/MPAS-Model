@@ -41,9 +41,9 @@
                      description="The number of atmospheric levels, always one more than the number of layers"/>
                 <dim name="nMonths" definition="namelist:config_months"
                      description="The number of months in a year"/>
-		<dim name="nlcat" definition="namelist:config_nlandcat" 
+		<dim name="nlcat" definition="namelist:config_landuse_data" calculation='20 + 4 * merge(1,0,config_landuse_data(1:4)=="USGS")' 
                      description="The number of landuse categories used in the land surface model"/>
-		<dim name="nscat" definition="namelist:config_nsoilcat"
+		<dim name="nscat" definition="16"
                      description="The number of soil categories used in the land surface model"/>
         </dims>
 
@@ -126,10 +126,6 @@
                      units="-"
                      description="The number of months in a year"
                      possible_values="Positive integer values"/>
-		<nml_option name="config_nlandcat"              type="integer"       default_value="20"
-		     units='-'
-		     description="The number of landuse categories used by the LSM. 20 with USGS landuse data, 24 with MODIFIED_IGBP_MODIS_NOAH"
-		     possible_values="24 or 40"/>
 		<nml_option name="config_nsoilcat"              type="integer"       default_value="16"
                      units='-'
                      description="The number of landuse categories used by the LSM."
@@ -183,6 +179,11 @@
                      units="-"
                      description="The maximum snow albedo dataset to use (case 7 only)"
                      possible_values="`MODIS' or `NCEP'"/>
+
+		<nml_option name="config_lai_data"    type="character"     default_value="MODIS"
+                     units="-"
+                     description="The leaf area index dataset to use (case 7 only)"
+                     possible_values="`MODIS'"/>
 
                 <nml_option name="config_supersample_factor"    type="integer"       default_value="3"
                      units="-"
@@ -410,10 +411,13 @@
                         <var name="isice_lu" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="iswater_lu" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="ivgtyp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+			<var name="landusef" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="isltyp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+			<var name="soilf" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="snoalb" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="soiltemp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="greenfrac" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+			<var name="lai12m" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="shdmin" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="shdmax" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="albedo12m" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
@@ -508,10 +512,13 @@
                         <var name="isice_lu"/>
                         <var name="iswater_lu"/>
                         <var name="ivgtyp"/>
+			<var name="landusef"/>
+			<var name="soilf"/>
                         <var name="isltyp"/>
                         <var name="snoalb"/>
                         <var name="soiltemp"/>
                         <var name="greenfrac"/>
+			<var name="lai12m"/>
                         <var name="shdmin"/>
                         <var name="shdmax"/>
                         <var name="albedo12m"/>
@@ -781,6 +788,9 @@
 
                 <var name="greenfrac" type="real" dimensions="nMonths nCells" units="unitless"
                      description="monthly-mean climatological greeness fraction"/>
+
+		<var name="lai12m" type="real" dimensions="nMonths nCells" units="unitless"
+		    description="monthly-mean climatological leaf area index"/>
 
                 <var name="shdmin" type="real" dimensions="nCells" units="unitless"
                      description="minimum fractional coverage of annual green vegetation fraction"/>

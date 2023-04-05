@@ -3648,6 +3648,7 @@ module mpas_stream_manager
            !
            if ( stream % filename_interval /= 'none' ) then
                call mpas_set_time(now_time, dateTimeString=when, ierr=local_ierr)
+              
                call mpas_set_timeInterval(filename_interval, timeString=stream % filename_interval)
                
                call mpas_build_stream_filename(stream % referenceTime, now_time, filename_interval, stream % filename_template, blockID_local, temp_filename, ierr=local_ierr)
@@ -4222,7 +4223,8 @@ module mpas_stream_manager
         character (len=StrKIND), pointer :: packages
         logical :: active_field
         integer :: err_level
-
+        integer :: output_interval
+        type (MPAS_timeInterval_type) :: filename_interval
 
         if (direction == MPAS_STREAM_OUTPUT) then
 
@@ -4263,6 +4265,17 @@ module mpas_stream_manager
             call gen_random(idLength, c_file_id)
             call mpas_c_to_f_string(c_file_id, f_file_id)
             call mpas_writeStreamAtt(stream % stream, 'file_id', f_file_id, syncVal=.true., ierr=local_ierr)
+            if (local_ierr /= MPAS_STREAM_NOERR) then
+                ierr = MPAS_STREAM_MGR_ERROR
+                return
+            end if
+
+            !
+            ! Write output_interval to stream
+            !
+            call mpas_set_timeInterval(filename_interval, timeString=stream %filename_interval)
+            call mpas_get_timeInterval(filename_interval,M=output_interval)
+            call mpas_writeStreamAtt(stream%stream, 'output_interval',output_interval,syncVal=.true., ierr=local_ierr)
             if (local_ierr /= MPAS_STREAM_NOERR) then
                 ierr = MPAS_STREAM_MGR_ERROR
                 return

@@ -149,7 +149,6 @@ module mpas_subdriver
       domain_ptr => corelist % domainlist
       domain_ptr % core => corelist
 
-      print*, "calling mpas_allocate_domain"
       call mpas_allocate_domain(domain_ptr)
 
       !
@@ -205,14 +204,11 @@ module mpas_subdriver
          domain_ptr % streams_filename = streamsFile
       end if
 
-      print*, "Setup namelist"
       ierr = domain_ptr % core % setup_namelist(domain_ptr % configs, domain_ptr % namelist_filename, domain_ptr % dminfo)
-      print*, "Setup namelist complete"
       if ( ierr /= 0 ) then
          call mpas_log_write('Namelist setup failed for core '//trim(domain_ptr % core % coreName), messageType=MPAS_LOG_CRIT)
       end if
 
-      print*, "call mpas_framework_init_phase2"
       call mpas_framework_init_phase2(domain_ptr)
 
       ierr = domain_ptr % core % define_packages(domain_ptr % packages)
@@ -243,7 +239,6 @@ module mpas_subdriver
       end if
 
 
-      print*, "start mpas_timer s"
       call mpas_timer_start('total time')
       call mpas_timer_start('initialize')
 
@@ -251,14 +246,12 @@ module mpas_subdriver
       ! Using information from the namelist, a graph.info file, and a file containing
       !    mesh fields, build halos and allocate blocks in the domain
       !
-      print*, "build halos and allocate blocks"
 
       ierr = domain_ptr % core % get_mesh_stream(domain_ptr % configs, mesh_stream)
       if ( ierr /= 0 ) then
          call mpas_log_write('Failed to find mesh stream for core '//trim(domain_ptr % core % coreName), messageType=MPAS_LOG_CRIT)
       end if
 
-      print*, "stream xml get attribute"
       call mpas_f_to_c_string(domain_ptr % streams_filename, c_filename)
       call mpas_f_to_c_string(mesh_stream, c_mesh_stream)
       c_comm = domain_ptr % dminfo % comm
