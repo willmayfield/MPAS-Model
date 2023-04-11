@@ -278,7 +278,6 @@
  integer :: iCell,iSoil
  integer, pointer :: nCellsSolve,nSoilLevels,nFGSoilLevels
  integer, pointer :: config_nsoillevels
- character(len=StrKIND), pointer :: config_lsm_scheme
 
  real(kind=RKIND),dimension(:,:),pointer:: dzs_fg,zs_fg
  real(kind=RKIND),dimension(:,:),pointer:: dzs,zs
@@ -391,14 +390,12 @@
 
  integer, pointer :: config_nsoillevels
  
- character(len=StrKIND), pointer :: config_lsm_scheme
  character(len=StrKIND) :: errstring
 
 !-----------------------------------------------------------------------------------------------------------------
 !call mpas_log_write('')
 !call mpas_log_write('--- enter subroutine init_soil_layers_properties:')
 
- call mpas_pool_get_config(configs, 'config_lsm_scheme', config_lsm_scheme)
  call mpas_pool_get_dimension(dims, 'nCellsSolve', nCellsSolve)
  call mpas_pool_get_dimension(dims, 'nSoilLevels', nSoilLevels)
  call mpas_pool_get_dimension(dims, 'nFGSoilLevels', nFGSoilLevels)
