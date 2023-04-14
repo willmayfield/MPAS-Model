@@ -6527,7 +6527,7 @@ module atm_time_integration
             ! Compute diffusion, computed as \nabla divergence - k \times \nabla vorticity
             !
              do k=1,nVertLevels
-                tend_ru(k,iEdge) = tend_ru(k,iEdge) + laplacian_filter_coef * (  4.0*( divergence2(k) - divergence1(k) ) * r_dc  &
+                tend_ru(k,iEdge) = tend_ru(k,iEdge) + laplacian_filter_coef * (  6.0*( divergence2(k) - divergence1(k) ) * r_dc  &
                                                                                     -( vorticity2(k)  - vorticity1(k)  ) * r_dv )
              end do
 
