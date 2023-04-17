@@ -831,7 +831,9 @@
 			<var name="pin"/>
 			<var name="ozmixm"/>
 			<var name="isltyp"/>
+			<var name="soilf"/>
 			<var name="ivgtyp"/>
+			<var name="landusef"/>
 			<var name="mminlu"/>
 			<var name="isice_lu"/>
 			<var name="iswater_lu"/>
@@ -841,6 +843,7 @@
 			<var name="snoalb"/>
 			<var name="albedo12m"/>
 			<var name="greenfrac"/>
+			<var name="lai12m"/>
 			<var name="sfc_albbck"/>
 			<var name="skintemp"/>
 			<var name="snow"/>
@@ -853,6 +856,7 @@
 			<var name="xice"/>
 			<var name="xland"/>
 			<var name="dzs"/>
+			<var name="zs"/>
 			<var name="smcrel"/>
 			<var name="sh2o"/>
 			<var name="smois"/>
@@ -3053,7 +3057,7 @@
 		<var name="sfcexc" type="real" dimensions="nCells Time" units="m s^{-1}"
 		    desciption="surface exchange coefficient for heat"
 		    packages="lsm_ruc_in"/>
-	
+
 		<var name="sfcevp" type="real" dimensions="nCells Time" units="kg m^{-2}"
 		    description="total evaporation"
 		    packages="lsm_ruc_in"/>
@@ -3197,7 +3201,6 @@
                      description="monthly-mean climatological ozone defined at fixed pressure levels"/>
         </var_struct>
 
-
         <var_struct name="sfc_input" time_levs="1">
 
                 <!-- ================================================================================================== -->
@@ -3206,7 +3209,7 @@
 
                 <var name="isltyp" type="integer" dimensions="nCells" units="unitless"
                      description="dominant soil category"/>
-	
+
 		<var name="soilf" type="real" dimensions="nscat nCells" units="unitless"
                      description="fraction of each soil category present"/>
 
