@@ -2026,7 +2026,7 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
 !                              re_liquid, re_graupel, re_hail, re_icesnow,               &
 !                              vtcloud, vtrain, vtsnow, vtgraupel, vthail,               &
                               ipelectmp,                                                &
-                              diagflag,ke_diag,                                         &
+                              diagflag,ke_diag,diag_dbz,                                 &
                               nssl_progn,                                              & ! wrf-chem 
 ! 20130903 acd_mb_washout start
                               wetscav_on, rainprod, evapprod,                           & ! wrf-chem 
@@ -2105,7 +2105,7 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
       integer, intent(in):: itimestep !, ccntype
       integer, intent(in), optional :: ntmul, ntcnt
       logical, optional, intent(in) :: lastloop
-      logical, optional, intent(in) :: diagflag, f_cna, f_cn, f_cina
+      logical, optional, intent(in) :: diagflag, f_cna, f_cn, f_cina, diag_dbz
       integer, optional, intent(in) :: ipelectmp, ke_diag
 
 
@@ -2818,7 +2818,7 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
 
 
 ! compute diagnostic S-band reflectivity if needed
-     IF ( present( dbz ) .and. makediag .and. lastlooptmp ) THEN
+     IF ( present( dbz ) .and. diag_dbz .and. lastlooptmp ) THEN
    ! calc dbz
       
       IF ( .true. ) THEN
