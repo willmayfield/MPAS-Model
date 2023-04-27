@@ -34,7 +34,7 @@
  logical,parameter:: rdmaxalb = .false. !use snow albedo from geogrid;false use table values
  logical,parameter:: myj      = .false. !true if using Mellor-Yamada PBL scheme.
  logical,parameter:: frpcpn   = .false.
- logical,parameter:: rdlai2d  = .true.
+ logical,parameter:: rdlai2d  = .false.
 
 !urban physics: MPAS does not plan to run the urban physics option.
  integer,parameter:: sf_urban_physics = 0 !activate urban canopy model (=0: no urban canopy) 
@@ -1103,7 +1103,6 @@
     case("ruc")
        call mpas_timer_start('RUC')
        myjpbl = pbl_scheme(1:3)=="myj"
-
        call lsmruc( spp_lsm        = spp_lsm_loc   , lakemodel    = lakemodel   , lakemask  = lakemask_p,  &
                     rhosnf         = rhosnf_p      , precipfr     = precipfr_p  , mosaic_lu = mosaic_lu,   &
                     qsg            = qsg_p         , qvg          = qvg_p       , dew       = dew_p,       &
@@ -1134,7 +1133,7 @@
                     udrunoff       = udrunoff_p    , grdflx       = grdflx_p    , acsnow    = acsnow_p,    &
                     snom           = acsnom_p      , shdmin       = shdmin_p    , rdlai2d   = rdlai2d,     &
                     mosaic_soil    = mosaic_soil   , zs           = zs_p        , smfr3d    = smfr3d_p,    &
-                    shdmax         = shdmax_p      , globalCells  = globalCells,                           &
+                    shdmax         = shdmax_p      ,                                                       &
                     ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde ,  &
                     ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme ,  &
                     its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte    &
