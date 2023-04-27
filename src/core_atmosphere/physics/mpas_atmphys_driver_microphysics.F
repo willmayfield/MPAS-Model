@@ -355,6 +355,7 @@
  integer,intent(in):: time_lev
  integer,intent(in):: itimestep
  integer,intent(in):: its,ite
+
 !inout arguments:
  type(mpas_pool_type),intent(inout):: state
  type(mpas_pool_type),intent(inout):: diag
@@ -368,14 +369,12 @@
 !local variables and arrays:
  logical:: log_microphysics
  integer:: i,icell,icount,istep,j,k,kk
- integer, pointer :: do_diag_dbz
 
 !Calculate dtheta_dt_mp (NS: 2018-04-24)
 !Store theta, call microphysics->updates theta, calculate tendency
  integer, pointer :: nCells, nVertLevels, index_qv
  real(kind=RKIND), dimension(:,:), pointer :: dtheta_dt_mp, theta_m
  real (kind=RKIND), dimension(:,:,:), pointer :: scalars
- logical :: diag_mp
 
  call mpas_pool_get_dimension(mesh, 'nCells', nCells)
  call mpas_pool_get_dimension(mesh, 'nVertLevels', nVertLevels)
@@ -384,12 +383,6 @@
  call mpas_pool_get_array(state, 'theta_m', theta_m, time_lev)
  call mpas_pool_get_array(diag, 'dtheta_dt_mp', dtheta_dt_mp)
  call mpas_pool_get_array(state, 'scalars', scalars, time_lev)
- call mpas_pool_get_array(diag_physics,'do_diag_dbz',do_diag_dbz)
- if (do_diag_dbz==1) then
-   diag_mp = .true.
- else
-   diag_mp= .false.
- endif
 
  !initialize to theta before microphysics call.
  !I think the physics call actually updates variables, not generate a tendency.
@@ -503,7 +496,7 @@
                   sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
                   re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
                   has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
-                  diagflag  = l_diags     , dbz        = refl10cm_p   , diag_dbz   = diag_mp      , &
+                  diagflag  = l_diags     , dbz        = refl10cm_p   , &
                   ntmul      = n_microp   , ntcnt      = 1            , lastloop   = .true.       , &
                   ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
                   ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
@@ -525,7 +518,7 @@
                   sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
                   re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
                   has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
-                  diagflag  = l_diags     , dbz        = refl10cm_p   , diag_dbz   = diag_mp      , &
+                  diagflag  = l_diags     , dbz        = refl10cm_p   , &
                   ntmul      = n_microp   , ntcnt      = 1            , lastloop   = .true.       , &
                   ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
                   ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
@@ -540,22 +533,18 @@
  end select microp_select
 
 !... calculate the 10cm radar reflectivity and relative humidity, if needed:
+ if (l_diags) then
 
- !ensure that we only call compute_radar_reflectivity() if we are using an MPS that supports
- !the computation of simulated radar reflectivity:
- if (diag_mp) then
+    !ensure that we only call compute_radar_reflectivity() if we are using an MPS that supports
+    !the computation of simulated radar reflectivity:
     if(trim(microp_scheme) == "mp_wsm6"     .or. &
        trim(microp_scheme) == "mp_thompson" .or. &
        trim(microp_scheme) == "mp_nssl2m"   ) then
-       call mpas_log_write('Computing reflectivity')
-       call mpas_log_write('max refl10cm_p = $r dbz',realArgs=(/maxval(refl10cm_p)/))
        call compute_radar_reflectivity(configs,diag_physics,its,ite)
     else
        call mpas_log_write('*** NOTICE: NOT computing simulated radar reflectivity')
        call mpas_log_write('            since WSM6 or Thompson microphysics scheme was not selected')
     end if
- endif
- if (l_diags) then
 
     !calculate the relative humidity over water if the temperature is strictly greater than 0.C,
     !over ice otherwise.
@@ -790,8 +779,7 @@
        ! Reflectivity is already computed in 3D in the refl10cm_p array, so just read out the values
        if(.not.allocated(dBz1d)) allocate(dBZ1d(kts:kte))
        if(.not.allocated(zp)   ) allocate(zp(kts:kte)   )
-       call mpas_log_write("Computing refl10cm_1km_max")
-       call mpas_log_write("max before = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
+
        do j = jts,jte ! Assuming here that jts == jte (2D arrays)
        do i = its,ite
 
@@ -814,7 +802,6 @@
 
         enddo
         enddo
-       call mpas_log_write("max after = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
 
        if(allocated(dBz1d)) deallocate(dBZ1d)
        if(allocated(zp)   ) deallocate(zp   )

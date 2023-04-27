@@ -1003,7 +1003,6 @@
 			<var name="grdflx"/>
 			<var name="ivgtyp"/>
 			<var name="isltyp"/>
-			<var name="lai"/>
 			<var name="sfc_albedo"/>
 
 		</stream>
@@ -1103,31 +1102,7 @@
                         <var name="temperature_surface"/>
                         <var name="dewpoint_surface"/>
 			<var name="updraft_helicity_max"/>
-			<var name="updraft_helicity_max_01"/>
-                        <var name="updraft_helicity_max_16"/>
-                        <var name="updraft_helicity_max0_15"/>
-                        <var name="updraft_helicity_max05_15"/>
-                        <var name="updraft_helicity_max_02"/>
-                        <var name="updraft_helicity_max_03"/>
-                        <var name="updraft_helicity_min"/>
-                        <var name="updraft_helicity_min_01"/>
-                        <var name="updraft_helicity_min_16"/>
-                        <var name="updraft_helicity_min0_15"/>
-                        <var name="updraft_helicity_min05_15"/>
-                        <var name="updraft_helicity_min_02"/>
-                        <var name="updraft_helicity_min_03"/>
 			<var name="w_velocity_max"/>
-			<var name="w_velocity_min"/>
-                        <var name="w_velocity_mean"/>
-                        <var name="wind02_max"/>
-                        <var name="wind02_integral_max"/>
-                        <var name="wind_speed_10m_max"/>
-                        <var name="wind_speed_10m_mean"/>
-                        <var name="u10m_mean"/>
-                        <var name="v10m_mean"/>
-                        <var name="prec_acc_nc"/>
-                        <var name="prec_acc_c"/>
-                        <var name="snow_acc_nc"/>
 			<var name="wind_speed_level1_max"/>
                         <!-- End convective diagnostics defined in diagnostics/Registry_convective.xml -->
 
@@ -2295,9 +2270,6 @@
                 <var name="refl10cm_1km_max" type="real" dimensions="nCells Time" units="dBZ"
                      description="maximum diagnosed 10 cm radar reflectivity at 1 km AGL since last output time"
                      packages="mp_thompson_in;mp_wsm6_in;mp_nssl2m_in"/>
-
-		<var name="do_diag_dbz" type="integer" dimensions="" units = ""
-		    description="flag for whether to compute refelctivity at every time step for use in computing output-time-max 1km reflectivity"/>
 
                 <var name="i_rainnc" type="integer" dimensions="nCells Time" units="unitless"
                      description="incidence of accumulated grid-scale precipitation greater than config_bucket_rainnc"
