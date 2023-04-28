@@ -335,7 +335,7 @@ module init_atm_cases
                call mpas_pool_get_dimension(block_ptr % dimensions, 'nCells', nCells)
                call mpas_pool_get_dimension(block_ptr % dimensions, 'nEdges', nEdges)
                call mpas_pool_get_dimension(block_ptr % dimensions, 'nVertLevels', nVertLevels)
-
+               
                call mpas_get_time(curr_time, dateTimeString=timeString)
                xtime = timeString   ! Set field valid time, xtime, to the current time in the time loop
 
@@ -2775,6 +2775,9 @@ module init_atm_cases
 
       character (len=StrKIND) :: errstring
 
+      real (kind=RKIND) :: truelat1, truelat2, xlonc, cone
+
+
       call mpas_pool_get_config(configs, 'config_met_prefix', config_met_prefix)
       call mpas_pool_get_config(configs, 'config_start_time', config_start_time)
       call mpas_pool_get_config(configs, 'config_met_interp', config_met_interp)
@@ -5066,6 +5069,33 @@ call mpas_log_write('Done with soil consistency check')
       !
       ! Compute normal wind component and store in fg % u
       !
+
+      truelat1 = field % truelat1
+      truelat2 = field % truelat2
+      xlonc = field % xlonc
+
+      if( field % is_wind_grid_rel ) then
+         call mpas_log_write(" is_wind_grid_rel is true ")
+         call mpas_log_write(" truelat1, truelat2, xlonc are $r $r $r ",realArgs=(/truelat1, truelat2, xlonc/))
+
+         IF (ABS(truelat1-truelat2) .GT. 0.1) THEN
+            cone = ALOG10(COS(truelat1*rad_per_deg)) - &
+                   ALOG10(COS(truelat2*rad_per_deg))
+            cone = cone /(ALOG10(TAN((45.0 - ABS(truelat1)/2.0) * rad_per_deg)) - &
+                   ALOG10(TAN((45.0 - ABS(truelat2)/2.0) * rad_per_deg)))        
+         ELSE
+            cone = SIN(ABS(truelat1)*rad_per_deg )  
+         ENDIF
+
+         call mpas_log_write(" cone value is $r ",realArgs=(/cone/))
+         xlonc = rad_per_deg * xlonc
+         call mpas_log_write(" rotating velocities ")
+         call rotate_velocities(u_fg, v_fg, lonEdge, cone, xlonc, nfglevels_actual, nEdges)
+
+      else 
+         call mpas_log_write(" is_wind_grid_rel is false ")
+      end if
+
       do iEdge=1,nEdges
          do k=1,nfglevels_actual
             u_fg(k,iEdge) = cos(angleEdge(iEdge)) * u_fg(k,iEdge) &
@@ -5594,7 +5624,7 @@ call mpas_log_write('Done with soil consistency check')
 
       use mpas_dmpar, only : mpas_dmpar_min_real, mpas_dmpar_max_real
       use init_atm_read_met, only : met_data, read_met_init, read_met_close, read_next_met_field
-      use init_atm_llxy, only : proj_info, map_init, map_set, latlon_to_ij, PROJ_LATLON, PROJ_GAUSS, PROJ_LC, DEG_PER_RAD
+      use init_atm_llxy, only : proj_info, map_init, map_set, latlon_to_ij, PROJ_LATLON, PROJ_GAUSS, PROJ_LC, DEG_PER_RAD, RAD_PER_DEG
       use init_atm_hinterp, only : interp_sequence, FOUR_POINT, SIXTEEN_POINT, W_AVERAGE4, SEARCH
       use mpas_hash, only : hashtable, mpas_hash_init, mpas_hash_destroy, mpas_hash_search, mpas_hash_size, mpas_hash_insert
 
@@ -5717,6 +5747,7 @@ call mpas_log_write('Done with soil consistency check')
 
       real (kind=RKIND) :: max_zgrid_local, max_zgrid_global
 
+      real (kind=RKIND) :: truelat1, truelat2, xlonc, cone
 
       call mpas_log_write('Interpolating LBCs at time '//trim(timestamp))
 
@@ -6173,10 +6204,37 @@ call mpas_log_write('Done with soil consistency check')
          end do
       end if
 
-
       !
       ! Compute normal wind component and store in fg % u
       !
+
+      truelat1 = field % truelat1
+      truelat2 = field % truelat2
+      xlonc = field % xlonc
+
+      if( field % is_wind_grid_rel ) then
+         call mpas_log_write(" is_wind_grid_rel is true ")
+         call mpas_log_write(" truelat1, truelat2, xlonc are $r $r $r ",realArgs=(/truelat1, truelat2, xlonc/))
+
+         IF (ABS(truelat1-truelat2) .GT. 0.1) THEN
+            cone = ALOG10(COS(truelat1*rad_per_deg)) - &
+                   ALOG10(COS(truelat2*rad_per_deg))
+            cone = cone /(ALOG10(TAN((45.0 - ABS(truelat1)/2.0) * rad_per_deg)) - &
+                   ALOG10(TAN((45.0 - ABS(truelat2)/2.0) * rad_per_deg)))        
+         ELSE
+            cone = SIN(ABS(truelat1)*rad_per_deg )  
+         ENDIF
+
+         call mpas_log_write(" cone value is $r ",realArgs=(/cone/))
+         xlonc = rad_per_deg * xlonc
+         call mpas_log_write(" rotating velocities ")
+         call rotate_velocities(u_fg, v_fg, lonEdge, cone, xlonc, nfglevels_actual, nEdges)
+
+      else 
+         call mpas_log_write(" is_wind_grid_rel is false ")
+      end if
+
+
       do iEdge=1,nEdges
          do k=1,nfglevels_actual
             u_fg(k,iEdge) = cos(angleEdge(iEdge)) * u_fg(k,iEdge) &
@@ -7547,5 +7605,37 @@ call mpas_log_write('Done with soil consistency check')
 
     END function calcnfromq
 
+    subroutine rotate_velocities( u, v, lonEdge, cone, xlonc, levels, nEdges )
 
+    implicit none
+
+    real (kind=RKIND), dimension(:) :: lonEdge
+    real (kind=RKIND), dimension(:,:) :: u, v
+    real (kind=RKIND) :: cone, xlonc
+    integer :: levels, nEdges
+
+    integer :: iEdge, iLevel
+    real (kind=RKIND) :: rlon, cos_rlon, sin_rlon, twopii
+    real (kind=RKIND), dimension(levels) :: u_in, v_in
+
+    twopii = 4.0*asin(1.0)
+    ! mpas longitudes are 0 - 2*pi, adjust if xlonc is west (negative)
+    if (xlonc < 0) xlonc = xlonc + twopii
+
+    do iEdge=1, nEdges
+      rlon = lonEdge(iEdge) - xlonc
+      cos_rlon = cos(cone*rlon)
+      sin_rlon = sin(cone*rlon)
+
+      u_in(:) = u(:,iEdge)
+      v_in(:) = v(:,iEdge)
+
+      do iLevel=1, levels
+        u(iLevel,iEdge) =   cos_rlon*u_in(iLevel) + sin_rlon*v_in(iLevel)
+        v(iLevel,iEdge) = - sin_rlon*u_in(iLevel) + cos_rlon*v_in(iLevel)
+      end do
+    end do
+
+    end subroutine rotate_velocities
+    
 end module init_atm_cases
