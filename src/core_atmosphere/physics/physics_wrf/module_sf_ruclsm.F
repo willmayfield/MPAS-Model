@@ -1200,7 +1200,7 @@ print*, "lufrac = ", lufrac
    print *,'LAND, i,j,tso1d,soilm1d,soilt - end of time step',         &
                   i,j,tso1d,soilm1d,soilt(i,j)
    print *,'LAND, QFX, HFX after SFCTMP', i,j,lh(i,j),hfx(i,j)
-    ENDIF
+    
 !        IF (globalcells(I)==targetCell) then
 !        print*, "smois at end of ruc"
 !        do k = 1,nzs
