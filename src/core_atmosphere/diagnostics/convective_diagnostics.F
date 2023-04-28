@@ -59,6 +59,7 @@ module convective_diagnostics
     logical :: is_needed_prec_acc_nc
     logical :: is_needed_snow_acc_nc
     logical :: do_any_uh, do_any_diags 
+    integer,pointer :: do_diag_dbz
 
     contains
 
@@ -79,9 +80,8 @@ module convective_diagnostics
 
         use mpas_derived_types, only : MPAS_pool_type, MPAS_clock_type, MPAS_STREAM_OUTPUT, MPAS_STREAM_INPUT, &
                                        MPAS_STREAM_INPUT_OUTPUT
-        use mpas_pool_routines, only : mpas_pool_get_subpool
+        use mpas_pool_routines, only : mpas_pool_get_subpool,mpas_pool_get_array
         use mpas_atm_diagnostics_utils, only : mpas_stream_inclusion_count
-
         implicit none
 
         type (MPAS_pool_type), pointer :: all_pools
@@ -91,7 +91,7 @@ module convective_diagnostics
         call mpas_pool_get_subpool(all_pools, 'state', state)
         call mpas_pool_get_subpool(all_pools, 'diag', diag)
         call mpas_pool_get_subpool(all_pools, 'diag_physics', diag_physics)
-
+        call mpas_pool_get_array(diag_physics,'do_diag_dbz',do_diag_dbz)
         clock => simulation_clock
 
         is_needed_updraft_helicity = .false.
@@ -123,43 +123,47 @@ module convective_diagnostics
         is_needed_snow_acc_nc = .false.
         do_any_uh = .false.
         do_any_diags = .false.
+        do_diag_dbz = .0
+        if (mpas_stream_inclusion_count('refl10cm_1km_max', direction=MPAS_STREAM_OUTPUT) > 0) then
+            do_diag_dbz = 1
+        endif
         ! - UH Variables
         if (mpas_stream_inclusion_count('updraft_helicity_max', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_updraft_helicity = .true.
         end if
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity
         do_any_diags = do_any_diags .or. do_any_uh
-        if (mpas_stream_inclusion_count('updraft_helicity_01', direction=MPAS_STREAM_OUTPUT) > 0) then
+        if (mpas_stream_inclusion_count('updraft_helicity_max_01', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_updraft_helicity_01 = .true.
         end if
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity_01
         do_any_diags = do_any_diags .or. do_any_uh
 
-        if (mpas_stream_inclusion_count('updraft_helicity_16', direction=MPAS_STREAM_OUTPUT) > 0) then
+        if (mpas_stream_inclusion_count('updraft_helicity_max_16', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_updraft_helicity_16 = .true.
         end if
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity_16
         do_any_diags = do_any_diags .or. do_any_uh
 
-        if (mpas_stream_inclusion_count('updraft_helicity0_15', direction=MPAS_STREAM_OUTPUT) > 0) then
+        if (mpas_stream_inclusion_count('updraft_helicity_max0_15', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_updraft_helicity0_15 = .true.
         end if
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity0_15
         do_any_diags = do_any_diags .or. do_any_uh
 
-        if (mpas_stream_inclusion_count('updraft_helicity05_15', direction=MPAS_STREAM_OUTPUT) > 0) then
+        if (mpas_stream_inclusion_count('updraft_helicity_max05_15', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_updraft_helicity05_15 = .true.
         end if
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity05_15
         do_any_diags = do_any_diags .or. do_any_uh
 
-        if (mpas_stream_inclusion_count('updraft_helicity_02',direction=MPAS_STREAM_OUTPUT) > 0) then
+        if (mpas_stream_inclusion_count('updraft_helicity_max_02',direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_updraft_helicity_02 = .true.
         end if
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity_02
         do_any_diags = do_any_diags .or. do_any_uh
 
-        if (mpas_stream_inclusion_count('updraft_helicity_03', direction=MPAS_STREAM_OUTPUT) > 0) then
+        if (mpas_stream_inclusion_count('updraft_helicity_max_03', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_updraft_helicity_03 = .true.
         end if
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity_03
