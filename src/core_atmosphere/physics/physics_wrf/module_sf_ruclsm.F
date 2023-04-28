@@ -17,6 +17,7 @@ MODULE module_sf_ruclsm
 #if defined(mpas)
 use mpas_atmphys_constants, g => gravity,RHOWATER=>rho_w, piconst => pii
 use mpas_atmphys_utilities, only: physics_error_fatal,physics_message
+use mpas_log, only: mpas_log_write
 #define EM_CORE 1
 #define FATAL_ERROR(M) call physics_error_fatal( M )
 #define wrf_at_debug_level(LSMRUC_DBG_LVL) .false.
@@ -51,7 +52,7 @@ use mpas_atmphys_utilities, only: physics_error_fatal,physics_message
                         CZIL_DATA
 
         CHARACTER*256  :: err_message
-
+        INTEGER :: TARGETCELL=1230989
 
 CONTAINS
 
@@ -83,6 +84,7 @@ CONTAINS
                    SFCEVP,GRDFLX,SNOWFALLAC,ACSNOW,SNOM,         &
                    SMFR3D,KEEPFR3DFLAG,                          &
                    myjpbl,shdmin,shdmax,rdlai2d,                 &
+                   globalcells,                                  &
                    ids,ide, jds,jde, kds,kde,                    &
                    ims,ime, jms,jme, kms,kme,                    &
                    its,ite, jts,jte, kts,kte                     )
@@ -176,6 +178,7 @@ CONTAINS
                                        ims,ime, jms,jme, kms,kme, &
                                        ids,ide, jds,jde, kds,kde, &
                                        its,ite, jts,jte, kts,kte
+   INTEGER,   INTENT(IN   )     ::     globalcells(ims:ime)
 
 #if (EM_CORE==1)
    REAL,    DIMENSION( ims:ime, kms:kme, jms:jme ),OPTIONAL::    pattern_spp_lsm
@@ -196,18 +199,15 @@ CONTAINS
                                                             GLW, &
                                                             GSW, &
                                                          ALBBCK, &
-                                                           FLHC, &
-                                                           FLQC, &
                                                            CHS , &
                                                            XICE, &
                                                           XLAND, &
-!                                                         ALBBCK, &
-!                                                         VEGFRA, &
+                                                         VEGFRA, &
                                                            TBOT
 
 !beka
    REAL,       DIMENSION( ims:ime , jms:jme ),                   &
-               INTENT(INOUT   )    ::                       VEGFRA
+               INTENT(INOUT   )    ::         FLQC,FLHC
 
 
 #if (EM_CORE==1)
@@ -404,8 +404,9 @@ CONTAINS
  
    INTEGER   ::  I,J,K,NZS,NZS1,NDDZS
    INTEGER   ::  k1,l,k2,kp,km
+   INTEGER   ::  globalCellID
    CHARACTER (LEN=132) :: message
-
+   LOGICAL   :: print_flag = .false.
    REAL,DIMENSION(ims:ime,1:nsl,jms:jme) :: rstoch 
    REAL,DIMENSION(1:nsl)::rstoch_temp,field_sf_temp
 !beka
@@ -431,7 +432,7 @@ CONTAINS
          enddo 
        endif  
 #endif
-!---- table TBQ is for resolution of balance equation in VILKA)'
+!---- table TBQ is for resolution of balance equation in VILKA
         CQ=173.15-.05
         R273=1./273.15
         R61=6.1153*0.62198
@@ -452,7 +453,7 @@ CONTAINS
 
         END DO
 
-!--- Initialize soil/vegetation parameters'
+!--- Initialize soil/vegetation parameters
 !--- This is temporary until SI is added to mass coordinate ---!!!!!
 
 #if ( NMM_CORE == 1 )
@@ -465,14 +466,14 @@ CONTAINS
             do k=1,nsl
        keepfr3dflag(i,k,j)=0.
             enddo
-!--- initializing snow fraction, thereshold = 32 mm of snow water '
-!    or ~100 mm of snow height
-!
+!--- initializing snow fraction (thereshold = 32 mm of snow water 
+!    or ~100 mm of snow height) if it is not defined yet
+        if(snow(i,j) > 0. .and. snowc(i,j) <= 0.) then
            snowc(i,j) = min(1.,snow(i,j)/32.)
-          if(snow(i,j).le.32.) soilt1(i,j)=tso(i,1,j)
-call physics_message('!--- initializing inside snow temp if it is not defined')
+        endif
+!--- initializing inside snow temp if it is not defined
         IF((soilt1(i,j) .LT. 170.) .or. (soilt1(i,j) .GT.400.)) THEN
-            IF(snow(i,j).gt.32.) THEN
+          IF(snow(i,j).gt.32.) THEN
            soilt1(i,j)=0.5*(soilt(i,j)+tso(i,1,j))
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
         WRITE ( message , FMT='(A,F8.3,2I6)' ) &
@@ -483,14 +484,15 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
            soilt1(i,j) = tso(i,1,j)
             ENDIF
         ENDIF
-! --temperature inside snow initialized
            tsnav(i,j) =0.5*(soilt(i,j)+tso(i,1,j))-273.15
-           qcg  (i,j) =0.
            patmb=P8w(i,kms,j)*1.e-2
            QSG  (i,j) = QSN(SOILT(i,j),TBQ)/PATMB
         IF((qvg(i,j) .LE. 0.) .or. (qvg(i,j) .GT.0.1)) THEN
-           qvg  (i,j) = QSG(i,j)*mavail(i,j)
-          IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+           !17sept19 - bad approximation with very low mavail.
+           !qvg(i,j) = QSG(i,j)*mavail(i,j)
+           qvg  (i,j) = qv3d(i,1,j)
+           qcg  (i,j) =0.
+          IF ( print_flag ) THEN
            WRITE ( message , FMT='(A,3F8.3,2I6)' ) &
           'QVG is initialized in RUCLSM ', qvg(i,j),mavail(i,j),qsg(i,j),i,j
            !CALL wrf_debug ( 0 , message )
@@ -559,6 +561,7 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
       DO i=its,ite
 
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!     IF (globalCells(i)==targetCell) THEN
      !IF (MAVAIL(I,J) == 0.0_RKIND) then
       print *,' IN LSMRUC ','ims,ime,jms,jme,its,ite,jts,jte,nzs', &
                 ims,ime,jms,jme,its,ite,jts,jte,nzs
@@ -568,10 +571,9 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
       print *, 'LSMRUC, I,J,xland, QFX,HFX from SFCLAY',i,j,xland(i,j), &
                   qfx(i,j),hfx(i,j)
       print *, ' GSW, GLW =',gsw(i,j),glw(i,j)
-      print *, 'SOILT, TSO  =',soilt(i,j),(tso(i,k,j),k=1,nsl)
-      print *, 'SOILMOIS  =',(soilmois(i,k,j),k=1,nsl)
-      print *, 'SMFROZEN  =',(smfr3d(i,k,j),k=1,nsl)
-      print*,  'XICE =', xice(i,j)
+      print *, 'SOILT, TSO start of time step =',soilt(i,j),(tso(i,k,j),k=1,nsl)
+      print *, 'SOILMOIS start of time step =',(soilmois(i,k,j),k=1,nsl)
+      print *, 'SMFROZEN start of time step =',(smfr3d(i,k,j),k=1,nsl)
       print *, ' I,J=, after SFCLAY CHS,FLHC ',i,j,chs(i,j),flhc(i,j)
       print *, 'LSMRUC, IVGTYP,ISLTYP,ALB = ', ivgtyp(i,j),isltyp(i,j),alb(i,j),i,j
       print *, 'LSMRUC  I,J,DT,RAINBL =',I,J,dt,RAINBL(i,j)
@@ -693,6 +695,7 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
         NZS1=NZS-1
 !-----
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalcells(i) == targetCell) then 
          print *,' DT,NZS1, ZSMAIN, ZSHALF --->', dt,nzs1,zsmain,zshalf
     ENDIF
 
@@ -703,6 +706,9 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
           DTDZS(K1)=X/(ZSMAIN(K)-ZSMAIN(K-1))
           DTDZS2(K-1)=X
           DTDZS(K2)=X/(ZSMAIN(K+1)-ZSMAIN(K))
+!          IF (globalcells(i) == targetCell) then
+!            print *,' K,K1,K2, DTDZS(K1), DTDZS(K2) ',K,K1,K2, DTDZS(K1), DTDZS(K2)
+!          ENDIF
         END DO
 
 !27jul2011 - CN and SAT are defined in VEGPARM.TBL
@@ -751,7 +757,8 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
       if(ktau.eq.1 .and.(i.eq.358.and.j.eq.260)) &
          print *,'after SOILVEGIN - z0,znt(375,254),lai(375,254)',z0(i,j),znt(i,j),lai(i,j)
 
-      if(ktau.eq.1 .and. (i.eq.358.and.j.eq.260)) then
+!      if(ktau.eq.1 .and. (i.eq.358.and.j.eq.260)) then
+       if (globalCells(i) == targetCell) THEN
          print *,'NLCAT,iland,lufrac,EMISSL(I,J),PC(I,J),ZNT(I,J),LAI(I,J)', &
                   NLCAT,iland,lufrac,EMISSL(I,J),PC(I,J),ZNT(I,J),LAI(I,J),i,j
          print *,'NSCAT,soilfrac,QWRTZ,RHOCS,BCLH,DQM,KSAT,PSIS,QMIN,REF,WILT',&
@@ -972,7 +979,8 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
                 ACSNOW(I,J),edir(I,J),ec(I,J),ett(I,J),qfx(I,J), &
                 lh(I,J),hfx(I,J),sflx(I,J),sublim(I,J),          &
                 evapl(I,J),prcpl(I,J),budget(i,j),runoff1(i,j),  &
-                runoff2(I,J),soilice,soiliqw,infiltrp,smf(i,j))
+                runoff2(I,J),soilice,soiliqw,infiltrp,smf(i,j),  &
+                globalcells(I))
 
        field_sf_loc(i,:,j) = field_sf_temp
 !-----------------------------------------------------------------
@@ -990,13 +998,15 @@ call physics_message('!--- initializing inside snow temp if it is not defined')
         do k=1,nroot
              cropsm=1.1*wilt - qmin
           if(soilm1d(k) < cropsm*lufrac(crop)) then
-    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+   IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalcells(I)==targetCell) then
 print * ,'Soil moisture is below wilting in cropland category at time step',ktau  &
               ,'i,j,lufrac(crop),k,soilm1d(k),wilt,cropsm',                       &
                 i,j,lufrac(crop),k,soilm1d(k),wilt,cropsm
     ENDIF
              soilm1d(k) = cropsm*lufrac(crop)
-    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+    !IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+    IF (globalcells(I)==targetCell) then
       print * ,'Added soil water to cropland category, i,j,k,soilm1d(k)',i,j,k,soilm1d(k)
     ENDIF
           endif
@@ -1008,12 +1018,17 @@ print * ,'Soil moisture is below wilting in cropland category at time step',ktau
              cropsm=1.2*wilt - qmin
           if(soilm1d(k) < cropsm*lufrac(natural)*0.4) then
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalcells(I)==targetCell) then
 print * ,'Soil moisture is below wilting in mixed grassland/cropland category at time step',ktau &
               ,'i,j,lufrac(natural),k,soilm1d(k),wilt',                       &
                 i,j,lufrac(natural),k,soilm1d(k),wilt
+print*, "natural = ", natural
+print*, "ivgtyp = ", ivgtyp(i,j)
+print*, "lufrac = ", lufrac
     ENDIF
              soilm1d(k) = cropsm * lufrac(natural)*0.4
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalcells(I)==targetCell) then
       print * ,'Added soil water to grassland category, i,j,k,soilm1d(k)',i,j,k,soilm1d(k)
     ENDIF
           endif
@@ -1186,7 +1201,12 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
                   i,j,tso1d,soilm1d,soilt(i,j)
    print *,'LAND, QFX, HFX after SFCTMP', i,j,lh(i,j),hfx(i,j)
     ENDIF
-
+!        IF (globalcells(I)==targetCell) then
+!        print*, "smois at end of ruc"
+!        do k = 1,nzs
+!            print*, soilmois(i,k,j)
+!        enddo
+        ENDIF
 !--- end of a land or sea ice point
         ENDIF
 2999  continue ! lakes
@@ -1227,7 +1247,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
                 SMELT,SNOH,SNFLX,SNOM,SNOWFALLAC,ACSNOW,         &
                 edir1,ec1,ett1,eeta,qfx,hfx,s,sublim,            &
                 evapl,prcpl,fltot,runoff1,runoff2,soilice,       &
-                soiliqw,infiltr,smf)
+                soiliqw,infiltr,smf,globalCellID)
 !-----------------------------------------------------------------
        IMPLICIT NONE
 !-----------------------------------------------------------------
@@ -1235,7 +1255,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
 !--- input variables
 
    INTEGER,  INTENT(IN   )   ::  isice,i,j,nroot,ktau,nzs ,      &
-                                 nddzs                             !nddzs=2*(nzs-2)
+                                 nddzs,globalCellID              !nddzs=2*(nzs-2)
 
    REAL,     INTENT(IN   )   ::  DELT,CONFLX,meltfactor
    REAL,     INTENT(IN   )   ::  C1SN,C2SN
@@ -1522,7 +1542,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
 
 !--- 27 Feb 2014 - empirical formulations from John M. Brown
 !        rhonewsn=min(250.,rhowater/max(4.179,(13.*tanh((274.15-Tabs)*0.3333))))
-!--- 13 Mar 2018 - formulation from Trevor Elcott
+!--- 13 Mar 2018 - formulation from Trevor Alcott
         rhonewsn=min(125.,1000.0/max(8.,(17.*tanh((276.65-Tabs)*0.15))))
         rhonewgr=min(500.,rhowater/max(2.,(3.5*tanh((274.15-Tabs)*0.3333))))
         rhonewice=rhonewsn
@@ -1787,7 +1807,6 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
           runoff2s=0.
        
           ilands = ivgtyp
-
          CALL SOIL(spp_lsm,rstochcol,fieldcol_sf,               &
 !--- input variables
             i,j,ilands,isoil,delt,ktau,conflx,nzs,nddzs,nroot,   &
@@ -1806,7 +1825,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
             dews,soilts,qvgs,qsgs,qcgs,edir1s,ec1s,             &
             ett1s,eetas,qfxs,hfxs,ss,evapls,prcpls,fltots,runoff1s, &
             runoff2s,mavails,soilices,soiliqws,                 &
-            infiltrs,smf)
+            infiltrs,smf,globalCellID)
         else
 ! SEA ICE
 ! portion not covered with snow
@@ -1910,7 +1929,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
             GLW,GSWnew,GSWin,EMISS,RNET,IVGTYP,                 &
             QKMS,TKMS,PC,CST,dripsn,infwater,                   &
             RHO,VEGFRAC,ALB,ZNT,lai,                            &
-            MYJ,                                                &
+            MYJ,globalCellID,                                   &
 !--- soil fixed fields
             QWRTZ,rhocs,dqm,qmin,ref,wilt,psis,bclh,ksat,       &
             sat,cn,zsmain,zshalf,DTDZS,DTDZS2,tbq,              & 
@@ -2129,7 +2148,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
             dew,soilt,qvg,qsg,qcg,edir1,ec1,                    &
             ett1,eeta,qfx,hfx,s,evapl,prcpl,fltot,runoff1,      &
             runoff2,mavail,soilice,soiliqw,                     &
-            infiltr,smf)
+            infiltr,smf,globalCellID)
         else
 ! SEA ICE
 ! If current ice albedo is not the same as from the previous time step, then
@@ -2223,7 +2242,8 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
             dew,soilt,qvg,qsg,qcg,                           &
             edir1,ec1,ett1,eeta,qfx,hfx,s,evapl,             &
             prcpl,fltot,runoff1,runoff2,mavail,soilice,      &
-            soiliqw,infiltrp,smf)
+            soiliqw,infiltrp,smf,                            &
+            globalCellID )
 
 !*************************************************************
 !   Energy and moisture budget for vegetated surfaces 
@@ -2289,7 +2309,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
 
    INTEGER,  INTENT(IN   )   ::  nroot,ktau,nzs                , &
                                  nddzs                    !nddzs=2*(nzs-2)
-   INTEGER,  INTENT(IN   )   ::  i,j,iland,isoil
+   INTEGER,  INTENT(IN   )   ::  i,j,iland,isoil,globalCellID
    REAL,     INTENT(IN   )   ::  DELT,CONFLX
    LOGICAL,  INTENT(IN   )   ::  myj
 !--- 3-D Atmospheric variables
@@ -2516,7 +2536,6 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
              smfrkeep(k)=soilmois(k)/riw
            endif
           enddo
-
 !******************************************************************
 ! SOILPROP computes thermal diffusivity, and diffusional and
 !          hydraulic condeuctivities
@@ -2526,6 +2545,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
                nzs,fwsat,lwsat,tav,keepfr,                        &
                soilmois,soiliqw,soilice,                          &
                soilmoism,soiliqwm,soilicem,                       &
+               globalCellID,                                      &
 !--- soil fixed fields
                QWRTZ,rhocs,dqm,qmin,psis,bclh,ksat,               &
 !--- constants
@@ -2600,7 +2620,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
 
 ! Sakaguchi and Zeng (2009) - dry soil resistance to evaporation
 !      if (vgtype==11) then   ! MODIS wetland
-        alfa=1.
+!        alfa=1.
 !      else
         fex=min(1.,soilmois(1)/dqm)
         fex=max(fex,0.01)
@@ -2620,11 +2640,10 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
         soilres=0.25*(1.-cos(piconst*fex_fc))**2.
       endif
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
-!    if (i==421.and.j==280) then
+!    if (globalCellID==targetCell) then
      print *,'fex,psit,psis,bclh,g,r_v,soilt,alfa,mavail,soilmois(1),fc,ref,soilres,fex_fc', &
               fex,psit,psis,bclh,g,r_v,soilt,alfa,mavail,soilmois(1),fc,ref,soilres,fex_fc
     endif
-
 !**************************************************************
 !  SOILTEMP soilves heat budget and diffusion eqn. in soil
 !**************************************************************
@@ -2638,6 +2657,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
              QKMS,TKMS,PC,rho,vegfrac, lai,                   &
              thdif,cap,drycan,wetcan,                         & 
              transum,dew,mavail,soilres,alfa,                 &
+             globalCellID,                                    &
 !--- soil fixed fields
              dqm,qmin,bclh,zsmain,zshalf,DTDZS,tbq,           &
 !--- constants
@@ -2693,7 +2713,6 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
            soiliqw(k)=soilmois(k)
          endif
          ENDDO
-
 !*************************************************************************
 ! SOILMOIST solves moisture budget (Smirnova et al., 1996, EQ.22,28) 
 !           and Richards eqn.
@@ -2704,7 +2723,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
                zsmain,zshalf,diffu,hydro,                      &
                QSG,QVG,QCG,QCATM,QVATM,-infwater,              &
                QKMS,TRANSP,DRIP,DEW,0.,SOILICE,VEGFRAC,        &
-               0.,soilres,                                     &
+               0.,soilres,globalCellID,                        &
 !-- soil properties
                DQM,QMIN,REF,KSAT,RAS,INFMAX,                   &
 !-- output
@@ -3126,7 +3145,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
              GLW,GSW,GSWin,EMISS,RNET,IVGTYP,                  &
              QKMS,TKMS,PC,cst,drip,infwater,                   &
              rho,vegfrac,alb,znt,lai,                          & 
-             MYJ,                                              &
+             MYJ,globalCellID,                                 &
 !--- soil fixed fields
              QWRTZ,rhocs,dqm,qmin,ref,wilt,psis,bclh,ksat,     &
              sat,cn,zsmain,zshalf,DTDZS,DTDZS2,tbq,            &
@@ -3216,7 +3235,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
 
    INTEGER,  INTENT(IN   )   ::  nroot,ktau,nzs     ,            &
                                  nddzs                         !nddzs=2*(nzs-2)
-   INTEGER,  INTENT(IN   )   ::  i,j,isoil
+   INTEGER,  INTENT(IN   )   ::  i,j,isoil,globalCellID
 
    REAL,     INTENT(IN   )   ::  DELT,CONFLX,PRCPMS            , &
                                  RAINF,NEWSNOW,RHONEWSN,         &
@@ -3512,7 +3531,6 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
              smfrkeep(k)=soilmois(k)/riw
            endif
           enddo
-
 !******************************************************************
 ! SOILPROP computes thermal diffusivity, and diffusional and
 !          hydraulic condeuctivities
@@ -3522,6 +3540,7 @@ print * ,'Soil moisture is below wilting in mixed grassland/cropland category at
                nzs,fwsat,lwsat,tav,keepfr,                       &
                soilmois,soiliqw,soilice,                         &
                soilmoism,soiliqwm,soilicem,                      &
+               globalCellID,                                     &
 !--- soil fixed fields
                QWRTZ,rhocs,dqm,qmin,psis,bclh,ksat,              & 
 !--- constants
@@ -3671,7 +3690,7 @@ print *, 'TSO before calling SNOWTEMP: ', tso
                QSG,QVG,QCG,QCATM,QVATM,-INFWATER,                  &
                QKMS,TRANSP,0.,                                     &
                0.,SMELT,soilice,vegfrac,                           &
-               snowfrac,1.,                                        &
+               snowfrac,1.,globalCellID,                           &
 !-- soil properties
                DQM,QMIN,REF,KSAT,RAS,INFMAX,                       &
 !-- output
@@ -4569,6 +4588,7 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
            QKMS,TKMS,PC,RHO,VEGFRAC,lai,                    &
            THDIF,CAP,DRYCAN,WETCAN,                         &
            TRANSUM,DEW,MAVAIL,soilres,alfa,                 &
+           globalID,                                        &
 !--- soil fixed fields
            DQM,QMIN,BCLH,                                   &
            ZSMAIN,ZSHALF,DTDZS,TBQ,                         &
@@ -4632,7 +4652,7 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
 
    INTEGER,  INTENT(IN   )   ::  nroot,ktau,nzs                , &
                                  nddzs                         !nddzs=2*(nzs-2)
-   INTEGER,  INTENT(IN   )   ::  i,j,iland,isoil
+   INTEGER,  INTENT(IN   )   ::  i,j,iland,isoil,globalID
    REAL,     INTENT(IN   )   ::  DELT,CONFLX,PRCPMS, RAINF
    REAL,     INTENT(INOUT)   ::  DRYCAN,WETCAN,TRANSUM
 !--- 3-D Atmospheric variables
@@ -4748,7 +4768,11 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
           cotso(K+1)=X1/DENOM
           rhtso(K+1)=(FT+X2*rhtso(K))/DENOM
    33  CONTINUE
-
+!       if (globalID == targetCell) then    
+!        do K=1,NZS
+!          print*, 'THDIF at ',K, THDIF(K)
+!        enddo
+!       endif 
 !************************************************************************
 !--- THE HEAT BALANCE EQUATION (Smirnova et al., 1996, EQ. 21,26)
 
@@ -5689,6 +5713,7 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
               QSG,QVG,QCG,QCATM,QVATM,PRCP,                     &
               QKMS,TRANSP,DRIP,                                 &
               DEW,SMELT,SOILICE,VEGFRAC,SNOWFRAC,soilres,       &
+              globalID,                                         &
 !--soil properties
               DQM,QMIN,REF,KSAT,RAS,INFMAX,                     &
 !--output
@@ -5738,7 +5763,7 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
 !------------------------------------------------------------------
 !--- input variables
    REAL,     INTENT(IN   )   ::  DELT
-   INTEGER,  INTENT(IN   )   ::  NZS,NDDZS
+   INTEGER,  INTENT(IN   )   ::  NZS,NDDZS,globalID
 
 ! input variables
 
@@ -5832,7 +5857,6 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
         RHSMC(1)=(SOILMOIS(NZS)-HYDRO(NZS)*DELT/DID*soilmois(nzs) & 
                  +TRANSP(NZS)*DELT/DID)/DENOM
 !test        RHSMC(1)=SOILMOIS(NZS)-HYDRO(NZS)*soilmois(nzs)
-
 !test!!!
 !this test gave smoother soil moisture, ovwerall better results
         COSMC(1)=0.
@@ -5847,16 +5871,20 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
           Q2=X2-HYDRO(KN+1)*DTDZS2(KN-1)
           DENOM=1.+X2+X4-Q2*COSMC(K)
           COSMC(K+1)=Q4/DENOM
-    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
-          print *,'q2,soilmois(kn),DIFFU(KN),x2,HYDRO(KN+1),DTDZS2(KN-1),kn,k' &
-                  ,q2,soilmois(kn),DIFFU(KN),x2,HYDRO(KN+1),DTDZS2(KN-1),kn,k
-    ENDIF
-       RHSMC(K+1)=(SOILMOIS(KN)+Q2*RHSMC(K)                            &
+!    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalID==186483) then
+!          print *,'kn,k1,soilmois(kn),DIFFU(KN),DIFFU(KN-1),DTDZS(K1+1),DTDZS(K1),HYDRO(KN+1),HYDRO(KN-1)' &
+!                  ,kn,k1,soilmois(kn),DIFFU(KN),DIFFU(KN-1),DTDZS(K1+1),DTDZS(K1),HYDRO(KN+1),HYDRO(KN-1)
+!    ENDIF
+      RHSMC(K+1)=(SOILMOIS(KN)+Q2*RHSMC(K)                            &
                    +TRANSP(KN)                                            &
                    /(ZSHALF(KN+1)-ZSHALF(KN))                             &
                    *DELT)/DENOM
-    ENDDO
-    
+     !IF (globalID==targetCell) then
+     !     print *,'kn,k1,soilmois(kn),DIFFU(KN),DIFFU(KN-1),DTDZS(K1+1),DTDZS(K1),HYDRO(KN+1),HYDRO(KN-1), RHSMC(K+1)'&
+     !             ,kn,k1,soilmois(kn),DIFFU(KN),DIFFU(KN-1),DTDZS(K1+1),DTDZS(K1),HYDRO(KN+1),HYDRO(KN-1), RHSMC(K+1)
+    !ENDIF
+      ENDDO
 ! --- MOISTURE BALANCE BEGINS HERE
 
           TRANS=TRANSP(1)
@@ -5882,6 +5910,7 @@ print *, 'D9SN,SOILT,TSOB : ', D9SN,SOILT,TSOB
 
         TOTLIQ=PRCP-DRIP/DELT-UMVEG*DEW*RAS-SMELT
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalID==targetCell) then
 print *,'UMVEG*PRCP,DRIP/DELT,UMVEG*DEW*RAS,SMELT', &
          UMVEG*PRCP,DRIP/DELT,UMVEG*DEW*RAS,SMELT
     ENDIF
@@ -5962,6 +5991,7 @@ print *,'UMVEG*PRCP,DRIP/DELT,UMVEG*DEW*RAS,SMELT', &
          INFMAX = MAX(INFMAX1,HYDRO(1)*SOILMOIS(1))
          INFMAX = MIN(INFMAX, -TOTLIQ)
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!     IF (globalID==targetCell) then
 print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
          INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ
     ENDIF
@@ -5970,6 +6000,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
             RUNOFF=-TOTLIQ-INFMAX
             FLX=-INFMAX
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!     IF (globalID==targetCell) then
        print *,'FLX,RUNOFF1=',flx,runoff
     ENDIF
           ENDIF
@@ -6006,6 +6037,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 !-- saturation
             SOILMOIS(1)=DQM
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!     IF (globalID==targetCell) then
    print *,'FLXSAT,FLX,DELT',FLXSAT,FLX,DELT,RUNOFF2
     ENDIF
 !            RUNOFF2=(FLXSAT-FLX)
@@ -6015,6 +6047,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
           END IF
 
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalID==targetCell) then
    print *,'SOILMOIS,SOILIQW, soilice',SOILMOIS,SOILIQW,soilice*riw
    print *,'COSMC,RHSMC',COSMC,RHSMC
     ENDIF
@@ -6034,6 +6067,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
             SOILMOIS(K)=DQM
              IF(K.EQ.NZS)THEN
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!    IF (globalID==targetCell) then
    print *,'hydro(k),QQ,DQM,k',hydro(k),QQ,DQM,k
     ENDIF
                RUNOFF2=RUNOFF2+((QQ-DQM)*(ZSMAIN(K)-ZSHALF(K)))/DELT
@@ -6048,8 +6082,9 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
             SOILMOIS(K)=min(dqm,max(1.e-8,QQ))
            END IF
           END DO
-    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
-   print *,'END soilmois,soiliqw,soilice',soilmois,SOILIQW,soilice*riw
+!    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+     IF (globalID==targetCell) then
+   print *,'END soilmois',soilmois
     ENDIF
 
 !           RUNOFF2=RUNOFF2+hydro(nzs)*SOILMOIS(NZS)
@@ -6069,6 +6104,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
          nzs,fwsat,lwsat,tav,keepfr,                              &
          soilmois,soiliqw,soilice,                                &
          soilmoism,soiliqwm,soilicem,                             &
+         globalID,                                                &
 !--- soil fixed fields
          QWRTZ,rhocs,dqm,qmin,psis,bclh,ksat,                     &
 !--- constants
@@ -6100,7 +6136,8 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 !-----------------------------------------------------------------
 
 !--- soil properties
-   INTEGER, INTENT(IN   )    ::                            NZS
+   INTEGER, INTENT(IN   )    ::                            NZS,  &
+                                                        globalID
    REAL                                                        , &
             INTENT(IN   )    ::                           RHOCS, &
                                                            BCLH, &
@@ -6137,7 +6174,6 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
                                    soiliqw,soilice             , &
                                    soilicem,soiliqwm           , &
                                    fwsat,lwsat
-
 !--- local variables
    REAL,     DIMENSION(1:NZS)  ::  hk,detal,kasat,kjpl
 
@@ -6236,6 +6272,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
           diffu(K)=-BCLH*KSAT*PSIS/ame*                             &
                   (dqm/ame)**3.                                     &
                   *H**(BCLH+2.)*facd
+        ! if(globalID == targetCell) print*, 'k,diffu(k),KSAT,ame,dqm,H,bclh,facd', k, diffu(k),KSAT, ame, dqm,H, BCLH, facd
          endif
 
 !          diffu(K)=-BCLH*KSAT*PSIS/dqm                              &
@@ -6252,6 +6289,12 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
     IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
    print *,'soilice*riw,soiliqw,soilmois,ws',soilice*riw,soiliqw,soilmois,ws
     ENDIF
+      ! if (globalID == targetCell) then
+      !  do K=1,NZS
+      !     print *,'soilice*riw,soiliqw,soilmois,ws',K,soilice(K)*riw,soiliqw(k),soilmois,ws
+      !  enddo
+      ! endif
+         
          DO K=1,NZS
 
          if((ws-riw*soilice(k)).lt.0.12)then
@@ -6266,6 +6309,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
                   (soiliqw(K)/am)                                  &
                   **(2.*BCLH+2.)                                   &
                   * fach)
+       !   if(globalID == targetCell) print*, 'k,hydro,KSAT,am,soiliqw,bclh,fach', k, hydro(k),KSAT, am, soiliqw(k), BCLH, fach
           if(hydro(k)<1.e-10)hydro(k)=0.
          endif
 
@@ -6907,7 +6951,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 ! mosaic approach
        if(mosaic_soil == 1 ) then
             do k = 1, nscat
-        if(k.ne.14) then
+        if(k.ne.14) then  ! STATSGO value for water
 !exclude watrer points from this loop
           AREA   = AREA + soilfrac(k)
           RHOCS  = RHOCS + HC(k)*1.E6*soilfrac(k)
@@ -7040,7 +7084,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 
 ! initialize three  LSM related tables
    IF ( allowed_to_read ) THEN
-     CALL wrf_message( 'INITIALIZE THREE LSM RELATED TABLES' )
+     CALL mpas_log_write( 'INITIALIZE THREE LSM RELATED TABLES' )
       if(mminlu == 'USGS') then
         MMINLURUC='USGS-RUC'
       elseif(mminlu == 'MODIS' .OR. &
@@ -7177,7 +7221,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 
         character*8 :: MMINLURUC, MMINSL
         character*128 :: mess , message, vege_parm_string
-        logical, external :: wrf_dm_on_monitor
+!        logical, external :: wrf_dm_on_monitor
 
 
 !-----SPECIFY VEGETATION RELATED CHARACTERISTICS :
@@ -7206,7 +7250,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 !-----READ IN VEGETAION PROPERTIES FROM VEGPARM.TBL 
 !                                                                       
 
-       IF ( wrf_dm_on_monitor() ) THEN
+!       IF ( wrf_dm_on_monitor() ) THEN
 
         OPEN(19, FILE='VEGPARM.TBL',FORM='FORMATTED',STATUS='OLD',IOSTAT=ierr)
         IF(ierr .NE. OPEN_OK ) THEN
@@ -7216,7 +7260,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
         END IF
 
         WRITE ( mess, * ) 'INPUT VEGPARM FOR ',MMINLURUC
-        CALL wrf_message( mess )
+        CALL mpas_log_write( mess )
 
         LUMATCH=0
 
@@ -7227,11 +7271,11 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
            READ (19,*)LUCATS,IINDEX
 
            WRITE( mess , * ) 'VEGPARM FOR ',LUTYPE,' FOUND', LUCATS,' CATEGORIES'
-           CALL wrf_message( mess )
+           CALL mpas_log_write( mess )
 
            IF(LUTYPE.NE.MMINLURUC)THEN    ! Skip over the undesired table
               write ( mess , * ) 'Skipping ', LUTYPE, ' table'
-              CALL wrf_message( mess )
+              CALL mpas_log_write( mess )
               DO LC=1,LUCATS
                  READ (19,*)
               ENDDO
@@ -7244,7 +7288,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
            ELSE
               LUMATCH=1
               write ( mess , * ) 'Found ', LUTYPE, ' table'
-              CALL wrf_message( mess )
+              CALL mpas_log_write( mess )
               EXIT outer                ! Found the table, read the data
            END IF
 
@@ -7252,7 +7296,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 
         IF (LUMATCH == 1) then
            write ( mess , * ) 'Reading ',LUTYPE,' table'
-           CALL wrf_message( mess )
+           CALL mpas_log_write( mess )
            DO LC=1,LUCATS
               READ (19,*)IINDEX,ALBTBL(LC),Z0TBL(LC),LEMITBL(LC),PCTBL(LC), &
                          SHDTBL(LC),IFORTBL(LC),RSTBL(LC),RGLTBL(LC),         &
@@ -7294,7 +7338,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
            FATAL_ERROR ("Land Use Dataset '"//MMINLURUC//"' not found in VEGPARM.TBL.")
         ENDIF
 
-      END IF
+ !     END IF
 
       CALL wrf_dm_bcast_string  ( LUTYPE  , 8 )
       CALL wrf_dm_bcast_integer ( LUCATS  , 1 )
@@ -7324,7 +7368,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 !                                                                       
 !-----READ IN SOIL PROPERTIES FROM SOILPARM.TBL
 !                                                                       
-      IF ( wrf_dm_on_monitor() ) THEN
+      !IF ( wrf_dm_on_monitor() ) THEN
         OPEN(19, FILE='SOILPARM.TBL',FORM='FORMATTED',STATUS='OLD',IOSTAT=ierr)
         IF(ierr .NE. OPEN_OK ) THEN
           WRITE(message,FMT='(A)') &
@@ -7333,7 +7377,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
         END IF
 
         WRITE(mess,*) 'INPUT SOIL TEXTURE CLASSIFICATION = ',MMINSL
-        CALL wrf_message( mess )
+        CALL mpas_log_write( mess )
 
         LUMATCH=0
 
@@ -7354,7 +7398,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
         IF(SLTYPE.EQ.MMINSL)THEN
             WRITE( mess , * ) 'SOIL TEXTURE CLASSIFICATION = ',SLTYPE,' FOUND', &
                   SLCATS,' CATEGORIES'
-            CALL wrf_message ( mess )
+            CALL wrf_mpas_log_write ( mess )
           LUMATCH=1
         ENDIF
             IF(SLTYPE.EQ.MMINSL)THEN
@@ -7368,7 +7412,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
  2003   CONTINUE
 
         CLOSE (19)
-      ENDIF
+      !ENDIF
 
       CALL wrf_dm_bcast_integer ( LUMATCH , 1 )
       CALL wrf_dm_bcast_string  ( SLTYPE  , 8 )

@@ -78,7 +78,7 @@
  
 !local variables:
  integer:: iCell
-
+ integer, pointer :: globalCells(:)
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_dimension(mesh,'nCellsSolve',nCellsSolve)
@@ -117,6 +117,10 @@
 !valid on the 15th day of the month :
  call monthly_interp_to_date(nCellsSolve,current_date,lai12m,lai)
 
+  call mpas_pool_get_array(mesh,'indexToCellID',globalCells)
+  do iCell = 1,nCellsSolve
+    lai(iCell) = lai(iCell) / 10.
+  enddo
  end subroutine physics_update_surface
 
 !=================================================================================================================
