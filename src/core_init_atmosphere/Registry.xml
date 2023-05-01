@@ -416,6 +416,7 @@
                         <var name="shdmin" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="shdmax" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="albedo12m" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+                        <var name="lai12m" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="var2d" packages="vertical_stage_in;met_stage_in"/>
                         <var name="con" packages="vertical_stage_in;met_stage_in"/>
                         <var name="oa1" packages="vertical_stage_in;met_stage_in"/>
@@ -514,6 +515,7 @@
                         <var name="shdmin"/>
                         <var name="shdmax"/>
                         <var name="albedo12m"/>
+                        <var name="lai12m"/>
                         <var name="var2d" packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
                         <var name="con" packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
                         <var name="oa1" packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
@@ -790,6 +792,9 @@
 
                 <var name="albedo12m" type="real" dimensions="nMonths nCells" units="unitless"
                      description="monthly-mean climatological surface albedo"/>
+                     
+                <var name="lai12m" type="real" dimensions="nMonths nCells" units="unitless"
+                     description="monthly-mean climatological leaf area index"/>
 
                 <var name="isice_lu" type="integer" dimensions="" units="unitless" default_value="24"
                      description="Index category for snow/ice"/>
