@@ -40,6 +40,10 @@
                      description="The number of atmospheric levels, always one more than the number of layers"/>
                 <dim name="nMonths" definition="namelist:config_months"
                      description="The number of months in a year"/>
+		<dim name="nlcat" definition="namelist:config_landuse_data" calculation='20 + 4 * merge(1,0,config_landuse_data(1:4)=="USGS")'
+                     description="The number of landuse categories used in the land surface model"/>
+                <dim name="nscat" definition="16"
+                     description="The number of soil categories used in the land surface model"/>
         </dims>
 
 
@@ -123,6 +127,11 @@
                      description="The number of months in a year"
                      possible_values="Positive integer values"/>
 
+                <nml_option name="config_nsoilcat"              type="integer"       default_value="16"
+                     units='-'
+                     description="The number of landuse categories used by the LSM."
+                     possible_values="16"/>
+
         </nml_record>
 
         <nml_record name="data_sources" in_defaults="true">
@@ -151,6 +160,11 @@
                      units="-"
                      description="The land use classification to use (case 7 only)"
                      possible_values="`USGS' or `MODIFIED_IGBP_MODIS_NOAH'"/>
+
+                <nml_option name="config_soilcat_data"          type="character"     default_value="STASGO"
+                     units="-"
+                     description="The soil type classification to use (case 7 only)"
+                     possible_values="`STASGO' or `BNU'"/>
 
                 <nml_option name="config_topo_data"             type="character"     default_value="GMTED2010"
                      units="-"
@@ -394,6 +408,8 @@
                         <var name="iswater_lu" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="ivgtyp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="isltyp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+                        <var name="landusef" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+                        <var name="soilf" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="snoalb" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="soiltemp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="greenfrac" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
@@ -490,6 +506,8 @@
                         <var name="iswater_lu"/>
                         <var name="ivgtyp"/>
                         <var name="isltyp"/>
+                        <var name="landusef"/>
+                        <var name="soilf"/>
                         <var name="snoalb"/>
                         <var name="soiltemp"/>
                         <var name="greenfrac"/>
@@ -748,6 +766,12 @@
 
                 <var name="isltyp" name_in_code="soilcat_top"  type="integer"  dimensions="nCells" units="unitless"
                      description="dominate soil category"/>
+
+                <var name="landusef" name_in_code="landusef" type="real"  dimensions="nlcat nCells" units="unitless"
+                     description="fraction of each landuse category present in each cell"/>
+
+                <var name="soilf" name_in_code="soilf" type="real"  dimensions="nscat nCells" units="unitless"
+                     description="fraction of each soil type present in each cell"/>
 
                 <var name="snoalb" type="real" dimensions="nCells" units="unitless"
                      description="annual maximum snow albedo"/>

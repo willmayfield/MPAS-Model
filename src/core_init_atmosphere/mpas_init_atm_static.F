@@ -123,6 +123,8 @@
  character(len=StrKIND), pointer :: config_vegfrac_data
  character(len=StrKIND), pointer :: config_albedo_data
  character(len=StrKIND), pointer :: config_maxsnowalbedo_data
+ character(len=StrKIND), pointer :: config_soilcat_data
+ character(len=StrKIND), pointer :: config_lai_data
  character(len=StrKIND+1) :: geog_data_path      ! same as config_geog_data_path, but guaranteed to have a trailing slash
  character(len=StrKIND+1) :: geog_sub_path       ! subdirectory names in config_geog_data_path, with trailing slash
 
@@ -213,7 +215,8 @@
  call mpas_pool_get_config(configs, 'config_albedo_data', config_albedo_data)
  call mpas_pool_get_config(configs, 'config_maxsnowalbedo_data', config_maxsnowalbedo_data)
  call mpas_pool_get_config(configs, 'config_supersample_factor', supersample_fac)
-
+ call mpas_pool_get_config(configs, 'config_soilcat_data', config_soilcat_data)
+ call mpas_pool_get_config(configs, 'config_lai_data', config_lai_data)
  write(geog_data_path, '(a)') config_geog_data_path
  i = len_trim(geog_data_path)
  if (geog_data_path(i:i) /= '/') then
@@ -340,6 +343,8 @@
        write(mminlu,'(a)') 'USGS'
     case('MODIFIED_IGBP_MODIS_NOAH')
        write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
+    case('MODIFIED_IGBP_MODIS_NOAH_15s')
+       write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
     case default
          call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
          call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
@@ -383,6 +388,9 @@
     case('MODIFIED_IGBP_MODIS_NOAH')
        call mpas_log_write('Using 20-class MODIS 30-arc-second land cover dataset')
        geog_sub_path = 'modis_landuse_20class_30s/'
+        case('MODIFIED_IGBP_MODIS_NOAH_15s')
+       call mpas_log_write('Using 20-class MODIS 15-arc-second land cover dataset')
+       geog_sub_path = 'modis_landuse_20class_15s/'
     case default
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
@@ -399,7 +407,19 @@
 !
 ! Interpolate SOILCAT_TOP
 !
- geog_sub_path = 'soiltype_top_30s/'
+
+ if (trim(config_soilcat_data) == 'STASGO') then
+   geog_sub_path = 'soiltype_top_30s/'
+ elseif(trim(config_soilcat_data) == 'BNU') then
+   geog_sub_path = 'bnu_soiltype_top/'
+ else
+   call mpas_log_write('*****************************************************************',messageType=MPAS_LOG_ERR)
+   call mpas_log_write('Invalid soil type dataset'''//trim(config_soilcat_data) &
+                    //''' selected for config_soilcat_data',messageType=MPAS_LOG_ERR)
+    call mpas_log_write('   Possible options are: ''STASGO'',''BNU''', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('*****************************************************************',messageType=MPAS_LOG_ERR)
+    call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
+ endif
 
  call mpas_log_write('--- start interpolate SOILCAT_TOP')
  call interp_soilcat(mesh, tree, trim(config_geog_data_path)//trim(geog_sub_path), iswater_soil)
@@ -1578,12 +1598,14 @@
      integer, pointer :: nCells
      integer, pointer :: isice_lu_ptr
      integer, pointer :: iswater_lu_ptr
+     real, pointer :: landusef(:,:)
 
      real (kind=RKIND), pointer :: scalefactor
 
-     integer :: iCell
+     integer :: iCell, i
      integer :: ierr
 
+     real :: lu_sum
      ierr = mgr % init(trim(geog_data_path))
      if (ierr /= 0) then
          call mpas_log_write("Error occured initalizing interpolation for "//trim(geog_data_path), messageType=MPAS_LOG_CRIT)
@@ -1592,6 +1614,7 @@
 
      call mpas_pool_get_dimension(mesh, 'nCells', nCells)
      call mpas_pool_get_array(mesh, 'lu_index', lu_index)
+     call mpas_pool_get_array(mesh, 'landusef', landusef)
      call mpas_pool_get_config(mgr % pool, 'scale_factor', scalefactor)
      call mpas_pool_get_config(mgr % pool, 'category_min', category_min)
      call mpas_pool_get_config(mgr % pool, 'category_max', category_max)
@@ -1603,6 +1626,7 @@
 
      allocate(ncat(category_min:category_max, nCells))
      ncat(:,:) = 0
+     landusef(:,:) = 0.0
 
      call init_atm_map_static_data(mesh, mgr, kdtree, categorical_interp_criteria, categorical_interp_accumulation)
 
@@ -1611,6 +1635,11 @@
          ! starting index of the array is 1, and dataset categories do not necessarily start
          ! at 1, we need to use category_min to ensure the correct category location is chosen.
          lu_index(iCell) = maxloc(ncat(:,iCell), dim=1) - 1 + category_min
+         lu_sum = ncat(category_min,iCell)
+         do i = category_min+1,category_max
+           lu_sum = lu_sum + ncat(i,iCell)
+         enddo
+         landusef(:,iCell) = real(ncat(:,iCell)) / real(lu_sum)
      end do
      deallocate(ncat)
 
@@ -1658,10 +1687,13 @@
      integer, pointer :: nCells
      integer, pointer :: iswater_soil_ptr
 
+     real, pointer :: soilf(:,:)
      real (kind=RKIND), pointer :: scalefactor
 
-     integer :: iCell
+     integer :: iCell, i
      integer :: ierr
+
+     real :: soil_sum
 
      ierr = mgr % init(trim(geog_data_path))
      if (ierr /= 0) then
@@ -1671,6 +1703,7 @@
 
      call mpas_pool_get_dimension(mesh, 'nCells', nCells)
      call mpas_pool_get_array(mesh, 'soilcat_top', soilcat_top)
+     call mpas_pool_get_array(mesh, 'soilf', soilf)
      call mpas_pool_get_config(mgr % pool, 'scale_factor', scalefactor)
      call mpas_pool_get_config(mgr % pool, 'category_min', category_min)
      call mpas_pool_get_config(mgr % pool, 'category_max', category_max)
@@ -1680,7 +1713,7 @@
 
      allocate(ncat(category_min:category_max, nCells))
      ncat(:,:) = 0
-
+     soilf(:,:) = 0.0
      call init_atm_map_static_data(mesh, mgr, kdtree, categorical_interp_criteria, categorical_interp_accumulation)
 
      do iCell = 1, nCells
@@ -1688,6 +1721,11 @@
         ! starting index of the array is 1, and dataset categories do not necessarily start
         ! at 1, we need to use category_min to ensure the correct category location is chosen.
         soilcat_top(iCell) = maxloc(ncat(:,iCell), dim=1) - 1 + category_min
+        soil_sum = ncat(category_min,iCell)
+        do i = category_min+1,category_max
+          soil_sum = soil_sum + ncat(i,iCell)
+        enddo
+        soilf(:,iCell) = real(ncat(:,iCell)) / real(soil_sum)
      end do
      deallocate(ncat)
 
