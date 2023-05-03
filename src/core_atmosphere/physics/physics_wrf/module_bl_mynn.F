@@ -1089,11 +1089,11 @@ CONTAINS
 !      HL88 , lev2.5 criteria from eqs. 3.17, 3.19, & 3.20
        IF (sh(k)<0.0 .OR. sm(k)<0.0 .OR. &
            sh(k) > 0.76*b2 .or. (sm(k)**2*gm(k) .gt. .44**2)) THEN
-          PRINT*,"MYM_TURBULENCE2.5: k=",k," sh=",sh(k)
-          PRINT*," gm=",gm(k)," gh=",gh(k)," sm=",sm(k)
-          PRINT*," q2sq=",q2sq," q3sq=",q3sq," q3/q2=",q3sq/q2sq
-          PRINT*," qke=",qke(k)," el=",el(k)," ri=",ri
-          PRINT*," PBLH=",zi," u=",u(k)," v=",v(k)
+         ! PRINT*,"MYM_TURBULENCE2.5: k=",k," sh=",sh(k)
+         ! PRINT*," gm=",gm(k)," gh=",gh(k)," sm=",sm(k)
+         ! PRINT*," q2sq=",q2sq," q3sq=",q3sq," q3/q2=",q3sq/q2sq
+         ! PRINT*," qke=",qke(k)," el=",el(k)," ri=",ri
+         ! PRINT*," PBLH=",zi," u=",u(k)," v=",v(k)
        ENDIF
 
 !   **  Level 3 : start  **

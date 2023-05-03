@@ -6082,8 +6082,8 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
             SOILMOIS(K)=min(dqm,max(1.e-8,QQ))
            END IF
           END DO
-!    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
-     IF (globalID==targetCell) then
+    IF ( wrf_at_debug_level(LSMRUC_DBG_LVL) ) THEN
+!     IF (globalID==targetCell) then
    print *,'END soilmois',soilmois
     ENDIF
 
