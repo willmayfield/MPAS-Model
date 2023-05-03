@@ -2027,6 +2027,7 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
 !                              vtcloud, vtrain, vtsnow, vtgraupel, vthail,               &
                               ipelectmp,                                                &
                               diagflag,ke_diag,diag_dbz,                                 &
+                              refl_diagnostic,                                           & !LJR
                               nssl_progn,                                              & ! wrf-chem 
 ! 20130903 acd_mb_washout start
                               wetscav_on, rainprod, evapprod,                           & ! wrf-chem 
@@ -2097,6 +2098,7 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
       integer, parameter :: nproc = 1
       REAL, DIMENSION(ims:ime, kms:kme, jms:jme), optional, INTENT(INOUT)::  re_cloud, re_ice, re_snow, re_rain
       REAL, DIMENSION(ims:ime, kms:kme, jms:jme), optional, INTENT(IN):: tkediss
+      REAL, DIMENSION(ims:ime, jms:jme), optional, INTENT(INOUT):: refl_diagnostic !LJR
       INTEGER, INTENT(IN), optional :: has_reqc, has_reqi, has_reqs, has_reqr
       real, dimension(ims:ime, jms:jme), intent(out), optional ::                                 &
                             rainncw2, rainnci2       ! liquid rain, ice, accumulation rates
@@ -2818,20 +2820,19 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
 
 
 ! compute diagnostic S-band reflectivity if needed
-     IF ( present( dbz ) .and. diag_dbz .and. lastlooptmp ) THEN
+     IF ( present( dbz ) .and. makediag .and. lastlooptmp ) THEN
    ! calc dbz
-      
+     ! print*, "computing full 3d dbz" 
       IF ( .true. ) THEN
       IF ( present(ke_diag) ) THEN
         kediagloc = ke_diag
       ELSE
         kediagloc = nz
       ENDIF
-      call radardd02(nx,ny,nz,nor,na,an,t0,         &
+      call radardd02(nx,ny,nz,nor,an,t0,         &
      &    dbz2d,dn1,nz,cnoh,rho_qh,ipconc,kediagloc, 0)
       ENDIF ! .false.
-
-     
+      !print*, "after 3d dbz" 
        DO kz = kts,kediagloc ! kte
         DO ix = its,ite
          dbz(ix,kz,jy) = dbz2d(ix,1,kz)
@@ -2846,11 +2847,34 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
          ENDIF
           IF ( present( compdbz ) ) THEN
             compdbz(ix,jy) = Max( compdbz(ix,jy), dbz2d(ix,1,kz) )
+       !     print*, "after compdbz"
+          ENDIF
+          IF (diag_dbz) then
+           refl_diagnostic(ix,jy) = dbz2d(ix,1,17)
+       !    print*, "after refl_diagnostic"
           ENDIF
         ENDDO
        ENDDO
 
+
        ENDIF
+
+! compute diagnostics S-band refelctivity at chosen levels at every time step
+     IF (diag_dbz .and. .not. makediag ) then
+        IF ( present(ke_diag) ) THEN
+        kediagloc = ke_diag
+      ELSE
+        kediagloc = nz
+      ENDIF
+      !print*, "computing 1 level reflectivity"
+        call radardd02(nx,ny,nz,nor,an,t0,         &
+     &    dbz2d,dn1,nz,cnoh,rho_qh,ipconc,kediagloc, 0, &
+          zdbz_start=17, zdbz_end=17) 
+
+       do ix = its, ite
+         refl_diagnostic(ix,jy) = dbz2d(ix,1,17)
+       enddo
+    ENDIF
 
 
 
@@ -7715,8 +7739,9 @@ END SUBROUTINE nssl_2mom_driver
 ! #####################################################################
 
 ! ##############################################################################
-      subroutine radardd02(nx,ny,nz,nor,na,an,temk,         &
-     &    dbz,db,nzdbz,cnoh0t,hwdn1t,ipconc,ke_diag, iunit)
+      subroutine radardd02(nx,ny,nz,nor,an,temk,         &
+     &    dbz,db,nzdbz,cnoh0t,hwdn1t,ipconc,ke_diag, iunit, zdbz_start, &
+     &    zdbz_end)
 !
 ! 11.13.2005: Changed values of indices for reordering of lip
 !
@@ -7761,20 +7786,26 @@ END SUBROUTINE nssl_2mom_driver
 
 
       implicit none
-      
+      integer ng1
+      parameter (ng1=1)      
       character(LEN=15), parameter :: microp = 'ZVD'
-      integer nx,ny,nz,nor,na,ngt
-      integer nzdbz    !  how many levels actually to process
-      
-      integer ng1,n10
-      integer iunit
-      integer, parameter :: printyn = 0
+      integer, intent(in) ::  nx,ny,nz,nor
+      integer, intent(in) ::  nzdbz ! how many levels to actually process
+      integer, intent(in), optional :: zdbz_start,zdbz_end    !  start and end levels actually to process
+      real, intent(in) ::  an(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor,na)
+      real, intent(in) ::  temk(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)  ! air temperature (kelvin)
+      real, intent(in) ::  db(-nor+ng1:nx+nor,1,-nor+ng1:nz+nor)  ! air density
+      real, intent(out) ::  dbz(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)   ! reflectivity
+      real, intent(in) :: cnoh0t, hwdn1t
+      integer, intent(in) :: ipconc, ke_diag, iunit
 
-      parameter( ng1 = 1 )
+      integer n10,ngt
+!      integer iunit
+      integer, parameter :: printyn = 0
       
-      real cnoh0t,hwdn1t
-      integer ke_diag
-      integer ipconc
+!      real cnoh0t,hwdn1t
+!      integer ke_diag
+!      integer ipconc
       real vr
 
 
@@ -7782,11 +7813,11 @@ END SUBROUTINE nssl_2mom_driver
       
       integer vzflag
       integer, parameter :: norz = 3
-      real an(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor,na)
-      real db(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)  ! air density
+!      real an(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor,na)
+!      real db(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)  ! air density
 !      real gt(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor,ngt)
-      real temk(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)  ! air temperature (kelvin)
-      real dbz(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)   ! reflectivity
+!      real temk(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)  ! air temperature (kelvin)
+!      real dbz(-nor+ng1:nx+nor,-nor+ng1:ny+nor,-nor+ng1:nz+nor)   ! reflectivity
       real gz(-nor+1:nz+nor) ! ,z1d(-nor+1:nz+nor,4)
       
 !      real g,rgas,eta,inveta
@@ -7858,9 +7889,21 @@ END SUBROUTINE nssl_2mom_driver
       real :: ksq
       real :: dtp
 
+      integer :: loop_start, loop_end
+
 
 ! #########################################################################      
 
+      if (.not. present(zdbz_start)) then
+         loop_start = 1
+      else
+         loop_start = zdbz_start
+      endif
+      if (.not. present(zdbz_end)) then
+         loop_end = ke_diag
+      else
+         loop_end = zdbz_end
+      endif
       vzflag = 0
       
       izieg = 0
@@ -8136,7 +8179,7 @@ END SUBROUTINE nssl_2mom_driver
 
       DO jy=1,1
 
-        DO kz = 1,ke_diag ! nz
+        DO kz = loop_start, loop_end !1,ke_diag ! nz
          
           DO ix=1,nx
             dbz(ix,jy,kz) = 0.0
