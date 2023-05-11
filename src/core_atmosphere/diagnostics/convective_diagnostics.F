@@ -348,7 +348,7 @@ module convective_diagnostics
         real (kind=RKIND), dimension(:,:), pointer :: pressure_base, pressure_p
         real (kind=RKIND), dimension(:), pointer :: u10m, v10m, t2m
         real (kind=RKIND), dimension(:,:), pointer :: refl10cm
-        real (kind=RKIND), dimension(:), pointer :: rainncv, snowncv, graupelncv
+        real (kind=RKIND), dimension(:), pointer :: rainncv, snowncv, raincv
         real (kind=RKIND), dimension(:), pointer :: prec_acc_c, prec_acc_nc, snow_acc_nc
         real (kind=RKIND) :: uph, pb, pt
 
@@ -408,8 +408,8 @@ module convective_diagnostics
             call mpas_pool_get_array(diag_physics, 'v10', v10m)
             call mpas_pool_get_array(diag_physics, 't2m', t2m)
             call mpas_pool_get_array(diag_physics, 'rainncv', rainncv)
+            call mpas_pool_get_array(diag_physics, 'raincv', raincv)
             call mpas_pool_get_array(diag_physics, 'snowncv', snowncv)
-            call mpas_pool_get_array(diag_physics, 'graupelncv', graupelncv)
 
             call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
             call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
@@ -507,7 +507,7 @@ module convective_diagnostics
             if (is_needed_prec_acc_c .or. is_needed_prec_acc_nc .or. is_needed_snow_acc_nc) then
                 do iCell=1, nCellsSolve
                     if (is_needed_prec_acc_c) then
-                        prec_acc_c(iCell)  = prec_acc_c(iCell)  +  rainncv(iCell)
+                        prec_acc_c(iCell)  = prec_acc_c(iCell)  +  raincv(iCell)
                         prec_acc_c(iCell)  = MAX (prec_acc_c(iCell), 0.0)
                     endif
                     if (is_needed_prec_acc_nc) then
@@ -518,7 +518,7 @@ module convective_diagnostics
                         snow_acc_nc(iCell)   = snow_acc_nc(iCell) + snowncv(iCell)
                ! add convective precip to snow bucket if t2m < 273.15
                         IF ( t2m(iCell) .lt. 273.15 ) THEN
-                          snow_acc_nc(iCell)   = snow_acc_nc(iCell) +  rainncv(iCell)
+                          snow_acc_nc(iCell)   = snow_acc_nc(iCell) +  raincv(iCell)
                           snow_acc_nc(iCell)   = MAX (snow_acc_nc(iCell), 0.0)
                         ENDIF
                     endif
