@@ -335,7 +335,7 @@ module init_atm_cases
                call mpas_pool_get_dimension(block_ptr % dimensions, 'nCells', nCells)
                call mpas_pool_get_dimension(block_ptr % dimensions, 'nEdges', nEdges)
                call mpas_pool_get_dimension(block_ptr % dimensions, 'nVertLevels', nVertLevels)
-               
+
                call mpas_get_time(curr_time, dateTimeString=timeString)
                xtime = timeString   ! Set field valid time, xtime, to the current time in the time loop
 
@@ -5082,9 +5082,9 @@ call mpas_log_write('Done with soil consistency check')
             cone = ALOG10(COS(truelat1*rad_per_deg)) - &
                    ALOG10(COS(truelat2*rad_per_deg))
             cone = cone /(ALOG10(TAN((45.0 - ABS(truelat1)/2.0) * rad_per_deg)) - &
-                   ALOG10(TAN((45.0 - ABS(truelat2)/2.0) * rad_per_deg)))        
+                   ALOG10(TAN((45.0 - ABS(truelat2)/2.0) * rad_per_deg)))
          ELSE
-            cone = SIN(ABS(truelat1)*rad_per_deg )  
+            cone = SIN(ABS(truelat1)*rad_per_deg )
          ENDIF
 
          call mpas_log_write(" cone value is $r ",realArgs=(/cone/))
@@ -5092,7 +5092,7 @@ call mpas_log_write('Done with soil consistency check')
          call mpas_log_write(" rotating velocities ")
          call rotate_velocities(u_fg, v_fg, lonEdge, cone, xlonc, nfglevels_actual, nEdges)
 
-      else 
+      else
          call mpas_log_write(" is_wind_grid_rel is false ")
       end if
 
@@ -6220,9 +6220,9 @@ call mpas_log_write('Done with soil consistency check')
             cone = ALOG10(COS(truelat1*rad_per_deg)) - &
                    ALOG10(COS(truelat2*rad_per_deg))
             cone = cone /(ALOG10(TAN((45.0 - ABS(truelat1)/2.0) * rad_per_deg)) - &
-                   ALOG10(TAN((45.0 - ABS(truelat2)/2.0) * rad_per_deg)))        
+                   ALOG10(TAN((45.0 - ABS(truelat2)/2.0) * rad_per_deg)))
          ELSE
-            cone = SIN(ABS(truelat1)*rad_per_deg )  
+            cone = SIN(ABS(truelat1)*rad_per_deg )
          ENDIF
 
          call mpas_log_write(" cone value is $r ",realArgs=(/cone/))
@@ -6230,7 +6230,7 @@ call mpas_log_write('Done with soil consistency check')
          call mpas_log_write(" rotating velocities ")
          call rotate_velocities(u_fg, v_fg, lonEdge, cone, xlonc, nfglevels_actual, nEdges)
 
-      else 
+      else
          call mpas_log_write(" is_wind_grid_rel is false ")
       end if
 
@@ -6903,7 +6903,7 @@ call mpas_log_write('Done with soil consistency check')
       call mpas_pool_get_array(mesh, 'albedo12m', albedo12m)
       call mpas_pool_get_array(mesh, 'greenfrac', greenfrac)
       call mpas_pool_get_array(mesh, 'landusef', landusef)
-      call mpas_pool_get_array(mesh,' soilf', soilf)
+      call mpas_pool_get_array(mesh, 'soilf', soilf)
 
 
       call mpas_pool_get_array(fg, 'xice', xice)
@@ -6944,11 +6944,10 @@ call mpas_log_write('Done with soil consistency check')
          do iCat = 1, nLandCat
              landusef(iCat,iCell) = 0.0
          enddo
-           
+
          do iCat = 1,nSoilCat
              soilf(iCat,iCell) = 0.0
          enddo
-
 
          !snow coverage:
          snow(iCell) = 0.0
@@ -7637,5 +7636,5 @@ call mpas_log_write('Done with soil consistency check')
     end do
 
     end subroutine rotate_velocities
-    
+
 end module init_atm_cases
