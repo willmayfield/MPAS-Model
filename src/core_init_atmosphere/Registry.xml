@@ -42,7 +42,7 @@
                      description="The number of months in a year"/>
 		<dim name="nlcat" definition="namelist:config_landuse_data" calculation='20 + 4 * merge(1,0,config_landuse_data(1:4)=="USGS")'
                      description="The number of landuse categories used in the land surface model"/>
-                <dim name="nscat" definition="16"
+                <dim name="nscat" definition="16" definition:"namelist:config_nsoilcat"
                      description="The number of soil categories used in the land surface model"/>
         </dims>
 
@@ -196,6 +196,10 @@
                      description="Whether to use specific-humidity as the first-guess moisture variable. If this option is False, relative humidity will be used."
                      possible_values="true or false"/>
 
+		<nml_option name="config_lai_data"           type="character"     default_value="MODIS"
+                     units="-"
+                     description="The climatological monthly leaf area index dataset to use (case 7 only)"
+                     possible_values="`MODIS'"/>
         </nml_record>
 
         <nml_record name="vertical_grid" in_defaults="true">

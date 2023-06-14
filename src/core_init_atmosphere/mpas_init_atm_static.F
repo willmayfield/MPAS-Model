@@ -1293,12 +1293,12 @@
         if (nhs(iCell) == 0) then
             lai12m(:,iCell) = fillval
         else
-            lai12m(:,iCell) = real(real(lai_int(:,iCell), kind=R8KIND) / real(nhs(iCell), kind=R8KIND), kind=RKIND)
+            lai12m(:,iCell) = real(real(lai12m_int(:,iCell), kind=R8KIND) / real(nhs(iCell), kind=R8KIND), kind=RKIND)
         end if
     end do
 
     deallocate(nhs)
-    deallocate(lai_int)
+    deallocate(lai12m_int)
 
     ierr = mgr % finalize()
     if (ierr /= 0) then
