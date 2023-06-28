@@ -6537,9 +6537,10 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
        QS=(TT(I)+(TT(I)-TT(I+1))*RN)/PP
        GOTO 20
 !   1   PRINT *,'Crash in surface energy budget - STOP'
-   1   PRINT *,'     AVOST IN VILKA     Table index= ',I
-!       PRINT *,TN,D1,D2,PP,NSTEP,I,TT(i),ii,j,iland,isoil
-       print *,'I,J=',ii,j,'LU_index = ',iland, 'Psfc[hPa] = ',pp, 'Tsfc = ',tn
+!   1   PRINT *,'     AVOST IN VILKA     Table index= ',I
+    1   PRINT *,D1,D2,PP,TT(i),TT(i+1)
+    !   write(0,*),'I,J=',ii,j,'LU_index = ',iland, 'Psfc[hPa] = ',pp, 'Tsfc = ',tn,&
+    !             'TTI=',TT(I),'TTIP1=',TT(I+1),'D1=',D1
        FATAL_ERROR ('  Crash in surface energy budget  ' )
    20  CONTINUE
 !-----------------------------------------------------------------------

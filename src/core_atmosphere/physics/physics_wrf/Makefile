@@ -10,6 +10,7 @@ OBJS = \
 	module_bl_gwdo.o               \
 	module_bl_mynn.o               \
 	module_bl_ysu.o                \
+	module_bl_myjpbl.o             \
 	module_cam_error_function.o    \
 	module_cam_shr_kind_mod.o      \
 	module_cam_support.o           \
@@ -32,6 +33,7 @@ OBJS = \
 	module_sf_bep.o                \
 	module_sf_bep_bem.o            \
 	module_sf_sfcdiags.o           \
+	module_sf_myjsfc.o             \
 	module_sf_mynn.o               \
 	module_sf_noahdrv.o            \
 	module_sf_noahlsm.o            \

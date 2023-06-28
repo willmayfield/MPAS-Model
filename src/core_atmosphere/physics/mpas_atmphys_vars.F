@@ -405,6 +405,10 @@
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     rniblten_p         !
 
+!... MYJ PBL scheme (module_bl_myjpbl.F):
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    chlowq_p,         &!
+    mixht_p            !
 !=================================================================================================================
 !... variables and arrays related to parameterization of gravity wave drag over orography:
 !=================================================================================================================
@@ -493,6 +497,34 @@
     sh3d_p,           &!stability function for heat                                                            [-]
     elpbl_p            !length scale from PBL                                                                  [m]
 
+!... arrays only in myj surface layer scheme (module_sf_myjsfc.F):
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    thz0_p,           &!potential temperature at roughness length                                              [K]
+    uz0_p,            &!u at roughness length                                                                [m/s]
+    vz0_p,            &!v at roughness length                                                                [m/s]
+    akhs_p,           &!surface exchange coefficient for heat                                                  [-]
+    akms_p,           &!surface exchange coefficient for moisture                                              [-]
+    ct_p,             &!countergradient term                                                                   [-]
+    tshltr_p,         &!shelter potential temperature                                                          [K]
+    qshltr_p,         &!shelter specific humidity                                                              [-]
+    pshltr_p,         &!shelter pressure                                                                      [Pa]
+    th10_p,           &!potential temperature at 10 m                                                          [K]
+    q10_p,            &!specific humidity at 10 m                                                              [-]
+    thz0_sea,         &!potential temperature at roughness length (ice)                                        [K]
+    qz0_sea,          &!specific humidity at roughness length (ice)                                            [-]
+    uz0_sea,          &!u at roughness length (ice)                                                          [m/s]
+    vz0_sea,          &!v at roughness length (ice)                                                          [m/s]
+    akhs_sea,         &!surface exchange coefficient for heat (ice)                                            [-]
+    akms_sea,         &!surface exchange coefficient for moisture (ice)                                        [-]
+    ct_sea,           &!countergradient term (ice)                                                             [-]
+    tshltr_sea,       &!shelter potential temperature (ice)                                                    [K]
+    qshltr_sea,       &!shelter specific humidity (ice)                                                        [-]
+    pshltr_sea,       &!shelter pressure (ice)                                                                [Pa]
+    th10_sea,         &!potential temperature at 10 m (ice)                                                    [K]
+    q10_sea            !specific humidity at 10 m (ice)                                                        [-]
+
+ integer,dimension(:,:),allocatable:: &
+  lowlyr_p            !index of lowest model layer above ground                                                [-]
 !=================================================================================================================
 !... variables and arrays related to parameterization of seaice:
 !=================================================================================================================
