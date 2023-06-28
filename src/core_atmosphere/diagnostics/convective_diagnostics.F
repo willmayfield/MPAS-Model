@@ -294,17 +294,19 @@ module convective_diagnostics
     !>  and lowest-model-level wind speed.
     !
     !-----------------------------------------------------------------------
-    subroutine convective_diagnostics_update(stream_mgr, dt)
+    subroutine convective_diagnostics_update(configs, stream_mgr, dt)
 
         use mpas_stream_manager
         use mpas_timekeeping
-        use mpas_pool_routines, only : mpas_pool_get_dimension, mpas_pool_get_array
+        use mpas_pool_routines, only : mpas_pool_get_dimension, mpas_pool_get_array, &
+                                       mpas_pool_get_config
         use mpas_derived_types, only : MPAS_streamManager_type, MPAS_timeinterval_type, &
                                        MPAS_time_type
         implicit none
 
         type (MPAS_streamManager_type), target, intent(in) :: stream_mgr
         real (kind=RKIND), pointer, intent(in) :: dt
+        type (MPAS_pool_type), intent(in) :: configs
 
 !  - subroutine to compute max values of convective diagnostics over some time period
 !  - called at the end of every timestep
@@ -351,7 +353,7 @@ module convective_diagnostics
         real (kind=RKIND), dimension(:), pointer :: rainncv, snowncv, raincv
         real (kind=RKIND), dimension(:), pointer :: prec_acc_c, prec_acc_nc, snow_acc_nc
         real (kind=RKIND) :: uph, pb, pt
-
+        character(len=StrKIND),pointer:: config_convection_scheme
         type (MPAS_timeinterval_type) :: dt_interval, diag_interval, extra
         type (MPAS_time_type) :: ref_time
         integer (kind=I8KIND) :: nsteps
@@ -375,7 +377,7 @@ module convective_diagnostics
             call mpas_pool_get_array(mesh, 'kiteAreasOnVertex', kiteAreasOnVertex)
             call mpas_pool_get_array(mesh, 'cellsOnVertex', cellsOnVertex)
             call mpas_pool_get_array(mesh, 'zgrid', zgrid)
-
+            call mpas_pool_get_config(configs,'config_convection_scheme', config_convection_scheme)
             call mpas_pool_get_array(diag, 'vorticity', vorticity)
             call mpas_pool_get_array(diag, 'updraft_helicity_max', updraft_helicity_max)
             call mpas_pool_get_array(diag, 'updraft_helicity_max_01', updraft_helicity_max_01)
@@ -408,8 +410,12 @@ module convective_diagnostics
             call mpas_pool_get_array(diag_physics, 'v10', v10m)
             call mpas_pool_get_array(diag_physics, 't2m', t2m)
             call mpas_pool_get_array(diag_physics, 'rainncv', rainncv)
-            call mpas_pool_get_array(diag_physics, 'raincv', raincv)
+            !print(config_convection_scheme)
+            if(config_convection_scheme .ne. 'off') then
+                call mpas_pool_get_array(diag_physics, 'raincv', raincv)
+            endif
             call mpas_pool_get_array(diag_physics, 'snowncv', snowncv)
+            
 
             call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
             call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
@@ -506,7 +512,7 @@ module convective_diagnostics
 
             if (is_needed_prec_acc_c .or. is_needed_prec_acc_nc .or. is_needed_snow_acc_nc) then
                 do iCell=1, nCellsSolve
-                    if (is_needed_prec_acc_c) then
+                    if (is_needed_prec_acc_c .and. config_convection_scheme .ne. 'off') then
                         prec_acc_c(iCell)  = prec_acc_c(iCell)  +  raincv(iCell)
                         prec_acc_c(iCell)  = MAX (prec_acc_c(iCell), 0.0)
                     endif
@@ -518,8 +524,12 @@ module convective_diagnostics
                         snow_acc_nc(iCell)   = snow_acc_nc(iCell) + snowncv(iCell)
                ! add convective precip to snow bucket if t2m < 273.15
                         IF ( t2m(iCell) .lt. 273.15 ) THEN
-                          snow_acc_nc(iCell)   = snow_acc_nc(iCell) +  raincv(iCell)
-                          snow_acc_nc(iCell)   = MAX (snow_acc_nc(iCell), 0.0)
+                          if (config_convection_scheme .ne. 'off') then
+                             snow_acc_nc(iCell)   = snow_acc_nc(iCell) +  raincv(iCell)
+                         else
+                             snow_acc_nc(iCell) = snow_acc_nc(iCell)
+                         endif
+                         snow_acc_nc(iCell)   = MAX (snow_acc_nc(iCell), 0.0)
                         ENDIF
                     endif
                 enddo

@@ -235,7 +235,7 @@ module atm_time_integration
 
 
       !
-      ! Retrieve configuration options
+       call mpas_log_write(' Retrieve configuration options ')
       !
       call mpas_pool_get_config(domain % blocklist % configs, 'config_number_of_sub_steps', config_number_of_sub_steps)
       call mpas_pool_get_config(domain % blocklist % configs, 'config_time_integration_order', config_time_integration_order)
@@ -252,13 +252,13 @@ module atm_time_integration
       call mpas_pool_get_config(domain % blocklist % configs, 'config_dynamics_split_steps', config_dynamics_split)
 
       !
-      ! Retrieve field structures
+       call mpas_log_write(' Retrieve field structures ')
       !
       call mpas_pool_get_subpool(domain % blocklist % structs, 'state', state)
       call mpas_pool_get_subpool(domain % blocklist % structs, 'diag', diag)
 
       !
-      ! Retrieve fields
+       call mpas_log_write(' Retrieve fields ')
       !
       call mpas_pool_get_field(state, 'theta_m', theta_m_field, 1)
       call mpas_pool_get_field(state, 'scalars', scalars_field, 1)
@@ -266,7 +266,7 @@ module atm_time_integration
       call mpas_pool_get_field(diag, 'rtheta_p', rtheta_p_field)
 
       !
-      ! allocate storage for physics tendency save
+       call mpas_log_write(' allocate storage for physics tendency save ')
       !
       call mpas_pool_get_dimension(state, 'nCells', nCells)
       call mpas_pool_get_dimension(state, 'nEdges', nEdges)
@@ -282,7 +282,7 @@ module atm_time_integration
       tend_ru_physics(:,nEdges+1) = 0.0_RKIND
 
       !
-      ! Initialize RK weights
+      call mpas_log_write(' Initialize RK weights ')
       !
 
       dynamics_split = config_dynamics_split
@@ -6859,7 +6859,7 @@ module atm_time_integration
        real (kind=RKIND), dimension(5) :: localVals, globalVals
 
        real (kind=RKIND) :: spd, courant, lipschitz, uEdge, rdz
-       real (kind=RKIND), dimension(:,:), pointer :: w
+       real (kind=RKIND), dimension(:,:), pointer :: w, t, p
        real (kind=RKIND), dimension(:,:), pointer :: u, v, uReconstructZonal, uReconstructMeridional, uReconstructX, uReconstructY, uReconstructZ
        real (kind=RKIND), dimension(:,:,:), pointer :: scalars, scalars_1, scalars_2
        real (kind=RKIND), dimension(:,:), pointer :: rho_zz, wwavg, uhAvg, zz
@@ -7290,7 +7290,31 @@ module atm_time_integration
                call mpas_dmpar_max_real(domain % dminfo, scalar_max, global_scalar_max)
                call mpas_log_write(' global min, max scalar $i $r $r', intArgs=(/iScalar/), realArgs=(/global_scalar_min, global_scalar_max/))
             end do
+             call mpas_pool_get_array(state, 'theta_m', t, 2)
+             call mpas_pool_get_array(state, 'rho_zz', p, 2)
+             scalar_min = 0.0
+            scalar_max = 0.0
+            do iCell = 1, nCellsSolve
+            do k = 1, nVertLevels
+               scalar_min = min(scalar_min, t(k,iCell))
+               scalar_max = max(scalar_max, t(k,iCell))
+            end do
+            end do
+            call mpas_dmpar_min_real(domain % dminfo, scalar_min,global_scalar_min)
+            call mpas_dmpar_max_real(domain % dminfo, scalar_max,global_scalar_max)
+            call mpas_log_write('global min, max theta $r $r', realArgs=(/global_scalar_min, global_scalar_max/))
 
+            scalar_min = 0.0
+            scalar_max = 0.0
+            do iCell = 1, nCellsSolve
+            do k = 1, nVertLevels
+               scalar_min = min(scalar_min, p(k,iCell))
+               scalar_max = max(scalar_max, p(k,iCell))
+            end do
+            end do
+            call mpas_dmpar_min_real(domain % dminfo,scalar_min,global_scalar_min)
+            call mpas_dmpar_max_real(domain % dminfo,scalar_max,global_scalar_max)
+            call mpas_log_write('global min, max rho_zz $r $r', realArgs=(/global_scalar_min, global_scalar_max/))
             block => block % next
          end do
       end if
