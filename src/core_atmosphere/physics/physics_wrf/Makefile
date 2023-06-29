@@ -44,7 +44,8 @@ OBJS = \
         module_sf_noah_seaice_drv.o    \
 	module_sf_oml.o                \
 	module_sf_sfclay.o             \
-	module_sf_urban.o
+	module_sf_urban.o              \
+	module_sf_sfclayrev.o
 
 physics_wrf: $(OBJS)
 	ar -ru ./../libphys.a $(OBJS)

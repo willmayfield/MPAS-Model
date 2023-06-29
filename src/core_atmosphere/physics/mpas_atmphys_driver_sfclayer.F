@@ -19,6 +19,7 @@
  use module_sf_mynn
  use module_sf_sfclay
  use module_sf_myjsfc
+ use module_sf_sfclayrev
  implicit none
  private
  public:: init_sfclayer,       &
@@ -192,6 +193,14 @@
           if(.not.allocated(fh_sea)) allocate(fh_sea(ims:ime,jms:jme))
           if(.not.allocated(fm_sea)) allocate(fm_sea(ims:ime,jms:jme))
        endif
+   
+    case("sf_monin_obukhov_rev")
+       if(.not.allocated(fh_p)) allocate(fh_p(ims:ime,jms:jme))
+       if(.not.allocated(fm_p)) allocate(fm_p(ims:ime,jms:jme))
+       if(config_frac_seaice) then
+          if(.not.allocated(fh_sea)) allocate(fh_sea(ims:ime,jms:jme))
+          if(.not.allocated(fm_sea)) allocate(fm_sea(ims:ime,jms:jme))
+       endif
 
     case("sf_mynn")
        if(.not.allocated(snowh_p)) allocate(snowh_p(ims:ime,jms:jme))
@@ -336,6 +345,14 @@
  sfclayer_select: select case (trim(sfclayer_scheme))
 
     case("sf_monin_obukhov")
+       if(allocated(fh_p)) deallocate(fh_p)
+       if(allocated(fm_p)) deallocate(fm_p)
+       if(config_frac_seaice) then
+          if(allocated(fh_sea)) deallocate(fh_sea)
+          if(allocated(fm_sea)) deallocate(fm_sea)
+       endif
+
+    case("sf_monin_obukhov_rev")
        if(allocated(fh_p)) deallocate(fh_p)
        if(allocated(fm_p)) deallocate(fm_p)
        if(config_frac_seaice) then
@@ -589,6 +606,21 @@
  sfclayer_select: select case (trim(sfclayer_scheme))
 
     case("sf_monin_obukhov")
+       call mpas_pool_get_array(diag_physics,'fh',fh)
+       call mpas_pool_get_array(diag_physics,'fm',fm)
+
+       do j = jts,jte
+       do i = its,ite
+          fh_p(i,j) = fh(i)
+          fm_p(i,j) = fm(i)
+          if(config_frac_seaice) then
+             fh_sea(i,j) = fh(i)
+             fm_sea(i,j) = fm(i)
+          endif
+       enddo
+       enddo
+
+   case("sf_monin_obukhov_rev")
        call mpas_pool_get_array(diag_physics,'fh',fh)
        call mpas_pool_get_array(diag_physics,'fm',fm)
 
@@ -1005,6 +1037,28 @@
           enddo
        endif
 
+    case("sf_monin_obukhov_rev")
+       call mpas_pool_get_array(diag_physics,'fh',fh)
+       call mpas_pool_get_array(diag_physics,'fm',fm)
+
+       do j = jts,jte
+       do i = its,ite
+          fh(i) = fh_p(i,j)
+          fm(i) = fm_p(i,j)
+       enddo
+       enddo
+       if(config_frac_seaice) then
+          call mpas_pool_get_array(sfc_input,'xice',xice)
+          do j = jts,jte
+          do i = its,ite
+             if(xice(i).ge.xice_threshold .and. xice(i).le.1._RKIND) then
+                fh(i) = fh_p(i,j)*xice(i) + (1._RKIND-xice(i))*fh_sea(i,j)
+                fm(i) = fm_p(i,j)*xice(i) + (1._RKIND-xice(i))*fm_sea(i,j)
+             endif
+          enddo
+          enddo
+       endif
+
     case("sf_mynn")
        call mpas_pool_get_array(diag_physics,'ch',ch)
 
@@ -1246,6 +1300,9 @@
     case("sf_monin_obukhov")
        call sfclayinit(allowed_to_read)
 
+    case("sf_monin_obukhov_rev")
+       call sfclayrevinit()
+
     case("sf_mynn")
        call mynn_sf_init_driver(allowed_to_read)
 
@@ -1392,6 +1449,67 @@
                      )
        endif
        call mpas_timer_stop('Monin-Obukhov')
+
+    case("sf_monin_obukhov_rev")
+       call mpas_timer_start('Monin-Obukhov-Revised')
+       call sfclayrev( &
+                   p3d      = pres_hyd_p , psfc     = psfc_p     , t3d      = t_p        , &
+                   u3d      = u_p        , v3d      = v_p        , qv3d     = qv_p       , &
+                   dz8w     = dz_p       , cp       = cp         , g        = gravity    , &
+                   rovcp    = rcp        , R        = R_d        , xlv      = xlv        , &
+                   chs      = chs_p      , chs2     = chs2_p     , cqs2     = cqs2_p     , &
+                   cpm      = cpm_p      , znt      = znt_p      , ust      = ust_p      , &
+                   pblh     = hpbl_p     , mavail   = mavail_p   , zol      = zol_p      , &
+                   mol      = mol_p      , regime   = regime_p   , psim     = psim_p     , &
+                   psih     = psih_p     , fm       = fm_p       , fh       = fh_p       , &
+                   xland    = xland_p    , hfx      = hfx_p      , qfx      = qfx_p      , &
+                   lh       = lh_p       , tsk      = tsk_p      , flhc     = flhc_p     , &
+                   flqc     = flqc_p     , qgh      = qgh_p      , qsfc     = qsfc_p     , &
+                   rmol     = rmol_p     , u10      = u10_p      , v10      = v10_p      , &
+                   th2      = th2m_p     , t2       = t2m_p      , q2       = q2_p       , &
+                   gz1oz0   = gz1oz0_p   , wspd     = wspd_p     , br       = br_p       , &
+                   isfflx   = isfflx     , dx2d     = dx_p       , svp1     = svp1       , &
+                   svp2     = svp2       , svp3     = svp3       , svpt0    = svpt0      , &
+                   ep1      = ep_1       , ep2      = ep_2       , karman   = karman     , &
+                   eomeg    = eomeg      , stbolt   = stbolt     , P1000mb  = P0         , &
+                   ustm     = ustm_p     , ck       = ck_p       , cka      = cka_p      , &
+                   cd       = cd_p       , cda      = cda_p      , isftcflx = isftcflx   , &
+                   iz0tlnd  = iz0tlnd    , scm_force_flux = scm_force_flux               , &
+                   ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde , &
+                   ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme , &
+                   its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte   &
+                  )
+
+       if(config_frac_seaice) then
+          call sfclayrev( &
+                      p3d      = pres_hyd_p , psfc     = psfc_p     , t3d      = t_p        , &
+                      u3d      = u_p        , v3d      = v_p        , qv3d     = qv_p       , &
+                      dz8w     = dz_p       , cp       = cp         , g        = gravity    , &
+                      rovcp    = rcp        , R        = R_d        , xlv      = xlv        , &
+                      chs      = chs_sea    , chs2     = chs2_sea   , cqs2     = cqs2_sea   , &
+                      cpm      = cpm_sea    , znt      = znt_sea    , ust      = ust_sea    , &
+                      pblh     = hpbl_p     , mavail   = mavail_sea , zol      = zol_sea    , &
+                      mol      = mol_sea    , regime   = regime_sea , psim     = psim_sea   , &
+                      psih     = psih_sea   , fm       = fm_sea     , fh       = fh_sea     , &
+                      xland    = xland_sea  , hfx      = hfx_sea    , qfx      = qfx_sea    , &
+                      lh       = lh_sea     , tsk      = tsk_sea    , flhc     = flhc_sea   , &
+                      flqc     = flqc_sea   , qgh      = qgh_sea    , qsfc     = qsfc_sea   , &
+                      rmol     = rmol_sea   , u10      = u10_sea    , v10      = v10_sea    , &
+                      th2      = th2m_sea   ,  t2      = t2m_sea    , q2       = q2_sea     , &
+                      gz1oz0   = gz1oz0_sea , wspd     = wspd_sea   , br       = br_sea     , &
+                      isfflx   = isfflx     , dx2d     = dx_p       , svp1     = svp1       , &
+                      svp2     = svp2       , svp3     = svp3       , svpt0    = svpt0      , &
+                      ep1      = ep_1       , ep2      = ep_2       , karman   = karman     , &
+                      eomeg    = eomeg      , stbolt   = stbolt     , P1000mb  = P0         , &
+                      ustm     = ustm_sea   , ck       = ck_sea     , cka      = cka_sea    , &
+                      cd       = cd_sea     , cda      = cda_sea    , isftcflx = isftcflx   , &
+                      iz0tlnd  = iz0tlnd    , scm_force_flux = scm_force_flux , &
+                      ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde , &
+                      ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme , &
+                      its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte   &
+                     )
+       endif
+       call mpas_timer_stop('Monin-Obukhov-Revised')
 
     case("sf_mynn")
        call mpas_timer_start('MYNN_sfclay')
