@@ -50,17 +50,17 @@ ftn:
 	"OPENMP = $(OPENMP)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
-odin_ifort:
+vecna_ifort:
 	( $(MAKE) all \
-	"FC_PARALLEL = ftn" \
-	"CC_PARALLEL = cc" \
-	"CXX_PARALLEL = CC" \
+	"FC_PARALLEL = mpiifort" \
+	"CC_PARALLEL = mpiicc -diag-disable=10441"  \
+	"CXX_PARALLEL = mpicpc" \
 	"FC_SERIAL = ifort" \
-	"CC_SERIAL = icc" \
+	"CC_SERIAL = icx" \
 	"CXX_SERIAL = icpc" \
 	"FFLAGS_PROMOTION = -real-size 64" \
-	"FFLAGS_OPT = -O3 -convert big_endian -free -align array64byte" \
-	"CFLAGS_OPT = -O3" \
+	"FFLAGS_OPT = -O3 -march=core-avx2 -convert big_endian -free -align array64byte" \
+	"CFLAGS_OPT = -O3 -march=core-avx2" \
 	"CXXFLAGS_OPT = -O3" \
 	"LDFLAGS_OPT = -O3" \
 	"FFLAGS_DEBUG = -g -convert big_endian -free -CU -CB -check all -fpe0 -traceback" \
@@ -73,7 +73,7 @@ odin_ifort:
 	"DEBUG = $(DEBUG)" \
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
-	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" ) 
+	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 titan-cray:
 	( $(MAKE) all \

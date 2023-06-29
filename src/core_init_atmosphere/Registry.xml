@@ -1,4 +1,3 @@
-
 <?xml version="1.0"?>
 <registry model="mpas" core="init_atmosphere" core_abbrev="init_atm" version="7.3">
 
@@ -41,7 +40,7 @@
                      description="The number of atmospheric levels, always one more than the number of layers"/>
                 <dim name="nMonths" definition="namelist:config_months"
                      description="The number of months in a year"/>
-		<dim name="nlcat" definition="namelist:config_landuse_data" calculation='20 + 4 * merge(1,0,config_landuse_data(1:4)=="USGS")' 
+		<dim name="nlcat" definition="namelist:config_landuse_data" calculation='20 + 4 * merge(1,0,config_landuse_data(1:4)=="USGS")'
                      description="The number of landuse categories used in the land surface model"/>
 		<dim name="nscat" definition="16"
                      description="The number of soil categories used in the land surface model"/>
@@ -129,7 +128,7 @@
 		<nml_option name="config_nsoilcat"              type="integer"       default_value="16"
                      units='-'
                      description="The number of landuse categories used by the LSM."
-                     possible_values="16"/> 
+                     possible_values="16"/>
 
         </nml_record>
 
@@ -432,14 +431,12 @@
                         <var name="ol3" packages="vertical_stage_in;met_stage_in"/>
                         <var name="ol4" packages="vertical_stage_in;met_stage_in"/>
                         <var name="deriv_two" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
-                        <var name="advCells" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="defc_a" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="defc_b" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="coeffs_reconstruct" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="cf1" packages="met_stage_in"/>
                         <var name="cf2" packages="met_stage_in"/>
                         <var name="cf3" packages="met_stage_in"/>
-                        <var name="hx" packages="met_stage_in"/>
                         <var name="zgrid" packages="met_stage_in"/>
                         <var name="rdzw" packages="met_stage_in"/>
                         <var name="dzu" packages="met_stage_in"/>
@@ -533,14 +530,12 @@
                         <var name="ol3" packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
                         <var name="ol4" packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
                         <var name="deriv_two"/>
-                        <var name="advCells"/>
                         <var name="defc_a"/>
                         <var name="defc_b"/>
                         <var name="coeffs_reconstruct"/>
                         <var name="cf1" packages="vertical_stage_out;met_stage_out"/>
                         <var name="cf2" packages="vertical_stage_out;met_stage_out"/>
                         <var name="cf3" packages="vertical_stage_out;met_stage_out"/>
-                        <var name="hx" packages="vertical_stage_out;met_stage_out"/>
                         <var name="zgrid" packages="vertical_stage_out;met_stage_out"/>
                         <var name="rdzw" packages="vertical_stage_out;met_stage_out"/>
                         <var name="dzu" packages="vertical_stage_out;met_stage_out"/>
