@@ -529,20 +529,24 @@ module convective_diagnostics
                 allocate(updraft_helicity(nVertLevels,nCells+1))
                 allocate(updraft_helicity_neg(nVertLevels,nCells+1))
                 updraft_helicity(:,:) = 0.
+                updraft_helicity_neg(:,:) = 0.
                 do i=1,nVertices
                   do j=1,nvertexDegree
                     iCell = cellsOnVertex(j,i)
                     updraft_helicity(1:nVertLevels,iCell) = updraft_helicity(1:nVertLevels,iCell) + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
+                    updraft_helicity_neg(1:nVertLevels,iCell) = updraft_helicity_neg(1:nVertLevels,iCell) + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
                   end do
                 end do
+                call mpas_log_write('Min, max uh_neg 1 = $r, $r',realArgs=(/minval(updraft_helicity_neg),maxval(updraft_helicity_neg)/))
                 do iCell=1,nCellsSolve
                   do k=1,nVertLevels
                     updraft_helicity(k,iCell) =  max(0.,0.5*(w(k,iCell)+w(k+1,iCell)))  &                  
                                                            * max(0.,updraft_helicity(k,iCell)/areaCell(iCell))                     
-                    updraft_helicity_neg(k,iCell) = min(0.,0.5*(w(k,iCell)+w(k+1,iCell)))  &
-                                                           * min(0.,updraft_helicity(k,iCell)/areaCell(iCell))
+                    updraft_helicity_neg(k,iCell) = min(0.,0.5*(w(k,iCell)+w(k+1,iCell))  &
+                                                           * updraft_helicity_neg(k,iCell)/areaCell(iCell))
                   end do
                 end do
+                call mpas_log_write('Min, max uh_neg 2 = $r, $r',realArgs=(/minval(updraft_helicity_neg),maxval(updraft_helicity_neg)/))
 !
 !  compute diagnostics
 !
@@ -608,6 +612,7 @@ module convective_diagnostics
                   endif
         
                 end do
+                call mpas_log_write('Min, max uh_min = $r, $r',realArgs=(/minval(updraft_helicity_min),maxval(updraft_helicity_min)/))
                 deallocate(updraft_helicity, updraft_helicity_neg)
             end if
     
