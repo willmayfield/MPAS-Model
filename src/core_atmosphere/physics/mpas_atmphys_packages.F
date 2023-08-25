@@ -40,7 +40,7 @@
  character(len=StrKIND),pointer:: config_lsm_scheme
  logical,pointer:: mp_kessler_in,mp_thompson_in,mp_wsm6_in,mp_nssl2m_in,nssl3m_in
  logical,pointer:: cu_grell_freitas_in,cu_kain_fritsch_in,cu_tiedtke_in
- logical,pointer:: bl_mynn_in,bl_ysu_in
+ logical,pointer:: bl_mynn_in,bl_ysu_in,bl_myj_in
  logical,pointer:: lsm_noah_in,lsm_ruc_in
 
  integer :: ierr
@@ -161,8 +161,12 @@
  nullify(bl_ysu_in)
  call mpas_pool_get_package(packages,'bl_ysu_inActive',bl_ysu_in)
 
+ nullify(bl_myj_in)
+ call mpas_pool_get_package(packages,'bl_myj_inActive',bl_myj_in)
+
  if(.not.associated(bl_mynn_in) .or. &
-    .not.associated(bl_ysu_in)) then
+    .not.associated(bl_ysu_in) .or. &
+    .not.associated(bl_myj_in)) then
     call mpas_log_write('====================================================================================',messageType=MPAS_LOG_ERR)
     call mpas_log_write('* Error while setting up packages for planetary layer  options in atmosphere core.',  messageType=MPAS_LOG_ERR)
     call mpas_log_write('====================================================================================',messageType=MPAS_LOG_ERR)
@@ -172,15 +176,18 @@
 
  bl_mynn_in = .false.
  bl_ysu_in  = .false.
-
+ bl_myj_in = .false.
  if(config_pbl_scheme=='bl_mynn') then
     bl_mynn_in = .true.
  elseif(config_pbl_scheme == 'bl_ysu') then
     bl_ysu_in = .true.
+ elseif(config_pbl_scheme == 'bl_myj') then
+    bl_myj_in = .true.
  endif
 
  call mpas_log_write('    bl_mynn_in              = $l', logicArgs=(/bl_mynn_in/))
  call mpas_log_write('    bl_ysu_in               = $l', logicArgs=(/bl_ysu_in/))
+ call mpas_log_write('    bl_myj_in               = $l', logicArgs=(/bl_myj_in/))
  call mpas_log_write('')
 
 !--- initialization of all packages for parameterizations of the land surface:

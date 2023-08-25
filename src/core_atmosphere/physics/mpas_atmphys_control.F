@@ -190,7 +190,8 @@
 !pbl scheme:
  if(.not. (config_pbl_scheme .eq. 'off'     .or. &
            config_pbl_scheme .eq. 'bl_mynn' .or. &
-           config_pbl_scheme .eq. 'bl_ysu')) then
+           config_pbl_scheme .eq. 'bl_ysu'  .or. &
+           config_pbl_scheme .eq. 'bl_myj')) then
 
     write(mpas_err_message,'(A,A10)') 'illegal value for pbl_scheme: ', &
           trim(config_pbl_scheme)
@@ -258,7 +259,9 @@
 !surface-layer scheme:
  if(.not. (config_sfclayer_scheme .eq. 'off'     .or. &
            config_sfclayer_scheme .eq. 'sf_mynn' .or. &
-           config_sfclayer_scheme .eq. 'sf_monin_obukhov')) then
+           config_sfclayer_scheme .eq. 'sf_monin_obukhov' .or. &
+           config_sfclayer_scheme .eq. 'sf_monin_obukhov_rev' .or. &
+           config_sfclayer_scheme .eq. 'sf_myj' )) then
  
     write(mpas_err_message,'(A,A10)') 'illegal value for surface layer scheme: ', &
           trim(config_sfclayer_scheme)
@@ -267,7 +270,12 @@
     if(config_pbl_scheme == 'bl_mynn') then
        config_sfclayer_scheme = 'sf_mynn'
     elseif(config_pbl_scheme == 'bl_ysu') then
-       config_sfclayer_scheme = 'sf_monin_obukhov'
+       if ( .not. (config_sfclayer_scheme .eq. 'sf_monin_obukhov' .or. &
+                   config_sfclayer_scheme .eq. 'sf_monin_obukhov_rev')) then
+           config_sfclayer_scheme = 'sf_monin_obukhov'
+       endif
+    elseif(config_pbl_scheme == 'bl_myj') then
+       config_sfclayer_scheme = 'sf_myj'
     endif
  endif
 
