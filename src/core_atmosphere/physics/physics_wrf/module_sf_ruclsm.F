@@ -6895,7 +6895,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
 ! of regions with varying Z0 (Lb = 5 if L=1000 m)
         LB = 5.
       if(mosaic_lu == 1) then
-      do k = 1,nlcat
+        do k = 1,nlcat
         AREA  = AREA + lufrac(k)
         EMISS = EMISS+ LEMITBL(K)*lufrac(k)
         ZNT   = ZNT  + lufrac(k)/ALOG(LB/ZNTtoday(K))**2.
@@ -6903,7 +6903,7 @@ print *,'INFMAX,INFMAX1,HYDRO(1)*SOILIQW(1),-TOTLIQ', &
         ZNT1  = ZNT1 + lufrac(k)*ZNTtoday(K)
         if(.not.rdlai2d) LAI = LAI  + LAItoday(K)*lufrac(k)
         PC    = PC   + PCTBL(K)*lufrac(k)
-      enddo
+        enddo
 
        if (area.gt.1.) area=1.
        if (area <= 0.) then

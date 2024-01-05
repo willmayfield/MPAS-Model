@@ -52,18 +52,19 @@ ftn:
 
 vecna_ifort:
 	( $(MAKE) all \
-	"FC_PARALLEL = mpiifort" \
-	"CC_PARALLEL = mpiicc -diag-disable=10441"  \
-	"CXX_PARALLEL = mpicpc" \
+	"FC_PARALLEL = mpif90" \
+	"CC_PARALLEL = mpicc -cc=icx -diag-disable=10441"  \
+	"CXX_PARALLEL = mpiicpc" \
 	"FC_SERIAL = ifort" \
 	"CC_SERIAL = icx" \
 	"CXX_SERIAL = icpc" \
 	"FFLAGS_PROMOTION = -real-size 64" \
-	"FFLAGS_OPT = -O3 -march=core-avx2 -convert big_endian -free -align array64byte" \
-	"CFLAGS_OPT = -O3 -march=core-avx2" \
+	"FFLAGS_OPT = -O3 -convert big_endian -free -align array64byte" \
+	"CFLAGS_OPT = -O3 " \
 	"CXXFLAGS_OPT = -O3" \
 	"LDFLAGS_OPT = -O3" \
-	"FFLAGS_DEBUG = -g -convert big_endian -free -CU -CB -check all -fpe0 -traceback" \
+	"LIB_HDF5=-L$(HDF5_LIBRARIES) -lhdf5_hl -lhdf5 -L${ZLIB_LIBRARIES} -lz -ldl -lm" \
+	"FFLAGS_DEBUG = -g -convert big_endian -free -CU -CB -check all -check bounds -fpe0 -traceback" \
 	"CFLAGS_DEBUG = -g -traceback" \
 	"CXXFLAGS_DEBUG = -g -traceback" \
 	"LDFLAGS_DEBUG = -g -fpe0 -traceback" \
