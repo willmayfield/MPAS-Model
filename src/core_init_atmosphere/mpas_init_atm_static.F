@@ -382,7 +382,7 @@
  end select
 
  call mpas_log_write('--- start interpolate TER')
- call interp_terrain(mesh, tree, trim(config_geog_data_path)//trim(geog_sub_path))
+ call interp_terrain(mesh, tree, trim(geog_data_path)//trim(geog_sub_path))
  call mpas_log_write('--- end interpolate TER')
 
 
@@ -409,7 +409,7 @@
  end select surface_input_select1
 
  call mpas_log_write('--- start interpolate LU_INDEX')
- call interp_landuse(mesh, tree, trim(config_geog_data_path)//trim(geog_sub_path), isice_lu, iswater_lu)
+ call interp_landuse(mesh, tree, trim(geog_data_path)//trim(geog_sub_path), isice_lu, iswater_lu)
  call mpas_log_write('--- end interpolate LU_INDEX')
 
 !
@@ -430,7 +430,7 @@
  endif
 
  call mpas_log_write('--- start interpolate SOILCAT_TOP')
- call interp_soilcat(mesh, tree, trim(config_geog_data_path)//trim(geog_sub_path), iswater_soil)
+ call interp_soilcat(mesh, tree, trim(geog_data_path)//trim(geog_sub_path), iswater_soil)
  call mpas_log_write('--- end interpolate SOILCAT_TOP')
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -484,7 +484,7 @@
        call mpas_log_write('   Dataset will be supersampled by a factor of $i', intArgs=(/supersample_fac/))
     end if
 
-    ierr = mgr % init(trim(config_geog_data_path)//trim(geog_sub_path))
+    ierr = mgr % init(trim(geog_data_path)//trim(geog_sub_path))
     if (ierr /= 0) then
        call mpas_log_write('Error occurred when initializing the interpolation of snow albedo (snoalb)', &
                             messageType=MPAS_LOG_CRIT)
@@ -729,7 +729,7 @@
 
     geog_sub_path = 'greenfrac_fpar_modis/'
 
-    ierr = mgr % init(trim(config_geog_data_path)//trim(geog_sub_path))
+    ierr = mgr % init(trim(geog_data_path)//trim(geog_sub_path))
     if (ierr /= 0) then
        call mpas_log_write('Error occurred when initalizing the interpolation of monthly vegetation fraction (greenfrac)', &
                             messageType=MPAS_LOG_CRIT)
@@ -960,7 +960,7 @@
 
     geog_sub_path = 'albedo_modis/'
 
-    ierr = mgr % init(trim(config_geog_data_path)//trim(geog_sub_path))
+    ierr = mgr % init(trim(geog_data_path)//trim(geog_sub_path))
     if (ierr /= 0) then
        call mpas_log_write('Error occurred when initalizing the interpolation of monthly albedo (albedo12m)', &
                             messageType=MPAS_LOG_CRIT)

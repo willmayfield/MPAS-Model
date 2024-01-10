@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<registry model="mpas" core="atmosphere" core_abbrev="atm" version="7.3">
+<registry model="mpas" core="atmosphere" core_abbrev="atm" version="8.0.1">
 
 <!-- **************************************************************************************** -->
 <!-- ************************************** Dimensions ************************************** -->
@@ -107,32 +107,32 @@
                      description="When config_split_dynamics_transport = T, the number of RK steps per transport step"
                      possible_values="Positive integer values"/>
 
-                <nml_option name="config_h_mom_eddy_visc2" type="real" default_value="0.0"
+                <nml_option name="config_h_mom_eddy_visc2" type="real" default_value="0.0" in_defaults="false"
                      units="m^2 s^{-1}"
                      description="$\nabla^2$ eddy viscosity for horizontal diffusion of momentum"
                      possible_values="Positive real values"/>
 
-                <nml_option name="config_h_mom_eddy_visc4" type="real" default_value="0.0"
+                <nml_option name="config_h_mom_eddy_visc4" type="real" default_value="0.0" in_defaults="false"
                      units="m^4 s^{-1}"
                      description="$\nabla^4$ eddy hyper-viscosity for horizontal diffusion of momentum"
                      possible_values="Positive real values"/>
 
-                <nml_option name="config_v_mom_eddy_visc2" type="real" default_value="0.0"
+                <nml_option name="config_v_mom_eddy_visc2" type="real" default_value="0.0" in_defaults="false"
                      units="m^2 s^{-1}"
                      description="$\nabla^2$ eddy viscosity for vertical diffusion of momentum"
                      possible_values="Positive real values"/>
 
-                <nml_option name="config_h_theta_eddy_visc2" type="real" default_value="0.0"
+                <nml_option name="config_h_theta_eddy_visc2" type="real" default_value="0.0" in_defaults="false"
                      units="m^2 s^{-1}"
                      description="$\nabla^2$ eddy viscosity for horizontal diffusion of theta"
                      possible_values="Positive real values"/>
 
-                <nml_option name="config_h_theta_eddy_visc4" type="real" default_value="0.0"
+                <nml_option name="config_h_theta_eddy_visc4" type="real" default_value="0.0" in_defaults="false"
                      units="m^4 s^{-1}"
                      description="$\nabla^4$ eddy hyper-viscosity for horizontal diffusion of theta"
                      possible_values="Positive real values"/>
 
-                <nml_option name="config_v_theta_eddy_visc2" type="real" default_value="0.0"
+                <nml_option name="config_v_theta_eddy_visc2" type="real" default_value="0.0" in_defaults="false"
                      units="m^2 s^{-1}"
                      description="$\nabla^2$ eddy viscosity for vertical diffusion of theta"
                      possible_values="Positive real values"/>
@@ -157,37 +157,37 @@
                      description="Scaling factor for the divergent component of $\nabla^4 u$ calculation"
                      possible_values="Positive real values"/>
 
-                <nml_option name="config_w_adv_order" type="integer" default_value="3"
+                <nml_option name="config_w_adv_order" type="integer" default_value="3" in_defaults="false"
                      units="-"
                      description="Horizontal advection order for w"
                      possible_values="2, 3, or 4"/>
 
-                <nml_option name="config_theta_adv_order" type="integer" default_value="3"
+                <nml_option name="config_theta_adv_order" type="integer" default_value="3" in_defaults="false"
                      units="-"
                      description="Horizontal advection order for theta"
                      possible_values="2, 3, or 4"/>
 
-                <nml_option name="config_scalar_adv_order" type="integer" default_value="3"
+                <nml_option name="config_scalar_adv_order" type="integer" default_value="3" in_defaults="false"
                      units="-"
                      description="Horizontal advection order for scalars"
                      possible_values="2, 3, or 4"/>
 
-                <nml_option name="config_u_vadv_order" type="integer" default_value="3"
+                <nml_option name="config_u_vadv_order" type="integer" default_value="3" in_defaults="false"
                      units="-"
                      description="Vertical advection order for normal velocities (u)"
                      possible_values="2, 3, or 4"/>
 
-                <nml_option name="config_w_vadv_order" type="integer" default_value="3"
+                <nml_option name="config_w_vadv_order" type="integer" default_value="3" in_defaults="false"
                      units="-"
                      description="Vertical advection order for w"
                      possible_values="2, 3, or 4"/>
 
-                <nml_option name="config_theta_vadv_order" type="integer" default_value="3"
+                <nml_option name="config_theta_vadv_order" type="integer" default_value="3" in_defaults="false"
                      units="-"
                      description="Vertical advection order for theta"
                      possible_values="2, 3, or 4"/>
 
-                <nml_option name="config_scalar_vadv_order" type="integer" default_value="3"
+                <nml_option name="config_scalar_vadv_order" type="integer" default_value="3" in_defaults="false"
                      units="-"
                      description="Vertical advection order for scalars"
                      possible_values="2, 3, or 4"/>
@@ -197,7 +197,7 @@
                      description="Whether to advect scalar fields"
                      possible_values=".true. or .false."/>
 
-                <nml_option name="config_positive_definite" type="logical" default_value="false"
+                <nml_option name="config_positive_definite" type="logical" default_value="false" in_defaults="false"
                      units="-"
                      description="Whether to enable positive-definite advection of scalars"
                      possible_values=".true. or .false."/>
@@ -246,6 +246,11 @@
                      units="-"
                      description="Number of halo layers for fields"
                      possible_values="Integer values, typically 2 or 3; DO NOT CHANGE"/>
+
+                <nml_option name="config_relax_zone_divdamp_coef" type="real" default_value="6.0" in_defaults="false"
+                     units="-"
+                     description="Coefficient for the divergent component of the Laplacian filter of momentum in the relaxation zone"
+                     possible_values="Positive real values"/>
         </nml_record>
 
         <nml_record name="damping" in_defaults="true">
@@ -1629,8 +1634,8 @@
                 <var name="vorticity" type="real" dimensions="nVertLevels nVertices Time" units="s^{-1}"
                      description="Relative vorticity at vertices"/>
 
-                <var name="pv_edge" type="real" dimensions="nVertLevels nEdges Time" units="s^{-1} kg^{-1} m^3"
-                     description="absolute vorticity/rho_zz averaged to the cell edge from the vertices"/>
+                <var name="pv_edge" type="real" dimensions="nVertLevels nEdges Time" units="s^{-1}"
+                     description="absolute vertical vorticity averaged to the cell edge from the vertices"/>
 
                 <var name="rho_edge" type="real" dimensions="nVertLevels nEdges Time" units="kg m^{-3}"
                      description="rho_zz averaged from cell centers to the cell edge"/>
@@ -1638,11 +1643,11 @@
                 <var name="ke" type="real" dimensions="nVertLevels nCells Time" units="m^2 s^{-2}"
                      description="Kinetic energy at a cell center"/>
 
-                <var name="pv_vertex" type="real" dimensions="nVertLevels nVertices Time" units="s^{-1} kg^{-1} m^3"
-                     description="absolute vorticity/rho_zz at a vertex"/>
+                <var name="pv_vertex" type="real" dimensions="nVertLevels nVertices Time" units="s^{-1}"
+                     description="absolute vertical vorticity at a vertex"/>
 
-                <var name="pv_cell" type="real" dimensions="nVertLevels nCells Time" units="s^{-1} kg^{-1} m^3"
-                     description="absolute vorticity/rho_zz averaged to the cell center from the vertices"/>
+                <var name="pv_cell" type="real" dimensions="nVertLevels nCells Time" units="s^{-1}"
+                     description="absolute vertical vorticity averaged to the cell center from the vertices"/>
 
                 <var name="dtheta_dt_mp" type="real" dimensions="nVertLevels nCells Time" units="K s^{-1}"
                      description="Potential temperature heating rate from microphysics"/>
@@ -1786,8 +1791,8 @@
                 <var name="tend_theta" name_in_code="theta_m" type="real" dimensions="nVertLevels nCells Time" units="kg K m^{-3} s^{-1}"
                      description="tendency of coupled potential temperature rho*theta_m/zz from dynamics and physics, updated each RK step"/>
 
-                <var name="rt_diabatic_tend" type="real" dimensions="nVertLevels nCells Time" units="kg K s^{-1}"
-                     description="Tendency of coupled potential temperature from physics"/>
+                <var name="rt_diabatic_tend" type="real" dimensions="nVertLevels nCells Time" units="K s^{-1}"
+                     description="Tendency of modified potential temperature due to cloud microphysics"/>
 
                 <var name="euler_tend_u" name_in_code="u_euler" type="real" dimensions="nVertLevels nEdges Time" units="m s^{-2}"
                      description="Tendency of u from dynamics"/>
@@ -2957,6 +2962,9 @@
                      description="Total dry air tendency from physics"
                      persistence="scratch" />
 
+                <var name="rthdynten" type="real" dimensions="nVertLevels nCells Time" units="K s^{-1}"
+                     description="tendency of temperature due to horizontal and vertical advections"/>
+
                 <!-- Scratch variables used when propagating cell-centered winds to edges -->
                 <var name="tend_uzonal" type="real" dimensions="nVertLevels nCells Time" units="m s^{-1} s^{-1}"
                      description="Total cell-centered zonal wind tendency from physics"
@@ -3000,10 +3008,6 @@
                 <!-- TIEDTKE AND GRELL -->
                 <var name="rqvdynten" type="real" dimensions="nVertLevels nCells Time" units="kg kg^{-1} s^{-1}"
                      description="tendency of water vapor due to horizontal and vertical advections"
-                     packages="cu_grell_freitas_in;cu_tiedtke_in"/>
-
-                <var name="rthdynten" type="real" dimensions="nVertLevels nCells Time" units="K s^{-1}"
-                     description="tendency of temperature due to horizontal and vertical advections"
                      packages="cu_grell_freitas_in;cu_tiedtke_in"/>
 
                 <var name="rucuten" type="real" dimensions="nVertLevels nCells Time" units="m s^{-1} s^{-1}"

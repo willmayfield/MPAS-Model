@@ -98,6 +98,69 @@ module atm_time_integration
    contains
 
 
+   !***********************************************************************
+   !
+   !  routine mpas_atm_dynamics_checks
+   !
+   !> \brief   Checks compatibility of dynamics settings
+   !> \author  Michael Duda
+   !> \date    14 June 2023
+   !> \details
+   !>  This routine checks that dynamics settings are valid.
+   !>  Specifically,the following are checked by this routine:
+   !>
+   !>  1) config_positive_definite == .false.
+   !>
+   !>  At present only a warning is printed in the case of a failed check,
+   !>  and a value of 0 is always returned by the ierr argument. However,
+   !>  warnings may be escalated to errors in future.
+   !
+   !-----------------------------------------------------------------------
+   subroutine mpas_atm_dynamics_checks(dminfo, blockList, streamManager, ierr)
+
+       use mpas_log, only : mpas_log_write
+       use mpas_derived_types, only : dm_info, block_type, MPAS_LOG_WARN
+       use mpas_pool_routines, only : mpas_pool_get_config
+
+       implicit none
+
+       type (dm_info), pointer :: dminfo
+       type (block_type), pointer :: blockList
+       type (MPAS_streamManager_type), pointer :: streamManager
+       integer, intent(out) :: ierr
+
+       logical, pointer :: config_positive_definite
+
+
+       call mpas_log_write('')
+       call mpas_log_write('Checking consistency of dynamics settings...')
+
+       !
+       ! Check that config_positive_definite == .false., since the positive-definite advection
+       ! option is currently unimplemented.
+       !
+       nullify(config_positive_definite)
+       call mpas_pool_get_config(blocklist % configs, 'config_positive_definite', config_positive_definite)
+
+       if (config_positive_definite) then
+           call mpas_log_write('The positive definite advection option is currently unimplemented, and', &
+                               messageType=MPAS_LOG_WARN)
+           call mpas_log_write('setting config_positive_definite = true will enable monotonic advection.', &
+                               messageType=MPAS_LOG_WARN)
+           call mpas_log_write('Please remove the specification of config_positive_definite from the', &
+                               messageType=MPAS_LOG_WARN)
+           call mpas_log_write('&nhyd_model namelist group.', &
+                               messageType=MPAS_LOG_WARN)
+       end if
+
+       call mpas_log_write(' ----- done checking dynamics settings -----')
+       call mpas_log_write('')
+
+       ierr = 0
+
+   end subroutine mpas_atm_dynamics_checks
+
+
    !----------------------------------------------------------------------------
    !  routine MPAS_atm_dynamics_init
    !
@@ -682,7 +745,7 @@ module atm_time_integration
 
 !$OMP PARALLEL DO
                do thread=1,nThreads
-                  call atm_bdy_adjust_dynamics_relaxzone_tend( tend, state, diag, mesh, nVertLevels, dt,                   &
+                  call atm_bdy_adjust_dynamics_relaxzone_tend( block % configs, tend, state, diag, mesh, nVertLevels, dt,  &
                                                                ru_driving_values, rt_driving_values, rho_driving_values,   &
                                                                cellThreadStart(thread), cellThreadEnd(thread),             &
                                                                edgeThreadStart(thread), edgeThreadEnd(thread),             &
@@ -1079,9 +1142,7 @@ module atm_time_integration
          call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
          call mpas_pool_get_array(state, 'theta_m', theta_m, 2)
 
-         if (associated(tend_physics)) then
-            call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
-         end if
+         call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
 
          !NOTE: The calculation of the tendency due to horizontal and vertical advection for the water vapor mixing ratio
          !requires that the subroutine atm_advance_scalars_mono was called on the third Runge Kutta step, so that a halo
@@ -3825,7 +3886,7 @@ module atm_time_integration
 
       real (kind=RKIND), dimension(:,:), pointer :: rr_save
 
-      real (kind=RKIND), dimension(:,:), pointer :: rthdynten => null()
+      real (kind=RKIND), dimension(:,:), pointer :: rthdynten
 
       real (kind=RKIND), dimension(:,:,:), pointer :: scalars
 
@@ -3867,8 +3928,6 @@ module atm_time_integration
       logical, pointer :: config_rayleigh_damp_u
       real (kind=RKIND), pointer :: config_rayleigh_damp_u_timescale_days
       integer, pointer :: config_number_rayleigh_damp_u_levels, config_number_cam_damping_levels
-
-      logical :: inactive_rthdynten
 
 
       call mpas_pool_get_config(mesh, 'sphere_radius', r_earth)
@@ -3919,9 +3978,7 @@ module atm_time_integration
       call mpas_pool_get_array(diag, 'h_divergence', h_divergence)
       call mpas_pool_get_array(diag, 'exner', exner)
 
-      if (associated(tend_physics)) then
-         call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
-      end if
+      call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
 
       call mpas_pool_get_array(mesh, 'weightsOnEdge', weightsOnEdge)
       call mpas_pool_get_array(mesh, 'cellsOnEdge', cellsOnEdge)
@@ -3998,18 +4055,6 @@ module atm_time_integration
       call mpas_pool_get_array(mesh, 'cf2', cf2)
       call mpas_pool_get_array(mesh, 'cf3', cf3)
 
-      !
-      ! rthdynten is currently associated with packages, and if those packages
-      ! are not active at run-time, we need to produce an rthdynten array for
-      ! use in the atm_compute_dyn_tend_work routine
-      !
-      inactive_rthdynten = .false.
-      if (.not. associated(rthdynten)) then
-         allocate(rthdynten(nVertLevels,nCells+1))
-         rthdynten(:,nCells+1) = 0.0_RKIND
-         inactive_rthdynten = .true.
-      end if
-
       call atm_compute_dyn_tend_work(nCells, nEdges, nVertices, nVertLevels, &
          nCellsSolve, nEdgesSolve, vertexDegree, maxEdges, maxEdges2, num_scalars, moist_start, moist_end, &
          fEdge, dvEdge, dcEdge, invDcEdge, invDvEdge, invAreaCell, invAreaTriangle, meshScalingDel2, meshScalingDel4, &
@@ -4030,10 +4075,6 @@ module atm_time_integration
          rthdynten, &
          cellStart, cellEnd, vertexStart, vertexEnd, edgeStart, edgeEnd, &
          cellSolveStart, cellSolveEnd, vertexSolveStart, vertexSolveEnd, edgeSolveStart, edgeSolveEnd)
-
-      if (inactive_rthdynten) then
-         deallocate(rthdynten)
-      end if
 
    end subroutine atm_compute_dyn_tend
 
@@ -5761,7 +5802,7 @@ module atm_time_integration
 
 !-------------------------------------------------------------------------
 
-   subroutine atm_bdy_adjust_dynamics_relaxzone_tend( tend, state, diag, mesh, nVertLevels, dt,                                             &
+   subroutine atm_bdy_adjust_dynamics_relaxzone_tend( config, tend, state, diag, mesh, nVertLevels, dt,                                             &
                                                       ru_driving_values, rt_driving_values, rho_driving_values,                                     &
                                                       cellStart, cellEnd, edgeStart, edgeEnd,                               &
                                                       cellSolveStart, cellSolveEnd, edgeSolveStart, edgeSolveEnd )
@@ -5774,6 +5815,7 @@ module atm_time_integration
       !
       !  WCS Fall 2016
 
+      type (mpas_pool_type), intent(in) :: config
       type (mpas_pool_type), intent(in) :: state
       type (mpas_pool_type), intent(inout) :: tend
       type (mpas_pool_type), intent(in) :: diag
@@ -5795,6 +5837,7 @@ module atm_time_integration
       
 
       real (kind=RKIND) :: edge_sign, laplacian_filter_coef, rayleigh_damping_coef, r_dc, r_dv, invArea
+      real (kind=RKIND), pointer :: divdamp_coef
       real (kind=RKIND), dimension(nVertLevels) :: divergence1, divergence2, vorticity1, vorticity2      
       integer :: iCell, iEdge, i, k, cell1, cell2, iEdge_vort, iEdge_div
       integer :: vertex1, vertex2, iVertex
@@ -5829,6 +5872,8 @@ module atm_time_integration
       call mpas_pool_get_array(mesh, 'edgesOnVertex', edgesOnVertex)
       call mpas_pool_get_array(mesh, 'nEdgesOnCell',nEdgesOnCell)
       call mpas_pool_get_array(mesh, 'verticesOnEdge', verticesOnEdge)
+
+      call mpas_pool_get_config(config, 'config_relax_zone_divdamp_coef', divdamp_coef)
       
       !  First, Rayleigh damping terms for ru, rtheta_m and rho_zz
 
@@ -5940,8 +5985,9 @@ module atm_time_integration
             ! Compute diffusion, computed as \nabla divergence - k \times \nabla vorticity
             !
              do k=1,nVertLevels
-                tend_ru(k,iEdge) = tend_ru(k,iEdge) + laplacian_filter_coef * (  4.0*( divergence2(k) - divergence1(k) ) * r_dc  &
-                                                                                    -( vorticity2(k)  - vorticity1(k)  ) * r_dv )
+                tend_ru(k,iEdge) = tend_ru(k,iEdge) + laplacian_filter_coef &
+                                                      * (divdamp_coef * (divergence2(k) - divergence1(k)) * r_dc  &
+                                                                       -(vorticity2(k)  - vorticity1(k))  * r_dv)
              end do
 
           end if  !  end test for relaxation-zone edge
