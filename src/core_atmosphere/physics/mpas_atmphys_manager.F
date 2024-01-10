@@ -124,6 +124,8 @@
 ! * in subroutine physics_run_init, removed the initialization of the local variable microp_scheme.
 !   microp_scheme is no longer needed and can be replaced with config_microp_scheme.
 !   Laura D. Fowler (laura@ucar.edu) / 2017-02-16.
+! * replaced the option "noah" with "sf_noah" to run the NOAH land surface scheme.
+!   Laura D. Fowler (laura@ucar.edu) / 2022-02-18.
 
 
  contains
@@ -675,7 +677,7 @@
  num_landcat = nlcat
  num_soilcat = nscat
 
- if(trim(config_lsm_scheme) .eq. "noah") sf_surface_physics = 2 
+ if(trim(config_lsm_scheme) .eq. "sf_noah") sf_surface_physics = 2
 
 !initialization of local physics time-steps:
 !... dynamics:

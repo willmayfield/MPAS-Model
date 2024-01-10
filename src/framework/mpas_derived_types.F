@@ -37,12 +37,6 @@ module mpas_derived_types
 #endif
 
    use ESMF
-   use ESMF_BaseMod
-   use ESMF_Stubs
-   use ESMF_CalendarMod
-   use ESMF_ClockMod
-   use ESMF_TimeMod
-   use ESMF_TimeIntervalMod
 
 #include "mpas_attlist_types.inc"
 
@@ -51,6 +45,8 @@ module mpas_derived_types
 #include "mpas_dmpar_types.inc"
 
 #include "mpas_field_types.inc"
+
+#include "mpas_halo_types.inc"
 
 #include "mpas_pool_types.inc"
 

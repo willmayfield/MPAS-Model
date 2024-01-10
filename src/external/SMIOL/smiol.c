@@ -11,8 +11,7 @@
 #include "pnetcdf.h"
 #define PNETCDF_DEFINE_MODE 0
 #define PNETCDF_DATA_MODE 1
-#define N_REQS 256 
-#define BUFSIZE (128*1024*1024)
+#define MAX_REQS 256
 #endif
 
 #define START_COUNT_READ 0
@@ -27,6 +26,30 @@ int build_start_count(struct SMIOL_file *file, const char *varname,
                       size_t *basic_type_size, int *ndims,
                       int *has_unlimited_dim,
                       size_t **start, size_t **count);
+
+#ifdef SMIOL_PNETCDF
+int write_chunk_pnetcdf(struct SMIOL_file *file,
+                        int varidp,
+                        int ndims,
+                        int has_unlimited_dim,
+                        size_t basic_type_size,
+                        MPI_Comm io_file_comm,
+                        const void *buf_p,
+                        MPI_Offset *mpi_start,
+                        MPI_Offset *mpi_count
+                       );
+
+int read_chunk_pnetcdf(struct SMIOL_file *file,
+                       int varidp,
+                       int ndims,
+                       int has_unlimited_dim,
+                       size_t basic_type_size,
+                       MPI_Comm io_file_comm,
+                       void *buf_p,
+                       MPI_Offset *mpi_start,
+                       MPI_Offset *mpi_count
+                      );
+#endif
 
 
 /********************************************************************************
@@ -198,20 +221,26 @@ int SMIOL_inquire(void)
  * Depending on the specified file mode, creates or opens the file specified
  * by filename within the provided SMIOL context.
  *
+ * The bufsize argument specifies the size in bytes of the buffer to be attached
+ * to the file by I/O tasks; at present this buffer is only used by the Parallel-
+ * NetCDF library if the file is opened with a mode of SMIOL_FILE_CREATE or
+ * SMIOL_FILE_WRITE. A bufsize of 0 will force the use of the Parallel-NetCDF
+ * blocking write interface, while a nonzero value enables the use of the
+ * non-blocking, buffered interface for writing.
+ *
  * Upon successful completion, SMIOL_SUCCESS is returned, and the file handle
  * argument will point to a valid file handle and the current frame for the
  * file will be set to zero. Otherwise, the file handle is NULL and an error
  * code other than SMIOL_SUCCESS is returned.
  *
  ********************************************************************************/
-int SMIOL_open_file(struct SMIOL_context *context, const char *filename, int mode, struct SMIOL_file **file)
+int SMIOL_open_file(struct SMIOL_context *context, const char *filename,
+                    int mode, struct SMIOL_file **file, size_t bufsize)
 {
-#ifdef SMIOL_PNETCDF
-	int ierr;
-#endif
 	int io_group;
 	MPI_Comm io_file_comm;
 	MPI_Comm io_group_comm;
+	int ierr;
 
 
 	/*
@@ -240,37 +269,59 @@ int SMIOL_open_file(struct SMIOL_context *context, const char *filename, int mod
 	(*file)->context = context;
 	(*file)->frame = (SMIOL_Offset) 0;
 
-	/* Set flag that indicates whether this task performs I/O */
-	(*file)->io_task = (context->comm_rank % context->io_stride == 0) ? 1 : 0;
 
-	/* Create a communicator for collective file I/O operations */
-	ierr = MPI_Comm_split(MPI_Comm_f2c(context->fcomm), (*file)->io_task,
-	                      context->comm_rank, &io_file_comm);
-	(*file)->io_file_comm = MPI_Comm_c2f(io_file_comm);
-
-	/* Create a communicator for gathering/scattering values within a group of tasks associated with an I/O task */
+	/*
+	 * Determine whether a task is an I/O task or not, and compute
+	 * the I/O group to which each task belongs
+	 */
+	(*file)->io_task = context->comm_rank % context->io_stride == 0 ? 1 : 0;
 	io_group = context->comm_rank / context->io_stride;
+
+	/*
+	 * If there are fewer than comm_size / io_stride I/O tasks, some
+	 * tasks that were set to I/O tasks above will actually not perform
+	 * I/O. Also, place all remainder tasks in the last I/O group
+	 */
+	if (io_group >= context->num_io_tasks) {
+		(*file)->io_task = 0;
+		io_group = context->num_io_tasks - 1;
+	}
+
+	/*
+	 * Create a communicator for communicating within a group of tasks
+	 * associated with an I/O task
+	 */
 	ierr = MPI_Comm_split(MPI_Comm_f2c(context->fcomm), io_group,
 	                      context->comm_rank, &io_group_comm);
+	if (ierr != MPI_SUCCESS) {
+		free((*file));
+		(*file) = NULL;
+		return SMIOL_MPI_ERROR;
+	}
 	(*file)->io_group_comm = MPI_Comm_c2f(io_group_comm);
 
-#ifdef SMIOL_PNETCDF
-	(*file)->n_reqs = 0;
-	if ((*file)->io_task) {
-		(*file)->reqs = malloc(sizeof(int) * (size_t)N_REQS);
-	} else {
-		(*file)->reqs = NULL;
+
+	/*
+	 * Create a communicator for collective file I/O operations among
+	 * I/O tasks (i.e., io_task == 1)
+	 */
+	ierr = MPI_Comm_split(MPI_Comm_f2c(context->fcomm), (*file)->io_task,
+	                      context->comm_rank, &io_file_comm);
+	if (ierr != MPI_SUCCESS) {
+		free((*file));
+		(*file) = NULL;
+		return SMIOL_MPI_ERROR;
 	}
-#endif
+	(*file)->io_file_comm = MPI_Comm_c2f(io_file_comm);
+
 
 	if (mode & SMIOL_FILE_CREATE) {
 #ifdef SMIOL_PNETCDF
 		if ((*file)->io_task) {
 			ierr = ncmpi_create(io_file_comm, filename,
-			                    (NC_64BIT_DATA | NC_CLOBBER), MPI_INFO_NULL,
+			                    (NC_64BIT_DATA | NC_CLOBBER),
+			                    MPI_INFO_NULL,
 			                    &((*file)->ncidp));
-			ncmpi_buffer_attach((*file)->ncidp, BUFSIZE);
-/* TO DO: check return status */
 		}
 		(*file)->state = PNETCDF_DEFINE_MODE;
 #endif
@@ -278,9 +329,8 @@ int SMIOL_open_file(struct SMIOL_context *context, const char *filename, int mod
 #ifdef SMIOL_PNETCDF
 		if ((*file)->io_task) {
 			ierr = ncmpi_open(io_file_comm, filename,
-			                  NC_WRITE, MPI_INFO_NULL, &((*file)->ncidp));
-			ncmpi_buffer_attach((*file)->ncidp, BUFSIZE);
-/* TO DO: check return status */
+			                  NC_WRITE, MPI_INFO_NULL,
+			                  &((*file)->ncidp));
 		}
 		(*file)->state = PNETCDF_DATA_MODE;
 #endif
@@ -288,7 +338,8 @@ int SMIOL_open_file(struct SMIOL_context *context, const char *filename, int mod
 #ifdef SMIOL_PNETCDF
 		if ((*file)->io_task) {
 			ierr = ncmpi_open(io_file_comm, filename,
-			                  NC_NOWRITE, MPI_INFO_NULL, &((*file)->ncidp));
+			                  NC_NOWRITE, MPI_INFO_NULL,
+			                  &((*file)->ncidp));
 		}
 		(*file)->state = PNETCDF_DATA_MODE;
 #endif
@@ -301,7 +352,7 @@ int SMIOL_open_file(struct SMIOL_context *context, const char *filename, int mod
 	}
 
 #ifdef SMIOL_PNETCDF
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c((*file)->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		free((*file));
 		(*file) = NULL;
@@ -310,6 +361,36 @@ int SMIOL_open_file(struct SMIOL_context *context, const char *filename, int mod
 		context->lib_type = SMIOL_LIBRARY_PNETCDF;
 		context->lib_ierr = ierr;
 		return SMIOL_LIBRARY_ERROR;
+	}
+
+	(*file)->bufsize = 0;
+	(*file)->n_reqs = 0;
+	(*file)->reqs = NULL;
+
+	if (mode & SMIOL_FILE_CREATE || mode & SMIOL_FILE_WRITE) {
+		if (bufsize > 0 && (*file)->io_task) {
+			(*file)->bufsize = bufsize;
+			ierr = ncmpi_buffer_attach((*file)->ncidp,
+			                           (MPI_Offset)bufsize);
+			(*file)->reqs = malloc(sizeof(int) * (size_t)MAX_REQS);
+		}
+
+		if (bufsize > 0) {
+			MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
+			if (ierr != NC_NOERR) {
+				if ((*file)->reqs != NULL) {
+					free((*file)->reqs);
+					(*file)->reqs = NULL;
+				}
+				free((*file));
+				(*file) = NULL;
+				MPI_Comm_free(&io_file_comm);
+				MPI_Comm_free(&io_group_comm);
+				context->lib_type = SMIOL_LIBRARY_PNETCDF;
+				context->lib_ierr = ierr;
+				return SMIOL_LIBRARY_ERROR;
+			}
+		}
 	}
 #endif
 
@@ -331,12 +412,11 @@ int SMIOL_open_file(struct SMIOL_context *context, const char *filename, int mod
  ********************************************************************************/
 int SMIOL_close_file(struct SMIOL_file **file)
 {
-#ifdef SMIOL_PNETCDF
-	int ierr;
-	int statuses[N_REQS];
-#endif
 	MPI_Comm io_file_comm;
 	MPI_Comm io_group_comm;
+#ifdef SMIOL_PNETCDF
+	int ierr;
+#endif
 
 
 	/*
@@ -347,19 +427,49 @@ int SMIOL_close_file(struct SMIOL_file **file)
 		return SMIOL_SUCCESS;
 	}
 
+	io_file_comm = MPI_Comm_f2c((*file)->io_file_comm);
+	io_group_comm = MPI_Comm_f2c((*file)->io_group_comm);
+
 #ifdef SMIOL_PNETCDF
 	if ((*file)->io_task) {
+		ierr = NC_NOERR;
 		if ((*file)->n_reqs > 0) {
+			int statuses[MAX_REQS];
+
 			ierr = ncmpi_wait_all((*file)->ncidp, (*file)->n_reqs,
 			                      (*file)->reqs, statuses);
-/* TO DO: check return error code */
 			(*file)->n_reqs = 0;
 		}
-		free((*file)->reqs);
+		if ((*file)->reqs != NULL) {
+			free((*file)->reqs);
+		}
+	}
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
+	if (ierr != NC_NOERR) {
+		((*file)->context)->lib_type = SMIOL_LIBRARY_PNETCDF;
+		((*file)->context)->lib_ierr = ierr;
+		free((*file));
+		(*file) = NULL;
+		return SMIOL_LIBRARY_ERROR;
+	}
 
+	ierr = NC_NOERR;
+	if ((*file)->io_task && (*file)->bufsize > 0) {
+		ierr = ncmpi_buffer_detach((*file)->ncidp);
+	}
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
+	if (ierr != NC_NOERR) {
+		((*file)->context)->lib_type = SMIOL_LIBRARY_PNETCDF;
+		((*file)->context)->lib_ierr = ierr;
+		free((*file));
+		(*file) = NULL;
+		return SMIOL_LIBRARY_ERROR;
+	}
+
+	if ((*file)->io_task) {
 		ierr = ncmpi_close((*file)->ncidp);
 	}
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c((*file)->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		((*file)->context)->lib_type = SMIOL_LIBRARY_PNETCDF;
 		((*file)->context)->lib_ierr = ierr;
@@ -369,14 +479,12 @@ int SMIOL_close_file(struct SMIOL_file **file)
 	}
 #endif
 
-	io_file_comm = MPI_Comm_f2c((*file)->io_file_comm);
 	if (MPI_Comm_free(&io_file_comm) != MPI_SUCCESS) {
 		free((*file));
 		(*file) = NULL;
 		return SMIOL_MPI_ERROR;
 	}
 
-	io_group_comm = MPI_Comm_f2c((*file)->io_group_comm);
 	if (MPI_Comm_free(&io_group_comm) != MPI_SUCCESS) {
 		free((*file));
 		(*file) = NULL;
@@ -407,6 +515,7 @@ int SMIOL_close_file(struct SMIOL_file **file)
 int SMIOL_define_dim(struct SMIOL_file *file, const char *dimname, SMIOL_Offset dimsize)
 {
 #ifdef SMIOL_PNETCDF
+	MPI_Comm io_group_comm;
 	int dimidp;
 	int ierr;
 	MPI_Offset len;
@@ -427,6 +536,8 @@ int SMIOL_define_dim(struct SMIOL_file *file, const char *dimname, SMIOL_Offset 
 	}
 
 #ifdef SMIOL_PNETCDF
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+
 	/*
 	 * The parallel-netCDF library does not permit zero-length dimensions
 	 */
@@ -451,7 +562,7 @@ int SMIOL_define_dim(struct SMIOL_file *file, const char *dimname, SMIOL_Offset 
 		if (file->io_task) {
 			ierr = ncmpi_redef(file->ncidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -463,7 +574,7 @@ int SMIOL_define_dim(struct SMIOL_file *file, const char *dimname, SMIOL_Offset 
 	if (file->io_task) {
 		ierr = ncmpi_def_dim(file->ncidp, dimname, len, &dimidp);
 	}
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 		file->context->lib_ierr = ierr;
@@ -500,9 +611,10 @@ int SMIOL_inquire_dim(struct SMIOL_file *file, const char *dimname,
                       SMIOL_Offset *dimsize, int *is_unlimited)
 {
 #ifdef SMIOL_PNETCDF
-	int dimidp;
+	MPI_Comm io_group_comm;
+	int dimidp = 0;
 	int ierr;
-	MPI_Offset len;
+	MPI_Offset len = 0;
 #endif
 	/*
 	 * Check that file handle is valid
@@ -534,10 +646,12 @@ int SMIOL_inquire_dim(struct SMIOL_file *file, const char *dimname,
 	}
 
 #ifdef SMIOL_PNETCDF
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+
 	if (file->io_task) {
 		ierr = ncmpi_inq_dimid(file->ncidp, dimname, &dimidp);
 	}
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		(*dimsize) = (SMIOL_Offset)(-1);  /* TODO: should there be a well-defined invalid size? */
 		file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
@@ -552,7 +666,7 @@ int SMIOL_inquire_dim(struct SMIOL_file *file, const char *dimname,
 		if (file->io_task) {
 			ierr = ncmpi_inq_dimlen(file->ncidp, dimidp, &len);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			(*dimsize) = (SMIOL_Offset)(-1);  /* TODO: should there be a well-defined invalid size? */
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
@@ -561,7 +675,8 @@ int SMIOL_inquire_dim(struct SMIOL_file *file, const char *dimname,
 		}
 
 		(*dimsize) = (SMIOL_Offset)len;
-		MPI_Bcast(dimsize, 1, MPI_LONG, 0, MPI_Comm_f2c(file->io_group_comm));
+/* TO DO: what if SMIOL_Offset is different in size from MPI_LONG */
+		MPI_Bcast(dimsize, 1, MPI_LONG, 0, io_group_comm);
 	}
 
 
@@ -569,23 +684,25 @@ int SMIOL_inquire_dim(struct SMIOL_file *file, const char *dimname,
 	 * Inquire if this dimension is the unlimited dimension
 	 */
 	if (is_unlimited != NULL) {
-		int unlimdimidp;
+		int unlimdimidp = 0;
 		if (file->io_task) {
 			ierr = ncmpi_inq_unlimdim(file->ncidp, &unlimdimidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
 			return SMIOL_LIBRARY_ERROR;
 		}
-		MPI_Bcast(&unlimdimidp, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
-		MPI_Bcast(&dimidp, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
-		if (unlimdimidp == dimidp) {
-			(*is_unlimited) = 1;
-		} else {
-			(*is_unlimited) = 0; // Not the unlimited dim
+
+		if (file->io_task) {
+			if (unlimdimidp == dimidp) {
+				(*is_unlimited) = 1;
+			} else {
+				(*is_unlimited) = 0; /* Not the unlimited dim */
+			}
 		}
+		MPI_Bcast(is_unlimited, 1, MPI_INT, 0, io_group_comm);
 	}
 #endif
 
@@ -611,6 +728,7 @@ int SMIOL_inquire_dim(struct SMIOL_file *file, const char *dimname,
 int SMIOL_define_var(struct SMIOL_file *file, const char *varname, int vartype, int ndims, const char **dimnames)
 {
 #ifdef SMIOL_PNETCDF
+	MPI_Comm io_group_comm;
 	int *dimids;
 	int ierr;
 	int i;
@@ -644,6 +762,8 @@ int SMIOL_define_var(struct SMIOL_file *file, const char *varname, int vartype, 
 	}
 
 #ifdef SMIOL_PNETCDF
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+
 	dimids = (int *)malloc(sizeof(int) * (size_t)ndims);
 	if (dimids == NULL) {
 		return SMIOL_MALLOC_FAILURE;
@@ -654,9 +774,10 @@ int SMIOL_define_var(struct SMIOL_file *file, const char *varname, int vartype, 
 	 */
 	for (i=0; i<ndims; i++) {
 		if (file->io_task) {
-			ierr = ncmpi_inq_dimid(file->ncidp, dimnames[i], &dimids[i]);
+			ierr = ncmpi_inq_dimid(file->ncidp,
+			                       dimnames[i], &dimids[i]);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			free(dimids);
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
@@ -693,7 +814,7 @@ int SMIOL_define_var(struct SMIOL_file *file, const char *varname, int vartype, 
 		if (file->io_task) {
 			ierr = ncmpi_redef(file->ncidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -706,9 +827,10 @@ int SMIOL_define_var(struct SMIOL_file *file, const char *varname, int vartype, 
 	 * Define the variable
 	 */
 	if (file->io_task) {
-		ierr = ncmpi_def_var(file->ncidp, varname, xtype, ndims, dimids, &varidp);
+		ierr = ncmpi_def_var(file->ncidp, varname, xtype, ndims, dimids,
+		                     &varidp);
 	}
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		free(dimids);
 		file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
@@ -746,12 +868,13 @@ int SMIOL_define_var(struct SMIOL_file *file, const char *varname, int vartype, 
 int SMIOL_inquire_var(struct SMIOL_file *file, const char *varname, int *vartype, int *ndims, char **dimnames)
 {
 #ifdef SMIOL_PNETCDF
+	MPI_Comm io_group_comm;
 	int *dimids;
-	int varidp;
+	int varidp = 0;
 	int ierr;
 	int i;
 	int xtypep;
-	int ndimsp;
+	int ndimsp = 0;
 #endif
 
 	/*
@@ -787,13 +910,15 @@ int SMIOL_inquire_var(struct SMIOL_file *file, const char *varname, int *vartype
 	}
 
 #ifdef SMIOL_PNETCDF
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+
 	/*
 	 * Get variable ID
 	 */
 	if (file->io_task) {
 		ierr = ncmpi_inq_varid(file->ncidp, varname, &varidp);
 	}
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 		file->context->lib_ierr = ierr;
@@ -807,13 +932,13 @@ int SMIOL_inquire_var(struct SMIOL_file *file, const char *varname, int *vartype
 		if (file->io_task) {
 			ierr = ncmpi_inq_vartype(file->ncidp, varidp, &xtypep);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
 			return SMIOL_LIBRARY_ERROR;
 		}
-		MPI_Bcast(&xtypep, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&xtypep, 1, MPI_INT, 0, io_group_comm);
 
 		/* Convert parallel-netCDF variable type to SMIOL variable type */
 		switch (xtypep) {
@@ -841,13 +966,13 @@ int SMIOL_inquire_var(struct SMIOL_file *file, const char *varname, int *vartype
 		if (file->io_task) {
 			ierr = ncmpi_inq_varndims(file->ncidp, varidp, &ndimsp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
 			return SMIOL_LIBRARY_ERROR;
 		}
-		MPI_Bcast(&ndimsp, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ndimsp, 1, MPI_INT, 0, io_group_comm);
 	}
 
 	/*
@@ -869,7 +994,7 @@ int SMIOL_inquire_var(struct SMIOL_file *file, const char *varname, int *vartype
 		if (file->io_task) {
 			ierr = ncmpi_inq_vardimid(file->ncidp, varidp, dimids);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -878,21 +1003,30 @@ int SMIOL_inquire_var(struct SMIOL_file *file, const char *varname, int *vartype
 		}
 
 		for (i = 0; i < ndimsp; i++) {
+			int len;
+
 			if (dimnames[i] == NULL) {
 				return SMIOL_INVALID_ARGUMENT;
 			}
 			if (file->io_task) {
-				ierr = ncmpi_inq_dimname(file->ncidp, dimids[i], dimnames[i]);
+				ierr = ncmpi_inq_dimname(file->ncidp, dimids[i],
+				                         dimnames[i]);
 			}
-			MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+			MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 			if (ierr != NC_NOERR) {
 				file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 				file->context->lib_ierr = ierr;
 				free(dimids);
 				return SMIOL_LIBRARY_ERROR;
 			}
-/* TO DO: how many characters to broadcast here? */
-			ierr = MPI_Bcast(dimnames[i], 64, MPI_CHAR, 0, MPI_Comm_f2c(file->io_group_comm));
+
+			if (file->io_task) {
+				len = (int)strnlen(dimnames[i],
+				                   (size_t)NC_MAX_NAME);
+				len++; /* Include the terminating '\0' character */
+			}
+			MPI_Bcast(&len, 1, MPI_INT, 0, io_group_comm);
+			MPI_Bcast(dimnames[i], len, MPI_CHAR, 0, io_group_comm);
 		}
 
 		free(dimids);
@@ -946,15 +1080,6 @@ int SMIOL_put_var(struct SMIOL_file *file, const char *varname,
 	void *agg_buf = NULL;
 	const void *agg_buf_cnst = NULL;
 
-#ifdef SMIOL_PNETCDF
-	MPI_Offset usage;
-	MPI_Offset max_counts;
-	long lusage;
-	long max_usage;
-	int statuses[N_REQS];
-#endif
-
-//fprintf(stderr, "---- Writing variable %s ----\n", varname);
 
 	/*
 	 * Basic checks on arguments
@@ -1057,16 +1182,21 @@ int SMIOL_put_var(struct SMIOL_file *file, const char *varname,
 #ifdef SMIOL_PNETCDF
 	{
 		int j;
-		int varidp;
+		int varidp = 0;
 		const void *buf_p;
 		MPI_Offset *mpi_start;
 		MPI_Offset *mpi_count;
+		MPI_Comm io_group_comm;
+		MPI_Comm io_file_comm;
+
+		io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+		io_file_comm = MPI_Comm_f2c(file->io_file_comm);
 
 		if (file->state == PNETCDF_DEFINE_MODE) {
 			if (file->io_task) {
 				ierr = ncmpi_enddef(file->ncidp);
 			}
-			MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+			MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 			if (ierr != NC_NOERR) {
 				file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 				file->context->lib_ierr = ierr;
@@ -1085,7 +1215,7 @@ int SMIOL_put_var(struct SMIOL_file *file, const char *varname,
 		if (file->io_task) {
 			ierr = ncmpi_inq_varid(file->ncidp, varname, &varidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -1128,120 +1258,19 @@ int SMIOL_put_var(struct SMIOL_file *file, const char *varname,
 		}
 
 		if (file->io_task) {
-			if (decomp) {
-				usage = element_size * decomp->io_count;
-			} else {
-				usage = element_size;
-			}
-			lusage = usage;
-			ierr = MPI_Allreduce(&lusage, &max_usage, 1, MPI_LONG, MPI_MAX,
-			                     MPI_Comm_f2c(file->io_file_comm));
-
-			/*
-			 * If the chunk of data to be written is larger than the buffer
-			 * size, just write through the non-buffered interface; otherwise,
-			 * the ncmpi_bput_vara call will fail.
-			 */
-//fprintf(stderr, "   mine/max chunk size across all tasks: %ld %ld\n", lusage, max_usage);
-			if (max_usage > BUFSIZE || max_usage > ((MPI_Offset)INT_MAX)) {
-				if (max_usage <= ((MPI_Offset)INT_MAX)) {
-//fprintf(stderr, "   variable %s has chunks <2GB, so just put_vara_all\n", varname);
-					ierr = ncmpi_put_vara_all(file->ncidp,
-					                          varidp,
-					                          mpi_start, mpi_count,
-					                          buf_p,
-					                          0, MPI_DATATYPE_NULL);
-					if (ierr != NC_NOERR) {
-//fprintf(stderr, "   call to ncmpi_put_vara_all returned %d\n", ierr);
-					}
-				} else {
-					int iter_idx = 0;
-					MPI_Offset remaining_count;
-					MPI_Offset max_count;
-					long done, global_done;
-					size_t buf_offset;
-//fprintf(stderr, "   variable %s has chunks >2GB\n", varname);
-
-/* TO DO: if this var has a record dim, increment iter_idx */
-					if (has_unlimited_dim) iter_idx++;
-
-					max_count = ((MPI_Offset)INT_MAX) / element_size;
-					remaining_count = mpi_count[iter_idx];
-
-					mpi_count[iter_idx] = (max_count < remaining_count) ? max_count : remaining_count;
-					remaining_count -= mpi_count[iter_idx];
-					done = (mpi_count[iter_idx] == 0) ? 1 : 0;
-					global_done = 0;
-					buf_offset = 0;
-					while (!global_done) {
-//fprintf(stderr, "       writing chunk start/count/offset %ld/%ld/%ld\n", (long)mpi_start[iter_idx], (long)mpi_count[iter_idx], (long)buf_offset);
-						ierr = ncmpi_put_vara_all(file->ncidp,
-						                          varidp,
-						                          mpi_start, mpi_count,
-						                          &((uint8_t *)buf_p)[buf_offset],
-						                          0, MPI_DATATYPE_NULL);
-
-						if (!done) {
-							buf_offset += (size_t)mpi_count[iter_idx] * element_size;
-							mpi_start[iter_idx] += mpi_count[iter_idx];
-							mpi_count[iter_idx] = (max_count < remaining_count) ? max_count : remaining_count;
-							remaining_count -= mpi_count[iter_idx];
-
-							done = (mpi_count[iter_idx] == 0) ? 1 : 0;
-						}
-/* TO DO: can the setting of done go inside the if-test above? */
-
-						if (ierr != NC_NOERR) {
-//fprintf(stderr, "   call to ncmpi_put_vara_all returned %d\n", ierr);
-							done = -1;
-						}
-
-/* TO DO: check for errors in MPI_Allreduce */
-						MPI_Allreduce(&done, &global_done, 1, MPI_LONG, MPI_MIN,
-						                     MPI_Comm_f2c(file->io_file_comm));
-					};
-				}
-			} else {
-/* TO DO: check for errors in ncmpi_inq_buffer_usage */
-				ierr = ncmpi_inq_buffer_usage(file->ncidp, &usage);
-if (ierr != NC_NOERR) {
-	fprintf(stderr, "   ncmpi_inq_buffer_usage returned %d\n", ierr);
-}
-				if (decomp) {
-					usage += element_size * decomp->io_count;
-				} else {
-					usage += element_size;
-				}
-
-				lusage = usage;
-/* TO DO: check for errors in MPI_Allreduce */
-				ierr = MPI_Allreduce(&lusage, &max_usage, 1, MPI_LONG, MPI_MAX,
-				                     MPI_Comm_f2c(file->io_file_comm));
-//fprintf(stderr, "   mine/max buffer use across all tasks: %ld %ld\n", lusage, max_usage);
-				if (max_usage > BUFSIZE || file->n_reqs == N_REQS) {
-/* TO DO: check for errors in ncmpi_wait_all */
-//fprintf(stderr, "       waiting for %i requests\n", file->n_reqs);
-					ierr = ncmpi_wait_all(file->ncidp, file->n_reqs,
-					                      file->reqs, NULL);  /* statuses */
-					file->n_reqs = 0;
-//fprintf(stderr, "   ==== cleared buffer, and now n_reqs = %d\n", file->n_reqs);
-				}
-
-				ierr = ncmpi_bput_vara(file->ncidp,
-				                       varidp,
-				                       mpi_start, mpi_count,
-				                       buf_p,
-				                       0, MPI_DATATYPE_NULL,
-				                       &(file->reqs[file->n_reqs]));
-				file->n_reqs++;
-if (ierr != NC_NOERR) {
-	fprintf(stderr, "   ncmpi_bput_vara returned %d\n", ierr);
-}
-//fprintf(stderr, "   ==== buffered %s and now n_reqs = %d\n", varname, file->n_reqs);
-			}
+			ierr = write_chunk_pnetcdf(file,
+			                           varidp,
+			                           ndims,
+			                           has_unlimited_dim,
+			                           basic_size,
+			                           io_file_comm,
+			                           buf_p,
+			                           mpi_start,
+			                           mpi_count
+			                          );
 		}
-/* TO DO: to handle failures in MPI_Bcast, we could set ierr to other than NC_NOERR on all non-I/O tasks? */
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 
 		free(mpi_start);
 		free(mpi_count);
@@ -1313,11 +1342,9 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 	size_t *count;
 
 	void *agg_buf = NULL;
-	MPI_Datatype dtype = MPI_DATATYPE_NULL;
 
-#ifdef SMIOL_PNETCDF
-	int statuses[N_REQS];
-#endif
+	MPI_Comm io_group_comm;
+	MPI_Comm io_file_comm;
 
 
 	/*
@@ -1326,6 +1353,9 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 	if (file == NULL || varname == NULL) {
 		return SMIOL_INVALID_ARGUMENT;
 	}
+
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+	io_file_comm = MPI_Comm_f2c(file->io_file_comm);
 
 	/*
 	 * Work out the start[] and count[] arrays for reading this variable
@@ -1375,21 +1405,16 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 #ifdef SMIOL_PNETCDF
 	{
 		int j;
-		int varidp;
+		int varidp = 0;
 		void *buf_p;
 		MPI_Offset *mpi_start;
 		MPI_Offset *mpi_count;
-
-		MPI_Offset usage;
-		MPI_Offset max_counts;
-		long lusage;
-		long max_usage;
 
 		if (file->state == PNETCDF_DEFINE_MODE) {
 			if (file->io_task) {
 				ierr = ncmpi_enddef(file->ncidp);
 			}
-			MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+			MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 			if (ierr != NC_NOERR) {
 				file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 				file->context->lib_ierr = ierr;
@@ -1408,7 +1433,7 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 		if (file->io_task) {
 			ierr = ncmpi_inq_varid(file->ncidp, varname, &varidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -1450,95 +1475,37 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 			mpi_count[j] = (MPI_Offset)count[j];
 		}
 
+		ierr = NC_NOERR;
 		if (file->io_task) {
 			/*
-			 * Finish and flush any pending writes to this file before
-			 * reading back a variable
+			 * Finish and flush any pending writes to this file
+			 * before reading back a variable
 			 */
 			if (file->n_reqs > 0) {
+				int statuses[MAX_REQS];
+
 				ierr = ncmpi_wait_all(file->ncidp, file->n_reqs,
 				                      file->reqs, statuses);
-/* TO DO: check return error code */
 				file->n_reqs = 0;
 
-				if ((ierr = ncmpi_sync(file->ncidp)) != NC_NOERR) {
-					file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
-					file->context->lib_ierr = ierr;
-					return SMIOL_LIBRARY_ERROR;
+				if (ierr == NC_NOERR) {
+					ierr = ncmpi_sync(file->ncidp);
 				}
 			}
-
-			if (decomp) {
-				usage = element_size * decomp->io_count;
-			} else {
-				usage = element_size;
-			}
-			lusage = usage;
-			ierr = MPI_Allreduce(&lusage, &max_usage, 1, MPI_LONG, MPI_MAX,
-			                     MPI_Comm_f2c(file->io_file_comm));
-
-			/*
-			 * If the chunk of data to be written is larger than the buffer
-			 * size, just write through the non-buffered interface; otherwise,
-			 * the ncmpi_bput_vara call will fail.
-			 */
-/* TO DO: maybe we need separate error codes for each library's calls, and check all codes after block? */
-			if (max_usage > ((MPI_Offset)INT_MAX)) {
-//fprintf(stderr, "---- variable %s has chunks >2GB ----\n", varname);
-				int iter_idx = 0;
-				MPI_Offset remaining_count;
-				MPI_Offset max_count;
-				long done, global_done;
-				size_t buf_offset;
-
-/* TO DO: if this var has a record dim, increment iter_idx */
-				if (has_unlimited_dim) iter_idx++;
-
-				max_count = ((MPI_Offset)INT_MAX) / element_size;
-				remaining_count = mpi_count[iter_idx];
-
-				mpi_count[iter_idx] = (max_count < remaining_count) ? max_count : remaining_count;
-				remaining_count -= mpi_count[iter_idx];
-				done = (mpi_count[iter_idx] == 0) ? 1 : 0;
-				global_done = 0;
-				buf_offset = 0;
-				while (!global_done) {
-//fprintf(stderr, "        read start/count = %ld %ld\n", (long)mpi_start[iter_idx], (long)mpi_count[iter_idx]);
-					ierr = ncmpi_get_vara_all(file->ncidp,
-					                          varidp,
-					                          mpi_start, mpi_count,
-/* TO DO: need to update offset in buffer... */
-					                          &((uint8_t *)buf_p)[buf_offset],
-					                          0, MPI_DATATYPE_NULL);
-
-					if (!done) {
-						buf_offset += (size_t)mpi_count[iter_idx] * element_size;
-						mpi_start[iter_idx] += mpi_count[iter_idx];
-						mpi_count[iter_idx] = (max_count < remaining_count) ? max_count : remaining_count;
-						remaining_count -= mpi_count[iter_idx];
-
-						done = (mpi_count[iter_idx] == 0) ? 1 : 0;
-					}
-/* TO DO: can the setting of done go inside the if-test above? */
-
-					if (ierr != NC_NOERR) {
-						done = -1;
-					}
-
-/* TO DO: check for errors in MPI_Allreduce */
-					MPI_Allreduce(&done, &global_done, 1, MPI_LONG, MPI_MIN,
-					                     MPI_Comm_f2c(file->io_file_comm));
-//fprintf(stderr, "        global_done = %ld\n", done);
-				};
-			} else {
-				ierr = ncmpi_get_vara_all(file->ncidp,
+			if (ierr == NC_NOERR) {
+				ierr = read_chunk_pnetcdf(file,
 				                          varidp,
-				                          mpi_start, mpi_count,
+				                          ndims,
+				                          has_unlimited_dim,
+				                          basic_size,
+				                          io_file_comm,
 				                          buf_p,
-				                          0, MPI_DATATYPE_NULL);
+				                          mpi_start,
+				                          mpi_count
+				                         );
 			}
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 
 		free(mpi_start);
 		free(mpi_count);
@@ -1571,19 +1538,6 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 	 */
 	if (decomp) {
 		if (decomp->agg_factor != 1) {
-			ierr = MPI_Type_contiguous((int)element_size,
-			                           MPI_UINT8_T, &dtype);
-			if (ierr != MPI_SUCCESS) {
-				fprintf(stderr, "MPI_Type_contiguous failed with code %i\n", ierr);
-				return SMIOL_MPI_ERROR;
-			}
-
-			ierr = MPI_Type_commit(&dtype);
-			if (ierr != MPI_SUCCESS) {
-				fprintf(stderr, "MPI_Type_commit failed with code %i\n", ierr);
-				return SMIOL_MPI_ERROR;
-			}
-
 			agg_buf = malloc(element_size * decomp->n_compute_agg);
 			if (agg_buf == NULL && decomp->n_compute_agg > 0) {
 				return SMIOL_MALLOC_FAILURE;
@@ -1596,7 +1550,21 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 		                      element_size, in_buf, agg_buf);
 
 		if (decomp->agg_factor != 1) {
+			MPI_Datatype dtype = MPI_DATATYPE_NULL;
 			MPI_Comm agg_comm;
+
+			ierr = MPI_Type_contiguous((int)element_size,
+			                           MPI_UINT8_T, &dtype);
+			if (ierr != MPI_SUCCESS) {
+				fprintf(stderr, "MPI_Type_contiguous failed with code %i\n", ierr);
+				return SMIOL_MPI_ERROR;
+			}
+
+			ierr = MPI_Type_commit(&dtype);
+			if (ierr != MPI_SUCCESS) {
+				fprintf(stderr, "MPI_Type_commit failed with code %i\n", ierr);
+				return SMIOL_MPI_ERROR;
+			}
 
 			agg_comm = MPI_Comm_f2c(decomp->agg_comm);
 
@@ -1626,7 +1594,11 @@ int SMIOL_get_var(struct SMIOL_file *file, const char *varname,
 			return ierr;
 		}
 	} else {
-		ierr = MPI_Bcast(buf, element_size, MPI_CHAR, 0, MPI_Comm_f2c(file->io_group_comm));
+		/*
+		 * For non-decomposed variables, broadcast from I/O tasks
+		 * to other tasks in each I/O group
+		 */
+		MPI_Bcast(buf, (int)element_size, MPI_CHAR, 0, io_group_comm);
 	}
 
 	return SMIOL_SUCCESS;
@@ -1651,8 +1623,9 @@ int SMIOL_define_att(struct SMIOL_file *file, const char *varname,
                      const char *att_name, int att_type, const void *att)
 {
 #ifdef SMIOL_PNETCDF
+	MPI_Comm io_group_comm;
 	int ierr;
-	int varidp;
+	int varidp = 0;
 	nc_type xtype;
 #endif
 
@@ -1669,6 +1642,8 @@ int SMIOL_define_att(struct SMIOL_file *file, const char *varname,
 	 */
 
 #ifdef SMIOL_PNETCDF
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+
 	/*
 	 * If varname was provided, get the variable ID; else, the attribute
 	 * is a global attribute not associated with a specific variable
@@ -1677,7 +1652,7 @@ int SMIOL_define_att(struct SMIOL_file *file, const char *varname,
 		if (file->io_task) {
 			ierr = ncmpi_inq_varid(file->ncidp, varname, &varidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -1714,7 +1689,7 @@ int SMIOL_define_att(struct SMIOL_file *file, const char *varname,
 		if (file->io_task) {
 			ierr = ncmpi_redef(file->ncidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -1728,14 +1703,16 @@ int SMIOL_define_att(struct SMIOL_file *file, const char *varname,
 	 */
 	if (file->io_task) {
 		if (att_type == SMIOL_CHAR) {
-			ierr = ncmpi_put_att(file->ncidp, varidp, att_name, xtype,
-			                     (MPI_Offset)strlen(att), (const char *)att);
+			ierr = ncmpi_put_att(file->ncidp, varidp, att_name,
+			                     xtype, (MPI_Offset)strlen(att),
+			                     (const char *)att);
 		} else {
-			ierr = ncmpi_put_att(file->ncidp, varidp, att_name, xtype,
-			                     (MPI_Offset)1, (const char *)att);
+			ierr = ncmpi_put_att(file->ncidp, varidp, att_name,
+			                     xtype, (MPI_Offset)1,
+			                     (const char *)att);
 		}
 	}
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 		file->context->lib_ierr = ierr;
@@ -1775,10 +1752,11 @@ int SMIOL_inquire_att(struct SMIOL_file *file, const char *varname,
                       SMIOL_Offset *att_len, void *att)
 {
 #ifdef SMIOL_PNETCDF
+	MPI_Comm io_group_comm;
 	int ierr;
-	int varidp;
-	nc_type xtypep;
-	MPI_Offset lenp;
+	int varidp = 0;
+	nc_type xtypep = 0;
+	MPI_Offset lenp = 0;
 #endif
 
 	/*
@@ -1800,6 +1778,8 @@ int SMIOL_inquire_att(struct SMIOL_file *file, const char *varname,
 	}
 
 #ifdef SMIOL_PNETCDF
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+
 	/*
 	 * If varname was provided, get the variable ID; else, the inquiry is
 	 * is for a global attribute not associated with a specific variable
@@ -1808,7 +1788,7 @@ int SMIOL_inquire_att(struct SMIOL_file *file, const char *varname,
 		if (file->io_task) {
 			ierr = ncmpi_inq_varid(file->ncidp, varname, &varidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -1826,14 +1806,17 @@ int SMIOL_inquire_att(struct SMIOL_file *file, const char *varname,
 			ierr = ncmpi_inq_att(file->ncidp, varidp, att_name,
 			                     &xtypep, &lenp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
 			return SMIOL_LIBRARY_ERROR;
 		}
-		MPI_Bcast(&lenp, sizeof(MPI_Offset), MPI_BYTE, 0, MPI_Comm_f2c(file->io_group_comm));
-		MPI_Bcast(&xtypep, sizeof(nc_type), MPI_BYTE, 0, MPI_Comm_f2c(file->io_group_comm));
+
+		MPI_Bcast(&lenp, sizeof(MPI_Offset), MPI_BYTE, 0,
+		          io_group_comm);
+		MPI_Bcast(&xtypep, sizeof(nc_type), MPI_BYTE, 0,
+		          io_group_comm);
 
 		if (att_type != NULL) {
 			/* Convert parallel-netCDF type to SMIOL type */
@@ -1866,9 +1849,10 @@ int SMIOL_inquire_att(struct SMIOL_file *file, const char *varname,
 	 */
 	if (att != NULL) {
 		if (file->io_task) {
-			ierr = ncmpi_get_att(file->ncidp, varidp, att_name, att);
+			ierr = ncmpi_get_att(file->ncidp, varidp, att_name,
+			                     att);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -1876,18 +1860,19 @@ int SMIOL_inquire_att(struct SMIOL_file *file, const char *varname,
 		}
 
 		switch (xtypep) {
-			case NC_FLOAT:
-				ierr = MPI_Bcast(att, 1, MPI_FLOAT, 0, MPI_Comm_f2c(file->io_group_comm));
-				break;
-			case NC_DOUBLE:
-				ierr = MPI_Bcast(att, 1, MPI_DOUBLE, 0, MPI_Comm_f2c(file->io_group_comm));
-				break;
-			case NC_INT:
-				ierr = MPI_Bcast(att, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
-				break;
-			case NC_CHAR:
-				ierr = MPI_Bcast(att, lenp, MPI_CHAR, 0, MPI_Comm_f2c(file->io_group_comm));
-				break;
+		case NC_FLOAT:
+			ierr = MPI_Bcast(att, 1, MPI_FLOAT, 0, io_group_comm);
+			break;
+		case NC_DOUBLE:
+			ierr = MPI_Bcast(att, 1, MPI_DOUBLE, 0, io_group_comm);
+			break;
+		case NC_INT:
+			ierr = MPI_Bcast(att, 1, MPI_INT, 0, io_group_comm);
+			break;
+		case NC_CHAR:
+			ierr = MPI_Bcast(att, (int)lenp, MPI_CHAR, 0,
+			                 io_group_comm);
+			break;
 		}
 	}
 #endif
@@ -1910,8 +1895,8 @@ int SMIOL_inquire_att(struct SMIOL_file *file, const char *varname,
 int SMIOL_sync_file(struct SMIOL_file *file)
 {
 #ifdef SMIOL_PNETCDF
+	MPI_Comm io_group_comm;
 	int ierr;
-	int statuses[N_REQS];
 #endif
 
 	/*
@@ -1922,6 +1907,8 @@ int SMIOL_sync_file(struct SMIOL_file *file)
 	}
 
 #ifdef SMIOL_PNETCDF
+	io_group_comm = MPI_Comm_f2c(file->io_group_comm);
+
 	/*
 	 * If the file is in define mode then switch it into data mode
 	 */
@@ -1929,7 +1916,7 @@ int SMIOL_sync_file(struct SMIOL_file *file)
 		if (file->io_task) {
 			ierr = ncmpi_enddef(file->ncidp);
 		}
-		MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+		MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 		if (ierr != NC_NOERR) {
 			file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 			file->context->lib_ierr = ierr;
@@ -1939,16 +1926,21 @@ int SMIOL_sync_file(struct SMIOL_file *file)
 	}
 
 	if (file->io_task) {
+		ierr = NC_NOERR;
+
 		if (file->n_reqs > 0) {
+			int statuses[MAX_REQS];
+
 			ierr = ncmpi_wait_all(file->ncidp, file->n_reqs,
 			                      file->reqs, statuses);
-/* TO DO: check return error code */
 			file->n_reqs = 0;
 		}
 
-		ierr = ncmpi_sync(file->ncidp);
+		if (ierr == NC_NOERR) {
+			ierr = ncmpi_sync(file->ncidp);
+		}
 	}
-	MPI_Bcast(&ierr, 1, MPI_INT, 0, MPI_Comm_f2c(file->io_group_comm));
+	MPI_Bcast(&ierr, 1, MPI_INT, 0, io_group_comm);
 	if (ierr != NC_NOERR) {
 		file->context->lib_type = SMIOL_LIBRARY_PNETCDF;
 		file->context->lib_ierr = ierr;
@@ -2337,7 +2329,7 @@ int SMIOL_free_decomp(struct SMIOL_decomp **decomp)
  * Constructs start[] and count[] arrays for parallel I/O operations
  *
  * Given a pointer to a SMIOL file that was previously opened, the name of
- * a variable in that file, and a SMIOL decomp, this function returns three
+ * a variable in that file, and a SMIOL decomp, this function returns several
  * items that may be used when reading or writing the variable in parallel:
  *
  * 1) The size of each "element" of the variable, where an element is defined as
@@ -2349,10 +2341,15 @@ int SMIOL_free_decomp(struct SMIOL_decomp **decomp)
  *    For non-decomposed variables, the element size is the size of one record
  *    of the entire variable.
  *
- * 2) The number of dimensions for the variable, including any unlimited/record
+ * 2) The size of the fundamental datatype for the variable; for example, a
+ *    float variable would yield sizeof(float).
+ *
+ * 3) The number of dimensions for the variable, including any unlimited/record
  *    dimension.
  *
- * 3) The start[] and count[] arrays (each with size ndims) to be read or written
+ * 4) Whether the variable has a record (unlimited) dimension.
+ *
+ * 5) The start[] and count[] arrays (each with size ndims) to be read or written
  *    by an MPI rank using the I/O decomposition described in decomp.
  *
  * If the decomp argument is NULL, the variable is to be read or written as
@@ -2362,7 +2359,8 @@ int SMIOL_free_decomp(struct SMIOL_decomp **decomp)
  *
  * Depending on the value of the write_or_read argument -- either START_COUNT_READ
  * or START_COUNT_WRITE -- the count[] values will be set so that all ranks will
- * read the variable, or only rank 0 will write the variable.
+ * read the variable, or only rank 0 will write the variable if the variable is
+ * not decomposed.
  *
  ********************************************************************************/
 int build_start_count(struct SMIOL_file *file, const char *varname,
@@ -2538,3 +2536,317 @@ int build_start_count(struct SMIOL_file *file, const char *varname,
 
 	return SMIOL_SUCCESS;
 }
+
+
+#ifdef SMIOL_PNETCDF
+/********************************************************************************
+ *
+ * write_chunk_pnetcdf
+ *
+ * Write a chunk of a variable to a file using the Parallel-NetCDF library
+ *
+ * Given a file and information about a variable in the file, write a chunk of
+ * memory to the variable according to start/count arrays. If the size of the
+ * chunk to be written will fit within any buffer attached to the file, the
+ * chunk is written using the Parallel-NetCDF buffered non-blocking interface;
+ * otherwise, the chunk is written using the blocking write interface, ensuring
+ * that not more than 2 GiB is written in any single call to ncmpi_put_vara_all.
+ *
+ * The return value from this function will be NC_NOERR in case no errors
+ * occurred in calls to the Parallel-NetCDF library, or a Parallel-NetCDF error
+ * code otherwise.
+ *
+ * Within this function, return error codes from MPI calls are ignored.
+ *
+ ********************************************************************************/
+int write_chunk_pnetcdf(struct SMIOL_file *file,
+                        int varidp,
+                        int ndims,
+                        int has_unlimited_dim,
+                        size_t basic_type_size,
+                        MPI_Comm io_file_comm,
+                        const void *buf_p,
+                        MPI_Offset *mpi_start,
+                        MPI_Offset *mpi_count
+                       )
+{
+	int ierr = NC_NOERR;
+	long lusage;
+	long max_usage;
+	size_t element_size;
+	int iter_idx;
+	int i;
+
+	/*
+	 * For scalar variables (with or without an unlimited dimension),
+	 * just write with a single call to the blocking write interface.
+	 */
+	if (ndims == 0 || (has_unlimited_dim && ndims == 1)) {
+		ierr = ncmpi_bput_vara(file->ncidp,
+		                       varidp,
+		                       mpi_start, mpi_count,
+		                       buf_p,
+		                       0, MPI_DATATYPE_NULL,
+		                       &(file->reqs[(file->n_reqs++)]));
+		return ierr;
+	}
+
+	/*
+	 * Set iter_idx to be the slowest-varying non-record (non-unlimited)
+	 * dimension for the variable
+	 */
+	iter_idx = 0;
+	if (has_unlimited_dim) iter_idx++;
+
+	/*
+	 * Let element_size be the product of the fastest-varying dimension
+	 * sizes beyond the iter_idx dimension multiplied by the basic type
+	 * size for this variable.
+	 */
+	element_size = basic_type_size;
+	for (i = iter_idx + 1; i < ndims; i++) {
+		element_size *= mpi_count[i];
+	}
+
+	/*
+	 * Compute the maximum total number of bytes to be written by any MPI
+	 * task for their chunks of the variable
+	 */
+	lusage = (long)element_size * mpi_count[iter_idx];
+	MPI_Allreduce(&lusage, &max_usage, 1, MPI_LONG,
+	              MPI_MAX, io_file_comm);
+
+	/*
+	 * If the maximum size of a chunk of data to be written is larger than
+	 * the buffer size, just write through the non-buffered interface;
+	 * otherwise, the ncmpi_bput_vara call will fail.
+	 */
+	if (max_usage > file->bufsize || max_usage > ((MPI_Offset)INT_MAX)) {
+		MPI_Offset remaining_count;
+		MPI_Offset max_count;
+		long done, global_done;
+		size_t buf_offset;
+
+		max_count = ((MPI_Offset)INT_MAX) / element_size;
+		remaining_count = mpi_count[iter_idx];
+
+		/*
+		 * Bound the number of values to be written along the slowest-
+		 * varying non-record dimension to ensure that not more than
+		 * 2 GiB are written in the call to ncmpi_put_vara_all
+		 */
+		mpi_count[iter_idx] = (max_count < remaining_count)
+		                    ? max_count : remaining_count;
+		remaining_count -= mpi_count[iter_idx];
+		done = (mpi_count[iter_idx] == 0) ? 1 : 0;
+		global_done = 0;
+		buf_offset = 0;
+
+		/*
+		 * Keep calling ncmpi_put_vara_all on all I/O tasks as long as
+		 * at least one task still has data to be written, writing at
+		 * most 2 GiB at a time
+		 */
+		while (!global_done) {
+			ierr = ncmpi_put_vara_all(file->ncidp,
+			                          varidp,
+			                          mpi_start, mpi_count,
+			                          &((uint8_t *)buf_p)[buf_offset],
+			                          0, MPI_DATATYPE_NULL);
+
+			/*
+			 * Update start/count values for slowest non-record
+			 * dimension, and determine whether this task still has
+			 * data to be written
+			 */
+			if (!done) {
+				buf_offset += (size_t)mpi_count[iter_idx]
+				              * element_size;
+				mpi_start[iter_idx] += mpi_count[iter_idx];
+				mpi_count[iter_idx] = (max_count < remaining_count)
+				                    ? max_count : remaining_count;
+				remaining_count -= mpi_count[iter_idx];
+
+				done = (mpi_count[iter_idx] == 0) ? 1 : 0;
+			}
+
+			if (ierr != NC_NOERR) {
+				done = -1;
+			}
+
+			/*
+			 * Get done status across all I/O tasks
+			 */
+			MPI_Allreduce(&done, &global_done, 1, MPI_LONG, MPI_MIN,
+			              MPI_Comm_f2c(file->io_file_comm));
+		};
+
+	} else {
+		/*
+		 * If executing this else branch, assume bufsize > 0 and
+		 * that a buffer has therefore been attached to file.
+		 */
+
+		MPI_Offset usage;
+
+		/*
+		 * Check how many bytes have been used in buffer on this task
+		 */
+		ierr = ncmpi_inq_buffer_usage(file->ncidp,
+		                              &usage);
+		lusage = usage +
+		         (long)element_size * mpi_count[iter_idx];
+
+		MPI_Allreduce(&lusage, &max_usage, 1,
+		              MPI_LONG, MPI_MAX,
+		              io_file_comm);
+
+		/*
+		 * If making a buffered write would cause the remaining buffer
+		 * size to be exceeded on any task, wait for non-blocking
+		 * writes to complete
+		 */
+		if ((size_t)max_usage > file->bufsize
+		    || file->n_reqs == MAX_REQS) {
+			ierr = ncmpi_wait_all(file->ncidp, file->n_reqs,
+			                      file->reqs, NULL);  /* statuses */
+			file->n_reqs = 0;
+		}
+
+		if (ierr == NC_NOERR) {
+			ierr = ncmpi_bput_vara(file->ncidp,
+			                       varidp,
+			                       mpi_start, mpi_count,
+			                       buf_p,
+			                       0, MPI_DATATYPE_NULL,
+			                       &(file->reqs[(file->n_reqs++)]));
+		}
+	}
+
+	return ierr;
+}
+
+
+/********************************************************************************
+ *
+ * read_chunk_pnetcdf
+ *
+ * Read a chunk of a variable from a file using the Parallel-NetCDF library
+ *
+ * Given a file and information about a variable in the file, read a chunk of
+ * memory from the variable according to start/count arrays. The chunk is always
+ * read using the blocking read interface while ensuring that not more than 2
+ * GiB is read in any single call to ncmpi_get_vara_all.
+ *
+ * The return value from this function will be NC_NOERR in case no errors
+ * occurred in calls to the Parallel-NetCDF library, or a Parallel-NetCDF error
+ * code otherwise.
+ *
+ * Within this function, return error codes from MPI calls are ignored.
+ *
+ ********************************************************************************/
+int read_chunk_pnetcdf(struct SMIOL_file *file,
+                       int varidp,
+                       int ndims,
+                       int has_unlimited_dim,
+                       size_t basic_type_size,
+                       MPI_Comm io_file_comm,
+                       void *buf_p,
+                       MPI_Offset *mpi_start,
+                       MPI_Offset *mpi_count
+                      )
+{
+	int ierr = NC_NOERR;
+	int iter_idx;
+	MPI_Offset remaining_count;
+	MPI_Offset max_count;
+	long done, global_done;
+	size_t element_size;
+	size_t buf_offset;
+	int i;
+
+	/*
+	 * For scalar variables (with or without an unlimited dimension),
+	 * just read with a single call to the blocking read interface.
+	 */
+	if (ndims == 0 || (has_unlimited_dim && ndims == 1)) {
+		ierr = ncmpi_get_vara_all(file->ncidp,
+		                          varidp,
+		                          mpi_start, mpi_count,
+		                          buf_p,
+		                          0, MPI_DATATYPE_NULL);
+		return ierr;
+	}
+
+	/*
+	 * Set iter_idx to be the slowest-varying non-record (non-unlimited)
+	 * dimension for the variable
+	 */
+	iter_idx = 0;
+	if (has_unlimited_dim) iter_idx++;
+
+	/*
+	 * Let element_size be the product of the fastest-varying dimension
+	 * sizes beyond the iter_idx dimension multiplied by the basic type
+	 * size for this variable.
+	 */
+	element_size = basic_type_size;
+	for (i = iter_idx + 1; i < ndims; i++) {
+		element_size *= mpi_count[i];
+	}
+
+	max_count = ((MPI_Offset)INT_MAX) / element_size;
+	remaining_count = mpi_count[iter_idx];
+
+	/*
+	 * Bound the number of values to be read along the slowest-varying
+	 * non-record dimension to ensure that not more than 2 GiB are read
+	 * in the call to ncmpi_get_vara_all
+	 */
+	mpi_count[iter_idx] = (max_count < remaining_count)
+	                    ? max_count : remaining_count;
+
+	remaining_count -= mpi_count[iter_idx];
+	done = (mpi_count[iter_idx] == 0) ? 1 : 0;
+	global_done = 0;
+	buf_offset = 0;
+
+	/*
+	 * Keep calling ncmpi_get_vara_all on all I/O tasks as long as at least
+	 * one task still has data to be read, reading at most 2 GiB at a time
+	 */
+	while (!global_done) {
+		ierr = ncmpi_get_vara_all(file->ncidp,
+		                          varidp,
+		                          mpi_start, mpi_count,
+		                          &((uint8_t *)buf_p)[buf_offset],
+		                          0, MPI_DATATYPE_NULL);
+
+		/*
+		 * Update start/count values for slowest non-record dimension,
+		 * and determine whether this task still has data to be read
+		 */
+		if (!done) {
+			buf_offset += (size_t)mpi_count[iter_idx] * element_size;
+			mpi_start[iter_idx] += mpi_count[iter_idx];
+			mpi_count[iter_idx] = (max_count < remaining_count)
+			                    ? max_count : remaining_count;
+			remaining_count -= mpi_count[iter_idx];
+
+			done = (mpi_count[iter_idx] == 0) ? 1 : 0;
+		}
+
+		if (ierr != NC_NOERR) {
+			done = -1;
+		}
+
+		/*
+		 * Get done status across all I/O tasks
+		 */
+		MPI_Allreduce(&done, &global_done, 1, MPI_LONG, MPI_MIN,
+		              io_file_comm);
+	};
+
+	return ierr;
+}
+#endif

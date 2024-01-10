@@ -20,7 +20,8 @@
 !wrf physics:
  use module_mp_kessler
  use module_mp_thompson
- use module_mp_wsm6
+ use module_mp_wsm6,only: wsm6
+ use mp_wsm6,only: mp_wsm6_init,refl10cm_wsm6
  use module_mp_nssl_2mom
 
  implicit none
@@ -246,9 +247,9 @@
        if(allocated(graupelncv_p) ) deallocate(graupelncv_p )
 
        !cloud water,cloud ice,and snow effective radii:
-       if(.not.allocated(recloud_p) ) allocate(recloud_p(ims:ime,kms:kme,jms:jme) )
-       if(.not.allocated(reice_p)   ) allocate(reice_p(ims:ime,kms:kme,jms:jme)   )
-       if(.not.allocated(resnow_p)  ) allocate(resnow_p(ims:ime,kms:kme,jms:jme)  )
+       if(allocated(recloud_p) ) deallocate(recloud_p )
+       if(allocated(reice_p)   ) deallocate(reice_p   )
+       if(allocated(resnow_p)  ) deallocate(resnow_p  )
 
     microp2_select: select case(microp_scheme)
 
@@ -317,7 +318,15 @@
 
  logical :: outputon = .false.
 
+!CCPP-compliant flags:
+ character(len=StrKIND):: errmsg
+ integer:: errflg
+
 !-----------------------------------------------------------------------------------------------------------------
+
+!initialization of CCPP-compliant flags:
+ errmsg = ' '
+ errflg = 0
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
  call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
@@ -329,7 +338,8 @@
         call init_thompson_clouddroplets_forMPAS(mesh,sfc_input,diag_physics)
 
      case("mp_wsm6")
-        call wsm6init(rho_a,rho_r,rho_s,cliq,cpv,hail_opt,.false.)
+        call mp_wsm6_init(den0=rho_a,denr=rho_r,dens=rho_s,cl=cliq,cpv=cpv, &
+                          hail_opt=hail_opt,errmsg=errmsg,errflg=errflg)
 
      case("mp_nssl2m")
         IF ( nssl_moments == 'nssl3m' ) THEN
@@ -368,24 +378,14 @@
  character(len=StrKIND),pointer:: nssl_moments
 
 !local variables and arrays:
- logical:: log_microphysics
- integer:: i,icell,icount,istep,j,k,kk
+ integer:: istep
  integer, pointer :: do_diag_dbz
-
-!Calculate dtheta_dt_mp (NS: 2018-04-24)
-!Store theta, call microphysics->updates theta, calculate tendency
- integer, pointer :: nCells, nVertLevels, index_qv
- real(kind=RKIND), dimension(:,:), pointer :: dtheta_dt_mp, theta_m
- real (kind=RKIND), dimension(:,:,:), pointer :: scalars
  logical :: diag_mp
 
- call mpas_pool_get_dimension(mesh, 'nCells', nCells)
- call mpas_pool_get_dimension(mesh, 'nVertLevels', nVertLevels)
- call mpas_pool_get_dimension(state, 'index_qv', index_qv)
+!CCPP-compliant flags:
+ character(len=StrKIND):: errmsg
+ integer:: errflg
 
- call mpas_pool_get_array(state, 'theta_m', theta_m, time_lev)
- call mpas_pool_get_array(diag, 'dtheta_dt_mp', dtheta_dt_mp)
- call mpas_pool_get_array(state, 'scalars', scalars, time_lev)
  call mpas_pool_get_array(diag_physics,'do_diag_dbz',do_diag_dbz)
  if (do_diag_dbz==1) then
    diag_mp = .true.
@@ -393,17 +393,13 @@
    diag_mp= .false.
  endif
 
- !initialize to theta before microphysics call.
- !I think the physics call actually updates variables, not generate a tendency.
- do icell=1,nCells
-    do k=1,nVertLevels
-       dtheta_dt_mp(k,icell) = theta_m(k,icell) / (1._RKIND + rvord * scalars(index_qv,k,icell))
-    end do
- end do
-
 !-----------------------------------------------------------------------------------------------------------------
 !call mpas_log_write('')
 !call mpas_log_write('---enter subroutine driver_microphysics:')
+
+!initialization of CCPP-compliant flags:
+ errmsg = ' '
+ errflg = 0
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
  call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
@@ -464,31 +460,34 @@
        call mpas_timer_stop('Thompson')
 
     case ("mp_wsm6")
-       call mpas_timer_start('WSM6')
+       call mpas_timer_start('mp_wsm6')
        call wsm6( &
-                  th       = th_p        , q          = qv_p         , qc       = qc_p      , &
-                  qr       = qr_p        , qi         = qi_p         , qs       = qs_p      , &
-                  qg       = qg_p        , den        = rho_p        , pii      = pi_p      , &
-                  p        = pres_p      , delz       = dz_p         , delt     = dt_microp , &
-                  g        = gravity     , cpd        = cp           , cpv      = cpv       , &
-                  rd       = R_d         , rv         = R_v          , t0c      = svpt0     , &
-                  ep1      = ep_1        , ep2        = ep_2         , qmin     = epsilon   , &
-                  xls      = xls         , xlv0       = xlv          , xlf0     = xlf       , &
-                  den0     = rho_a       , denr       = rho_w        , cliq     = cliq      , &
-                  cice     = cice        , psat       = psat         , rain     = rainnc_p  , &
-                  rainncv  = rainncv_p   , snow       = snownc_p     , snowncv  = snowncv_p , &
-                  graupel  = graupelnc_p , graupelncv = graupelncv_p , sr       = sr_p      , &
-                  re_cloud = recloud_p   , re_ice     = reice_p      , re_snow  = resnow_p  , &
-                  has_reqc = has_reqc    , has_reqi   = has_reqi     , has_reqs = has_reqs  , &
-                  ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde     , &
-                  ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme     , &
-                  its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte       &
+                  th        = th_p        , q          = qv_p         , qc        = qc_p      , &
+                  qr        = qr_p        , qi         = qi_p         , qs        = qs_p      , &
+                  qg        = qg_p        , den        = rho_p        , pii       = pi_p      , &
+                  p         = pres_p      , delz       = dz_p         , delt      = dt_microp , &
+                  g         = gravity     , cpd        = cp           , cpv       = cpv       , &
+                  rd        = R_d         , rv         = R_v          , t0c       = svpt0     , &
+                  ep1       = ep_1        , ep2        = ep_2         , qmin      = epsilon   , &
+                  xls       = xls         , xlv0       = xlv          , xlf0      = xlf       , &
+                  den0      = rho_a       , denr       = rho_w        , cliq      = cliq      , &
+                  cice      = cice        , psat       = psat         , rain      = rainnc_p  , &
+                  rainncv   = rainncv_p   , snow       = snownc_p     , snowncv   = snowncv_p , &
+                  graupel   = graupelnc_p , graupelncv = graupelncv_p , sr        = sr_p      , &
+                  re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow   = resnow_p  , &
+                  has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs  = has_reqs  , &
+                  re_qc_bg  = re_qc_bg    , re_qi_bg   = re_qi_bg     , re_qs_bg  = re_qs_bg  , &
+                  re_qc_max = re_qc_max   , re_qi_max  = re_qi_max    , re_qs_max = re_qs_max , &
+                  errmsg    = errmsg      , errflg     = errflg                               , &
+                  ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde       , &
+                  ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme       , &
+                  its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte         &
                )
-       call mpas_timer_stop('WSM6')
+       call mpas_timer_stop('mp_wsm6')
 
 
     case ("mp_nssl2m")
-       call mpas_timer_start('NSSL2M')
+       call mpas_timer_start('mp_nssl')
         IF ( nssl_moments == 'nssl3m' ) THEN
           call nssl_2mom_driver( &
                   th        = th_p        , qv         = qv_p         , qc         = qc_p         , &
@@ -537,7 +536,7 @@
                            )
           ENDIF
 
-       call mpas_timer_stop('NSSL2M')
+       call mpas_timer_stop('mp_nssl')
 
     case default
 
@@ -581,14 +580,6 @@
 !... copy updated cloud microphysics variables from the wrf-physics grid back to the geodesic-
 !    dynamics grid:
  call microphysics_to_MPAS(configs,mesh,state,time_lev,diag,diag_physics,tend,itimestep,its,ite)
-
-!Calculate dtheta_dt_mp (NS: 2018-04-24)
-!From stored dtheta_dt_mp, calculate changeInTheta/timeStep
- do icell=1,nCells
-    do k=1,nVertLevels
-       dtheta_dt_mp(k,icell) = (theta_m(k,icell)/(1._RKIND+rvord*scalars(index_qv,k,icell)) - dtheta_dt_mp(k,icell))/(dt_dyn)
-    end do
- end do
 
 !... deallocation of all microphysics arrays:
 !$OMP BARRIER
@@ -854,7 +845,7 @@
              zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,1,j) ! height AGL
           enddo
 
-          call refl10cm_wsm6(qv1d,qr1d,qs1d,qg1d,t1d,p1d,dBZ1d,kts,kte,i,j)
+          call refl10cm_wsm6(qv1d,qr1d,qs1d,qg1d,t1d,p1d,dBZ1d,kts,kte)
 
           kp = 1
           do k = kts,kte

@@ -77,6 +77,7 @@ include 'mpif.h'
    public :: mpas_dmpar_bcast_char
    public :: mpas_dmpar_bcast_chars
    public :: mpas_dmpar_sum_int
+   public :: mpas_dmpar_sum_int8
    public :: mpas_dmpar_sum_real
    public :: mpas_dmpar_min_int
    public :: mpas_dmpar_min_real
@@ -750,6 +751,39 @@ include 'mpif.h'
       end if
 
    end subroutine mpas_dmpar_sum_int!}}}
+
+!-----------------------------------------------------------------------
+!  routine mpas_dmpar_sum_int8
+!
+!> \brief MPAS dmpar sum 8 byte integer routine.
+!> \author Matthew Dimond
+!> \date   11/07/2023
+!> \details
+!>  This routine sums (Allreduce) int(8) values across all processors in a communicator.
+!
+!-----------------------------------------------------------------------
+   subroutine mpas_dmpar_sum_int8(dminfo, i, isum)!{{{
+
+      implicit none
+
+      type (dm_info), intent(in) :: dminfo !< Input: Domain information
+      integer(kind=I8KIND), intent(in) :: i !< Input: Integer value input
+      integer(kind=I8KIND), intent(out) :: isum !< Output: Integer sum for output
+
+      integer :: mpi_ierr
+      integer :: threadNum
+
+      threadNum = mpas_threading_get_thread_num()
+
+      if ( threadNum == 0 ) then
+#ifdef _MPI
+         call MPI_Allreduce(i, isum, 1, MPI_INTEGER8, MPI_SUM, dminfo % comm, mpi_ierr)
+#else
+         isum = i
+#endif
+      end if
+
+   end subroutine mpas_dmpar_sum_int8!}}}
 
 !-----------------------------------------------------------------------
 !  routine mpas_dmpar_sum_real
@@ -8464,7 +8498,12 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      ! workaround for PGI compiler (CPR): ICE on pointers in private clause of omp-do workshare
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
@@ -8529,7 +8568,11 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, j, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
@@ -8597,7 +8640,11 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, j, k, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
@@ -8667,7 +8714,11 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
@@ -8732,7 +8783,11 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, j, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
@@ -8799,7 +8854,11 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, j, k, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
@@ -8869,7 +8928,11 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, j, k, l, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
@@ -8942,7 +9005,11 @@ subroutine mpas_dmpar_get_exch_list(haloLayer, ownedListField, neededListField, 
       commListPtr => exchangeGroup % sendList
       if (.not. associated(commListPtr)) return
       commListSize = commListPtr % commListSize
+#ifdef CPRPGI
+      !$omp do private(listPosition, bufferOffset, nAdded, iExch, iBuffer)
+#else
       !$omp do private(commListPtr, listPosition, bufferOffset, nAdded, fieldCursor, exchListPtr, iExch, j, k, l, m, iBuffer) 
+#endif
       do listItem = 1, commListSize
         commListPtr => exchangeGroup % sendList
         do listPosition = 2, listItem
