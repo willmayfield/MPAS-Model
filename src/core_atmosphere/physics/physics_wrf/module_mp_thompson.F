@@ -4880,7 +4880,7 @@
 !+---+-----------------------------------------------------------------+
 !..Put column of data into local arrays.
 !+---+-----------------------------------------------------------------+
-      do k = kts, kte
+      do k = loopstart, loopend  ! kts,kte
          temp(k) = t1d(k)
          qv(k) = MAX(1.E-10, qv1d(k))
          pres(k) = p1d(k)
@@ -4977,11 +4977,11 @@
 !+---+-----------------------------------------------------------------+
 
       N0_min = gonv_max
-      k_0 = kts
-      do k = kte, kts, -1
+      k_0 = loopstart  !kts
+      do k = loopend, loopstart, -1     ! kte, kts, -1
          if (temp(k).ge.270.65) k_0 = MAX(k_0, k)
       enddo
-      do k = kte, kts, -1
+      do k = loopend, loopstart, -1     ! kte, kts, -1
          if (k.gt.k_0 .and. L_qr(k) .and. mvd_r(k).gt.100.E-6) then
             xslw1 = 4.01 + alog10(mvd_r(k))
          else
@@ -5003,8 +5003,8 @@
 !..Locate K-level of start of melting (k_0 is level above).
 !+---+-----------------------------------------------------------------+
       melti = .false.
-      k_0 = kts
-      do k = kte-1, kts, -1
+      k_0 = loopstart    ! kts
+      do k = loopend-1,loopstart,-1         ! kte-1, kts, -1
          if ( (temp(k).gt.273.15) .and. L_qr(k)                         &
      &                            .and. (L_qs(k+1).or.L_qg(k+1)) ) then
             k_0 = MAX(k+1, k_0)
@@ -5043,7 +5043,7 @@
 !.. Uses code from Uli Blahak (rayleigh_soak_wetgraupel and supporting
 !.. routines).
 !+---+-----------------------------------------------------------------+
-     
+
       if (.not. iiwarm .and. melti .and. k_0.ge.2) then
        do k = k_0loop-1, loopstart, -1 !kts, -1
 

@@ -685,6 +685,7 @@
 			<var name="tday_accum"/>
 			<var name="tyear_mean"/>
 			<var name="tyear_accum"/>
+			<var name="refl10cm"/>
 			<var name="refl10cm_max"/>
 			<var name="i_rainnc"/>
 			<var name="rainncv"/>

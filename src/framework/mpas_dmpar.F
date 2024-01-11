@@ -258,8 +258,8 @@ include 'mpif.h'
          desiredThreadLevel = MPI_THREAD_FUNNELED
          call MPI_Init_thread(desiredThreadLevel, threadLevel, mpi_ierr)
 #else
-!         call MPI_Init(mpi_ierr)
-         call MPI_Init_thread(MPI_THREAD_MULTIPLE, threadLevel, mpi_ierr)
+         call MPI_Init(mpi_ierr)
+!         call MPI_Init_thread(MPI_THREAD_MULTIPLE, threadLevel, mpi_ierr)
 #endif
          call MPI_Comm_dup(MPI_COMM_WORLD, dminfo % comm, mpi_ierr)
       end if
