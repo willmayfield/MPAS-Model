@@ -212,9 +212,9 @@
  lsm_noah_in = .false.
  lsm_ruc_in = .false.
  
- if(config_lsm_scheme=='noah') then
+ if(config_lsm_scheme=='sf_noah') then
    lsm_noah_in = .true.
- elseif(config_lsm_scheme=='ruc') then
+ elseif(config_lsm_scheme=='sf_ruc') then
    lsm_ruc_in = .true.
  endif
 
