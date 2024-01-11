@@ -119,31 +119,6 @@ ftn:   # BUILDTARGET Cray compilers
 	"OPENACC = $(OPENACC)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
-vecna_ifort:
-	( $(MAKE) all \
-	"FC_PARALLEL = mpiifort" \
-	"CC_PARALLEL = mpiicc -diag-disable=10441"  \
-	"CXX_PARALLEL = mpicpc" \
-	"FC_SERIAL = ifort" \
-	"CC_SERIAL = icx" \
-	"CXX_SERIAL = icpc" \
-	"FFLAGS_PROMOTION = -real-size 64" \
-	"FFLAGS_OPT = -O3 -march=core-avx2 -convert big_endian -free -align array64byte" \
-	"CFLAGS_OPT = -O3 -march=core-avx2" \
-	"CXXFLAGS_OPT = -O3" \
-	"LDFLAGS_OPT = -O3" \
-	"FFLAGS_DEBUG = -g -convert big_endian -free -CU -CB -check all -fpe0 -traceback" \
-	"CFLAGS_DEBUG = -g -traceback" \
-	"CXXFLAGS_DEBUG = -g -traceback" \
-	"LDFLAGS_DEBUG = -g -fpe0 -traceback" \
-	"FFLAGS_OMP = -qopenmp" \
-	"CFLAGS_OMP = -qopenmp" \
-	"CORE = $(CORE)" \
-	"DEBUG = $(DEBUG)" \
-	"USE_PAPI = $(USE_PAPI)" \
-	"OPENMP = $(OPENMP)" \
-	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
-
 titan-cray:   # BUILDTARGET (deprecated) Cray compilers with options for ORNL Titan
 	( $(MAKE) all \
 	"FC_PARALLEL = ftn" \
@@ -318,31 +293,6 @@ ifort:   # BUILDTARGET Intel Fortran, C, and C++ compiler suite
 	"CFLAGS_OMP = -qopenmp" \
 	"PICFLAG = -fpic" \
 	"BUILD_TARGET = $(@)" \
-	"CORE = $(CORE)" \
-	"DEBUG = $(DEBUG)" \
-	"USE_PAPI = $(USE_PAPI)" \
-	"OPENMP = $(OPENMP)" \
-	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
-
-jet_ifort:
-	( $(MAKE) all \
-	"FC_PARALLEL = mpiifort" \
-	"CC_PARALLEL = mpiicc" \
-	"CXX_PARALLEL = mpicpc" \
-	"FC_SERIAL = ifort" \
-	"CC_SERIAL = icc" \
-	"CXX_SERIAL = icpc" \
-	"FFLAGS_PROMOTION = -real-size 64" \
-	"FFLAGS_OPT = -O3 -convert big_endian -free -align array64byte" \
-	"CFLAGS_OPT = -O3" \
-	"CXXFLAGS_OPT = -O3" \
-	"LDFLAGS_OPT = -O3" \
-	"FFLAGS_DEBUG = -g -convert big_endian -free -CU -CB -check all -fpe0 -traceback" \
-	"CFLAGS_DEBUG = -g -traceback" \
-	"CXXFLAGS_DEBUG = -g -traceback" \
-	"LDFLAGS_DEBUG = -g -fpe0 -traceback" \
-	"FFLAGS_OMP = -qopenmp" \
-	"CFLAGS_OMP = -qopenmp" \
 	"CORE = $(CORE)" \
 	"DEBUG = $(DEBUG)" \
 	"USE_PAPI = $(USE_PAPI)" \
@@ -753,7 +703,6 @@ endif
 ifneq ($(wildcard $(PIO_LIB)/libgptl\.*), )
 	LIBS += -lgptl
 endif
-endif # $(PIO) neq ""
 
 else # Not using PIO, using SMIOL
 	LIBS += -L$(PWD)/src/external/SMIOL -lsmiolf -lsmiol
@@ -1290,11 +1239,6 @@ IO_MESSAGE = "Using the SMIOL library."
 override CPPFLAGS += "-DMPAS_SMIOL_SUPPORT"
 endif
 
-ifneq "$(PIO)" ""
-	MAIN_DEPS = openmp pio_test
-else
-	MAIN_DEPS = openmp
-endif
 
 mpas_main: $(MAIN_DEPS)
 ifeq "$(AUTOCLEAN)" "true"

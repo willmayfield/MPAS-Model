@@ -158,7 +158,6 @@ int validate_reg_xml(ezxml_t registry)/*{{{*/
 			dimdesc = ezxml_attr(dim_xml, "description");
 			dimdecomp = ezxml_attr(dim_xml, "decomposition");
 			dimcalc = ezxml_attr(dim_xml, "calculation");
-
 			if (dimname == NULL){
 				fprintf(stderr,"ERROR: Name missing for dimension.\n");
 				return 1;

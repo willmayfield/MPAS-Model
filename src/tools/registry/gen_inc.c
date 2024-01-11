@@ -1035,14 +1035,14 @@ int parse_dimensions_from_registry(ezxml_t registry)/*{{{*/
 				// Namelist defined dimension
 				if(strncmp(dimdef, "namelist:", 9) == 0){
 					if(dimcalc != NULL){
-					    snprintf(option_name, 1024, "%s", dimcalc);
+                                            snprintf(option_name, 1024, "%s", dimcalc);
                                             fortprintf(fd, "         %s = %s\n", dimname, option_name);
                                             fortprintf(fd, "call mpas_log_write('       %s = $i ', intArgs=(/%s/))\n", dimname, option_name);
 
-					} else{
-					snprintf(option_name, 1024, "%s", (dimdef)+9);
-					fortprintf(fd, "         %s = %s\n", dimname, option_name);
-					fortprintf(fd, "call mpas_log_write('       %s = $i (%s)', intArgs=(/%s/))\n", dimname, option_name, option_name);
+                                        } else{
+						snprintf(option_name, 1024, "%s", (dimdef)+9);
+						fortprintf(fd, "         %s = %s\n", dimname, option_name);
+						fortprintf(fd, "call mpas_log_write('       %s = $i (%s)', intArgs=(/%s/))\n", dimname, option_name, option_name);
 					}
 				} else {
 					fortprintf(fd, "         %s = %s\n", dimname, dimdef);
@@ -1053,13 +1053,13 @@ int parse_dimensions_from_registry(ezxml_t registry)/*{{{*/
 				fortprintf(fd, "          else if ( %s == MPAS_MISSING_DIM ) then\n", dimname, dimname);
 				// Namelist defined dimension
 				if(strncmp(dimdef, "namelist:", 9) == 0){
-				    if(dimcalc!= NULL){
-				        snprintf(option_name, 1024, "%s", dimcalc);
-                                        fortprintf(fd, "         %s = %s\n", dimname, option_name);
-				    } else{
-					snprintf(option_name, 1024, "%s", (dimdef)+9);
-					fortprintf(fd, "         %s = %s\n", dimname, option_name);
-				    }
+					if(dimcalc!= NULL){
+                                            snprintf(option_name, 1024, "%s", dimcalc);
+                                            fortprintf(fd, "         %s = %s\n", dimname, option_name);
+                                    	} else{
+					    snprintf(option_name, 1024, "%s", (dimdef)+9);
+					    fortprintf(fd, "         %s = %s\n", dimname, option_name);
+					}
 				} else {
 					fortprintf(fd, "         %s = %s\n", dimname, dimdef);
 				}

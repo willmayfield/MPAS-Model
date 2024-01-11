@@ -123,6 +123,7 @@
  character(len=StrKIND), pointer :: config_vegfrac_data
  character(len=StrKIND), pointer :: config_albedo_data
  character(len=StrKIND), pointer :: config_maxsnowalbedo_data
+ character(len=StrKIND), pointer :: config_soilcat_data
  character(len=StrKIND), pointer :: config_lai_data
  character(len=StrKIND+1) :: geog_data_path      ! same as config_geog_data_path, but guaranteed to have a trailing slash
  character(len=StrKIND+1) :: geog_sub_path       ! subdirectory names in config_geog_data_path, with trailing slash
@@ -181,6 +182,8 @@
  real (kind=RKIND), dimension(:,:), pointer :: lai12m
  real (kind=RKIND), dimension(:,:), pointer :: albedo12m
  integer (kind=I8KIND), dimension(:,:), pointer :: albedo12m_int
+ real (kind=RKIND), dimension(:,:), pointer :: lai12m
+ integer (kind=I8KIND), dimension(:,:), pointer :: lai12m_int
  real (kind=RKIND) :: fillval
  real (kind=RKIND), pointer :: missing_value
  integer, dimension(:), pointer :: lu_index
@@ -225,7 +228,7 @@
  call mpas_pool_get_config(configs, 'config_supersample_factor', supersample_fac)
  call mpas_pool_get_config(configs, 'config_lai_data', config_lai_data)
  call mpas_pool_get_config(configs, 'config_30s_supersample_factor', supersample_fac_30s)
-
+ call mpas_pool_get_config(configs, 'config_soilcat_data', config_soilcat_data)
  write(geog_data_path, '(a)') config_geog_data_path
  i = len_trim(geog_data_path)
  if (geog_data_path(i:i) /= '/') then
@@ -277,6 +280,7 @@
  call mpas_pool_get_array(mesh, 'greenfrac', greenfrac)
  call mpas_pool_get_array(mesh, 'lai12m', lai12m)
  call mpas_pool_get_array(mesh, 'albedo12m', albedo12m)
+ call mpas_pool_get_array(mesh, 'lai12m', lai12m)
  call mpas_pool_get_array(mesh, 'shdmin', shdmin)
  call mpas_pool_get_array(mesh, 'shdmax', shdmax)
 
@@ -357,22 +361,10 @@
 !
  surface_input_select0: select case(trim(config_landuse_data))
     case('USGS')
-       isice_lu = 24
-       iswater_lu = 16
-       dx = 0.0083333333
-       !ismax_lu = 24
        write(mminlu,'(a)') 'USGS'
     case('MODIFIED_IGBP_MODIS_NOAH')
-       isice_lu = 15
-       iswater_lu = 17
-       dx = 0.0083333333
-       !ismax_lu = 20
        write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
     case('MODIFIED_IGBP_MODIS_NOAH_15s')
-       isice_lu = 15
-       iswater_lu = 17
-       dx = 0.0083333333 / 2.0
-       !ismax_lu = 20
        write(mminlu,'(a)') 'MODIFIED_IGBP_MODIS_NOAH'
     case default
          call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
@@ -415,27 +407,12 @@
     case('USGS')
        call mpas_log_write('Using 24-class USGS 30-arc-second land cover dataset')
        geog_sub_path = 'landuse_30s/'
-       nx = 1200
-       ny = 1200
-       dx = 0.0083333333
-       jmax = 21600
-       imax = 43200
     case('MODIFIED_IGBP_MODIS_NOAH')
        call mpas_log_write('Using 20-class MODIS 30-arc-second land cover dataset')
        geog_sub_path = 'modis_landuse_20class_30s/'
-       nx = 1200
-       ny = 1200
-       dx = 0.0083333333
-       jmax = 21600
-       imax = 43200
     case('MODIFIED_IGBP_MODIS_NOAH_15s')
        call mpas_log_write('Using 20-class MODIS 15-arc-second land cover dataset')
        geog_sub_path = 'modis_landuse_20class_15s/'
-       nx = 2400
-       ny = 2400
-       dx = 0.0083333333 / 2.0
-       imax = 86400
-       jmax = 43200
     case default
        call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
        call mpas_log_write('Invalid land use dataset '''//trim(config_landuse_data) &
@@ -448,17 +425,29 @@
 
  call mpas_log_write('--- start interpolate LU_INDEX')
  call interp_landuse(mesh, tree, trim(geog_data_path)//trim(geog_sub_path), isice_lu, iswater_lu, &
-                     ismax_lu, supersample_fac=supersample_fac_30s)
+                     supersample_fac=supersample_fac_30s)
  call mpas_log_write('--- end interpolate LU_INDEX')
 
 !
 ! Interpolate SOILCAT_TOP
 !
- geog_sub_path = 'soiltype_top_30s/'
+
+ if (trim(config_soilcat_data) == 'STASGO') then
+   geog_sub_path = 'soiltype_top_30s/'
+ elseif(trim(config_soilcat_data) == 'BNU') then
+   geog_sub_path = 'bnu_soiltype_top/'
+ else
+   call mpas_log_write('*****************************************************************',messageType=MPAS_LOG_ERR)
+   call mpas_log_write('Invalid soil type dataset'''//trim(config_soilcat_data) &
+                    //''' selected for config_soilcat_data',messageType=MPAS_LOG_ERR)
+    call mpas_log_write('   Possible options are: ''STASGO'',''BNU''', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('*****************************************************************',messageType=MPAS_LOG_ERR)
+    call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
+ endif
 
  call mpas_log_write('--- start interpolate SOILCAT_TOP')
  call interp_soilcat(mesh, tree, trim(geog_data_path)//trim(geog_sub_path), iswater_soil, &
-                     nscat, supersample_fac=supersample_fac_30s)
+                     supersample_fac=supersample_fac_30s)
  call mpas_log_write('--- end interpolate SOILCAT_TOP')
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -983,7 +972,6 @@
 
  call mpas_log_write('--- end interpolate GREENFRAC')
 
-
 !
 ! Interpolate ALBEDO12M
 !
@@ -1213,7 +1201,152 @@
  end if
 
  call mpas_log_write('--- end interpolate ALBEDO12M')
+ 
+!
+! Interpolate LAI
+!
+ if (trim(config_lai_data) == 'MODIS') then
 
+    call mpas_log_write('Using MODIS FPAR 30-arc-second data for climatological monthly leaf area index')
+
+    geog_sub_path = 'lai_modis_30s/'
+
+    ierr = mgr % init(trim(config_geog_data_path)//trim(geog_sub_path))
+    if (ierr /= 0) then
+       call mpas_log_write('Error occurred when initalizing the interpolation of monthly leaf area index (lai)', &
+                            messageType=MPAS_LOG_CRIT)
+    endif
+
+    call mpas_pool_get_config(mgr % pool, 'tile_bdr', tile_bdr)
+    call mpas_pool_get_config(mgr % pool, 'tile_x', tile_nx)
+    call mpas_pool_get_config(mgr % pool, 'tile_y', tile_ny)
+    call mpas_pool_get_config(mgr % pool, 'tile_z', tile_nz)
+    call mpas_pool_get_config(mgr % pool, 'missing_value', missing_value)
+
+    allocate(nhs(nCells))
+    allocate(lai12m_int(tile_nz, nCells))
+    nhs(:) = 0
+    lai12m(:,:) = 0.0
+    lai12m_int(:,:) = 0_I8KIND
+    fillval = 0.0
+
+    do iCell = 1, nCells
+        if (nhs(iCell) == 0) then
+            tile => null()
+            ierr = mgr % get_tile(latCell(iCell), lonCell(iCell), tile)
+            if (ierr /= 0 .or. .not. associated(tile)) then
+                call mpas_log_write('Could not get tile that contained cell $i', intArgs=(/iCell/), messageType=MPAS_LOG_CRIT)
+            end if
+
+            ierr = mgr % push_tile(tile)
+            if (ierr /= 0) then
+                call mpas_log_write("Error pushing this tile onto the stack: "//trim(tile % fname), messageType=MPAS_LOG_CRIT)
+            end if
+        end if
+
+        do while (.not. mgr % is_stack_empty())
+            tile => mgr % pop_tile()
+
+            if (tile % is_processed) then
+                cycle
+            end if
+
+            call mpas_log_write('Processing tile: '//trim(tile % fname))
+
+            all_pixels_mapped_to_halo_cells = .true.
+
+            do j = tile_bdr + 1, tile_ny + tile_bdr, 1
+                do i = tile_bdr + 1, tile_nx + tile_bdr, 1
+
+                    call mgr % tile_to_latlon(tile, j, i, lat_pt, lon_pt)
+                    call mpas_latlon_to_xyz(xPixel, yPixel, zPixel, sphere_radius, lat_pt, lon_pt)
+                    call mpas_kd_search(tree, (/xPixel, yPixel, zPixel/), res, max_distance=max_kdtree_distance2)
+
+                    if (.not. associated(res)) cycle
+
+                    !
+                    ! This field only matters for land cells, and for all but the outermost boundary cells,
+                    ! we can safely assume that the nearest model grid cell contains the pixel (else, a different
+                    ! cell would be nearest)
+                    !
+                    if (landMask(res % id) == 1 .and. bdyMaskCell(res % id) < nBdyLayers) then
+                        do k = 1, tile_nz
+                            if (tile % tile(i, j, k) == missing_value) then
+                                i8val = int(fillval, kind=I8KIND)
+                            else
+                                i8val = int(tile % tile(i,j,k), kind=I8KIND)
+                            end if
+                            lai12m_int(k, res % id) = lai12m_int(k, res % id) + i8val
+                        end do
+                        nhs(res % id) = nhs(res % id) + 1
+
+                        if (res % id <= nCellsSolve) then
+                            all_pixels_mapped_to_halo_cells = .false.
+                        end if
+
+                    ! For outermost land cells, additional work is needed to verify that the pixel
+                    ! actually lies within the nearest cell
+                    else if (landMask(res % id) == 1) then
+                        if (mpas_in_cell(xPixel, yPixel, zPixel, xCell(res % id), yCell(res % id), zCell(res % id), &
+                                          nEdgesOnCell(res % id), verticesOnCell(:,res % id), xVertex, yVertex, zVertex)) then
+                            do k = 1, tile_nz
+                                if (tile % tile(i, j, k) == missing_value) then
+                                    i8val = int(fillval, kind=I8KIND)
+                                else
+                                    i8val = int(tile % tile(i,j,k), kind=I8KIND)
+                                end if
+                                lai12m_int(k, res % id) = lai12m_int(k, res % id) + i8val
+                            end do
+                            nhs(res % id) = nhs(res % id) + 1
+
+                            if (res % id <= nCellsSolve) then
+                                all_pixels_mapped_to_halo_cells = .false.
+                            end if
+                        end if
+                    end if
+                end do
+            end do
+
+            tile % is_processed = .true.
+
+            if (.not. all_pixels_mapped_to_halo_cells) then
+                ierr = mgr % push_neighbors(tile)
+                if (ierr /= 0) then
+                    call mpas_log_write("Error pushing the tile neighbors of: "//trim(tile%fname), messageType=MPAS_LOG_CRIT)
+                end if
+            end if
+
+        end do
+    end do
+
+    do iCell = 1, nCells
+        ! For land points that have no overlap with valid data, and for water points,
+        ! just use the fill value...
+        if (nhs(iCell) == 0) then
+            lai12m(:,iCell) = fillval
+        else
+            lai12m(:,iCell) = real(real(lai12m_int(:,iCell), kind=R8KIND) / real(nhs(iCell), kind=R8KIND), kind=RKIND)
+        end if
+    end do
+
+    deallocate(nhs)
+    deallocate(lai12m_int)
+
+    ierr = mgr % finalize()
+    if (ierr /= 0) then
+       call mpas_log_write('Error occurred when finalizing the interpolation of monthly leaf area index (lai)', &
+                            messageType=MPAS_LOG_CRIT)
+    endif
+else
+
+    call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('Invalid monthly leaf area index dataset '''//trim(config_albedo_data) &
+                                  //''' selected for config_lai_data',                    messageType=MPAS_LOG_ERR)
+    call mpas_log_write('   Possible options are: ''MODIS''',                             messageType=MPAS_LOG_ERR)
+    call mpas_log_write('*****************************************************************', messageType=MPAS_LOG_ERR)
+    call mpas_log_write('Please correct the namelist.', messageType=MPAS_LOG_CRIT)
+
+ end if
 !
 ! Interpolate LAI
 !
@@ -1747,7 +1880,7 @@
  !> that isice and iswater are in the dataset's index file.
  !
  !-----------------------------------------------------------------------
- subroutine interp_landuse(mesh, kdtree, geog_data_path, isice_lu, iswater_lu, ismax_lu, supersample_fac)
+ subroutine interp_landuse(mesh, kdtree, geog_data_path, isice_lu, iswater_lu, supersample_fac)
 
      implicit none
 
@@ -1758,7 +1891,6 @@
      integer, intent(out) :: isice_lu
      integer, intent(out) :: iswater_lu
      integer, intent(in), optional :: supersample_fac
-     integer, intent(in) :: ismax_lu
 
      ! Local variables
      type (mpas_geotile_mgr_type) :: mgr
@@ -1767,12 +1899,13 @@
      integer, pointer :: iswater_lu_ptr
 
      real (kind=RKIND), pointer :: scalefactor
-     real (kind=RKIND), pointer :: landusef(:,:,:)
+     real (kind=RKIND), pointer :: landusef(:,:)
 
-     integer :: iCell
+     integer :: iCell, i
      integer :: ierr
      integer :: lu_sum
 
+     real :: lu_sum
      ierr = mgr % init(trim(geog_data_path))
      if (ierr /= 0) then
          call mpas_log_write("Error occured initalizing interpolation for "//trim(geog_data_path), messageType=MPAS_LOG_CRIT)
@@ -1793,23 +1926,22 @@
 
      allocate(ncat(category_min:category_max, nCells))
      ncat(:,:) = 0
-     landusef(:,:,:) = 0.0
+     landusef(:,:) = 0.0
 
      call init_atm_map_static_data(mesh, mgr, kdtree, categorical_interp_criteria, categorical_interp_accumulation, &
                                    supersample_fac=supersample_fac)
 
      do iCell = 1, nCells
-         lu_sum = ncat(1,iCell)
          ! Because maxloc returns the location of the maximum value of an array as if the
          ! starting index of the array is 1, and dataset categories do not necessarily start
          ! at 1, we need to use category_min to ensure the correct category location is chosen.
          lu_index(iCell) = maxloc(ncat(:,iCell), dim=1) - 1 + category_min
-         do i = 2,ismax_lu
-             lu_sum - lu_sum + ncat(i,iCell)
+         lu_sum = ncat(category_min,iCell)
+         do i = category_min+1,category_max
+           lu_sum = lu_sum + ncat(i,iCell)
          enddo
-         landusef(1:ismax_lu,iCell) = real(ncat(1:ismax_lu)) / real(lu_sum)    
-
-     enddo
+         landusef(:,iCell) = real(ncat(:,iCell)) / real(lu_sum)
+     end do
      deallocate(ncat)
 
      ierr = mgr % finalize()
@@ -1841,7 +1973,7 @@
  !> iswater is present in the dataset's index file.
  !>
  !-----------------------------------------------------------------------
- subroutine interp_soilcat(mesh, kdtree, geog_data_path, iswater_soil, nscat, supersample_fac)
+ subroutine interp_soilcat(mesh, kdtree, geog_data_path, iswater_soil, supersample_fac)
 
      implicit none
 
@@ -1850,7 +1982,6 @@
      type (mpas_kd_type), pointer, intent(in) :: kdtree
      character (len=*), intent(in) :: geog_data_path
      integer, intent(out) :: iswater_soil
-     integer, intent(in) :: nscat
      integer, intent(in), optional :: supersample_fac
      
      ! Local variables
@@ -1858,12 +1989,14 @@
      integer, pointer :: nCells
      integer, pointer :: iswater_soil_ptr
 
+     real, pointer :: soilf(:,:)
      real (kind=RKIND), pointer :: scalefactor
-     real (kind=RKIND), pointer :: soilf(:,:,:)
      
-     integer :: iCell
+     integer :: iCell, i
      integer :: ierr
      integer :: scat_sum
+
+     real :: soil_sum
 
      ierr = mgr % init(trim(geog_data_path))
      if (ierr /= 0) then
@@ -1883,21 +2016,21 @@
 
      allocate(ncat(category_min:category_max, nCells))
      ncat(:,:) = 0
-     soilf(:,:,:) = 0.0
+     soilf(:,:) = 0.0
 
      call init_atm_map_static_data(mesh, mgr, kdtree, categorical_interp_criteria, categorical_interp_accumulation, &
                                    supersample_fac=supersample_fac)
 
      do iCell = 1, nCells
-        scat_sum = ncat(1,iCell)
         ! Because maxloc returns the location of the maximum value of an array as if the
         ! starting index of the array is 1, and dataset categories do not necessarily start
         ! at 1, we need to use category_min to ensure the correct category location is chosen.
         soilcat_top(iCell) = maxloc(ncat(:,iCell), dim=1) - 1 + category_min
-        do i = 2,nscat
-            scat_sum = scat_sum + ncat(i,iCell)
-         end do
-         soilf(:,iCell) = real(ncat(:,iCell)) / real(scat_sum)
+        soil_sum = ncat(category_min,iCell)
+        do i = category_min+1,category_max
+          soil_sum = soil_sum + ncat(i,iCell)
+        enddo
+        soilf(:,iCell) = real(ncat(:,iCell)) / real(soil_sum)
      end do
      deallocate(ncat)
 
