@@ -9,7 +9,6 @@
 
 module atm_time_integration
 
-   use mpas_derived_types
    use mpas_pool_routines
    use mpas_kind_types
    use mpas_constants
@@ -3292,6 +3291,7 @@ module atm_time_integration
                                    advCellsForEdge, adv_coefs, adv_coefs_3rd, scalar_old, scalar_new, s_max, s_min, &
                                    wdtn, scale_arr, flux_arr, flux_upwind_tmp, flux_tmp, &
                                    bdyMaskCell, bdyMaskEdge, &
+                                   exchange_halo_group, advance_density, rho_zz_int)
 
       use mpas_atm_dimensions, only : nVertLevels
 
@@ -4228,7 +4228,6 @@ module atm_time_integration
       real (kind=RKIND), intent(in) :: dt
 
       real (kind=RKIND) :: config_mpas_cam_coef
-      integer, intent(in) :: nlevels_cam_damp
 
       logical, intent(in) :: config_rayleigh_damp_u
       real (kind=RKIND), intent(in) :: config_rayleigh_damp_u_timescale_days
@@ -4263,8 +4262,6 @@ module atm_time_integration
       real (kind=RKIND) :: kdiffu, z1, z2, z3, z4, zm, z0, zp, rayleigh_coef_inverse, visc2cam
 
       real (kind=RKIND), dimension( nVertLevels ) :: rayleigh_damp_coef
-
-      real (kind=RKIND), dimension(nlevels_cam_damp) :: visc2cam
 
       real (kind=RKIND) :: flux3, flux4
       real (kind=RKIND) :: q_im2, q_im1, q_i, q_ip1, ua, coef3
@@ -4335,12 +4332,6 @@ module atm_time_integration
                end do
             end do
 
-            do iCell = cellStart, cellEnd
-               do k = (nVertLevels - nlevels_cam_damp + 1), nVertLevels
-                  kk = k - nVertLevels + nlevels_cam_damp
-                  kdiff(k,iCell) = max(kdiff(k,iCell), visc2cam(kk))
-               end do
-            end do
          end if
 
       end if

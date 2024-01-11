@@ -1020,7 +1020,7 @@ subroutine compute_hourly_max_radar_reflectivity(configs,diag_physics,its,ite)
              zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,1,j) ! height AGL
           enddo
 
-          call refl10cm_wsm6(qv1d,qr1d,qs1d,qg1d,t1d,p1d,dBZ1d,17,17,i,j)
+          call refl10cm_wsm6(qv1d,qr1d,qs1d,qg1d,t1d,p1d,dBZ1d,17,17)
 
           !kp = 1
           do k = 17,17

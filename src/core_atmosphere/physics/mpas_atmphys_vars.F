@@ -824,8 +824,7 @@
     acrunoff_p,         &!run total accumulated runoff                                                    [kg m-2]
     snowfallac_p,       &!run total accumulated snowfall taking in to account melting                         [mm] 
     sfcexc_p,           &!Surface exhcange coefficient for heat                                            [m s-1]
-    sfcevp_p,           &!total evaporation                                                               [kg m-2]
-    lakemask_p           !lakemask
+    sfcevp_p             !total evaporation                                                               [kg m-2]
 
  real(kind=RKIND), dimension(:,:,:), allocatable:: &
     smfr3d_p ,          &!fraction of frozen soil moisture                                                     [-]
