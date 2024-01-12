@@ -58,7 +58,7 @@ module mpas_convective_diagnostics
     logical :: is_needed_prec_acc_c
     logical :: is_needed_prec_acc_nc
     logical :: is_needed_snow_acc_nc
-    logical :: do_any_uh, do_any_diags 
+    logical :: do_any_uh, do_any_diags
     integer,pointer :: do_diag_dbz
 
     contains
@@ -211,7 +211,7 @@ module mpas_convective_diagnostics
         do_any_uh = do_any_uh .or. is_needed_updraft_helicity_03_min
         do_any_diags = do_any_diags .or. do_any_uh
 
-        ! - Vertical Velocity 
+        ! - Vertical Velocity
         if (mpas_stream_inclusion_count('w_velocity_max', direction=MPAS_STREAM_OUTPUT) > 0) then
             is_needed_w_max = .true.
         end if
@@ -279,7 +279,7 @@ module mpas_convective_diagnostics
             is_needed_wind02_integral_max = .true.
         end if
         do_any_diags = do_any_diags .or. is_needed_wind02_integral_max
-   
+
     end subroutine convective_diagnostics_setup
 
 
@@ -316,13 +316,17 @@ module mpas_convective_diagnostics
 
         integer :: iCell, k, nVertLevelsP1, i, j, ierr
         integer, pointer :: nCells, nVertLevels, nCellsSolve, nVertexDegree, nVertices
+        integer, dimension(:), pointer :: nEdgesOnCell
+        integer, dimension(:,:), pointer :: edgesOnCell, cellsOnCell
         integer, pointer :: moist_start, moist_end
         integer, dimension(:,:), pointer :: cellsOnVertex
+        integer, dimension(:), pointer :: bdyMaskCell
+        real (kind=RKIND), dimension(:), pointer :: dcEdge, dvEdge
         real (kind=RKIND), dimension(:,:,:), pointer :: scalars
         real (kind=RKIND), dimension(:,:), pointer :: cqu
 
-        real (kind=RKIND), allocatable, dimension(:,:) :: updraft_helicity
-        real (kind=RKIND), allocatable, dimension(:,:) :: updraft_helicity_neg
+        real (kind=RKIND), allocatable, dimension(:,:) :: updraft_helicity, smooth_helicity
+        real (kind=RKIND), allocatable, dimension(:,:) :: updraft_helicity_neg, smooth_helicity_neg
         real (kind=RKIND), allocatable, dimension(:,:) :: wspd
         real (kind=RKIND), allocatable, dimension(:) :: z_agl, pres
         real (kind=RKIND), dimension(:,:), pointer :: kiteAreasOnVertex, vorticity, w, zgrid
@@ -358,21 +362,32 @@ module mpas_convective_diagnostics
         type (MPAS_time_type) :: ref_time
         integer (kind=I8KIND) :: nsteps
         integer :: dt_tmp, diag_tmp
+
+        real (kind=RKIND), parameter :: uh_smooth = 0.25
+
         ! - compute number of time steps between diag interval outputs
         call mpas_set_time(ref_time, dateTimeString='0000-01-01_00:00:00', ierr=ierr)
         call mpas_set_timeInterval(dt_interval, dt=dt)
         diag_interval = mpas_stream_mgr_get_stream_interval(stream_mgr, 'diagnostics', MPAS_STREAM_OUTPUT, ierr)
         call mpas_get_timeInterval(dt_interval, ref_time, S=dt_tmp)
         call mpas_get_timeInterval(diag_interval, ref_time, S=diag_tmp)
-        
+
         call mpas_interval_division(ref_time, diag_interval, dt_interval, nsteps, extra)
-        
+
         if (do_any_diags) then
             call mpas_pool_get_dimension(mesh, 'nCells', nCells)
             call mpas_pool_get_dimension(mesh, 'nVertLevels', nVertLevels)
             call mpas_pool_get_dimension(mesh, 'nCellsSolve', nCellsSolve)
             call mpas_pool_get_dimension(mesh, 'nVertices', nVertices)
             call mpas_pool_get_dimension(mesh, 'vertexDegree', nVertexDegree)
+
+            call mpas_pool_get_array(mesh, 'cellsOnCell', cellsOnCell)
+            call mpas_pool_get_array(mesh, 'dvEdge', dvEdge)
+            call mpas_pool_get_array(mesh, 'dcEdge', dcEdge)
+            call mpas_pool_get_array(mesh, 'nEdgesOnCell', nEdgesOnCell)
+            call mpas_pool_get_array(mesh, 'edgesOnCell', edgesOnCell)
+            call mpas_pool_get_array(mesh, 'bdyMaskCell', bdyMaskCell)
+
             call mpas_pool_get_array(mesh, 'areaCell', areaCell)
             call mpas_pool_get_array(mesh, 'kiteAreasOnVertex', kiteAreasOnVertex)
             call mpas_pool_get_array(mesh, 'cellsOnVertex', cellsOnVertex)
@@ -415,7 +430,7 @@ module mpas_convective_diagnostics
                 call mpas_pool_get_array(diag_physics, 'raincv', raincv)
             endif
             call mpas_pool_get_array(diag_physics, 'snowncv', snowncv)
-            
+
 
             call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
             call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
@@ -444,7 +459,7 @@ module mpas_convective_diagnostics
                   w_velocity_min(iCell) = min( w_velocity_min(iCell), minval(w(1:nVertLevels,iCell)))
                 end do
             end if
- 
+
             if (is_needed_w_mean) then
                 do iCell=1, nCellsSolve
                   pb = 0.8_RKIND * (pressure_base(1,iCell)+pressure_p(1,iCell)-pressure_base(nVertLevels,iCell)-pressure_p(nVertLevels,iCell))
@@ -473,8 +488,8 @@ module mpas_convective_diagnostics
                 enddo
             endif
 
-            if (is_needed_wind02_max) then   
-                allocate(wspd(nVertLevels,nCells))             
+            if (is_needed_wind02_max) then
+                allocate(wspd(nVertLevels,nCells))
                 do iCell=1, nCellsSolve
                   z_agl(1:nVertLevels) = 0.5*(zgrid(1:nVertLevels,iCell)+zgrid(2:nVertlevelsP1,iCell)) - zgrid(1,iCell)
                   if (column_height_value(refl10cm(:,iCell),z_agl(1:nVertLevels),1000.0_RKIND,nVertLevels) > 20.0_RKIND) then
@@ -486,7 +501,7 @@ module mpas_convective_diagnostics
                 enddo
                 deallocate(wspd)
             endif
-        
+
             if (is_needed_wind02_integral_max) then
                 do iCell=1, nCellsSolve
                   z_agl(1:nVertLevels) = 0.5*(zgrid(1:nVertLevels,iCell)+zgrid(2:nVertlevelsP1,iCell)) - zgrid(1,iCell)
@@ -496,7 +511,7 @@ module mpas_convective_diagnostics
                                                      integral_zstaggered(uzonal(:,iCell),z_agl,0.0_RKIND, 2000.0_RKIND, nVertLevels,nVertLevelsP1)**2))
                   endif
                 enddo
-            endif  
+            endif
 
             if (is_needed_ws10m_max) then
                 do iCell=1,nCellsSolve
@@ -543,25 +558,59 @@ module mpas_convective_diagnostics
                 do i=1,nVertices
                   do j=1,nvertexDegree
                     iCell = cellsOnVertex(j,i)
-                    updraft_helicity(1:nVertLevels,iCell) = updraft_helicity(1:nVertLevels,iCell) + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
-                    updraft_helicity_neg(1:nVertLevels,iCell) = updraft_helicity_neg(1:nVertLevels,iCell) + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
+                    updraft_helicity(1:nVertLevels,iCell) = updraft_helicity(1:nVertLevels,iCell)
+		                                          + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
+                    updraft_helicity_neg(1:nVertLevels,iCell) = updraft_helicity_neg(1:nVertLevels,iCell)
+		                                              + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
                   end do
                 end do
                 call mpas_log_write('Min, max uh_neg 1 = $r, $r',realArgs=(/minval(updraft_helicity_neg),maxval(updraft_helicity_neg)/))
-                do iCell=1,nCellsSolve
+                do iCell=1,nCells
                   do k=1,nVertLevels
-                    updraft_helicity(k,iCell) =  max(0.,0.5*(w(k,iCell)+w(k+1,iCell)))  &                  
-                                                           * max(0.,updraft_helicity(k,iCell)/areaCell(iCell))                     
+                    updraft_helicity(k,iCell) =  max(0.,0.5*(w(k,iCell)+w(k+1,iCell)))  &
+                                                           * max(0.,updraft_helicity(k,iCell)/areaCell(iCell))
                     updraft_helicity_neg(k,iCell) = min(0.,0.5*(w(k,iCell)+w(k+1,iCell))  &
                                                            * updraft_helicity_neg(k,iCell)/areaCell(iCell))
                   end do
                 end do
-                call mpas_log_write('Min, max uh_neg 2 = $r, $r',realArgs=(/minval(updraft_helicity_neg),maxval(updraft_helicity_neg)/))
+!
+!  2nd order smoothing of updraft helicity - code adapted from terrain smoothing algorithm in mpas_init_cases.F
+!
+                allocate(smooth_helicity(nVertLevels,nCells+1))
+                allocate(smooth_helicity_neg(nVertLevels,nCells+1))
+
+                smooth_helicity(:,:) = 0.
+                smooth_helicity_neg(:,:) = 0.
+
+                do iCell=1,nCellsSolve
+                    if (bdyMaskCell(iCell) == 0)  then ! do smoothing only on the internal mesh
+                        do j = 1,nEdgesOnCell(iCell)
+                           do k=1,nVertLevels
+                             smooth_helicity(k,iCell) = smooth_helicity(k,iCell) &
+                                  + dvEdge(edgesOnCell(j,iCell)) / dcEdge(edgesOnCell(j,iCell))    &
+                                  * (updraft_helicity(k,cellsOnCell(j,iCell))-updraft_helicity(k,iCell))
+                             smooth_helicity_neg(k,iCell) = smooth_helicity_neg(k,iCell) &
+                                  + dvEdge(edgesOnCell(j,iCell)) / dcEdge(edgesOnCell(j,iCell))    &
+                                  * (updraft_helicity_neg(k,cellsOnCell(j,iCell))-updraft_helicity_neg(k,iCell))
+                           end do
+                        end do
+                    end if
+                end do
+
+                do k=1,nVertLevels
+                  updraft_helicity(k,1:nCellsSolve) = updraft_helicity(k,1:nCellsSolve) &
+                                                    + uh_smooth*smooth_helicity(k,1:nCellsSolve)
+                  updraft_helicity_neg(k,1:nCellsSolve) = updraft_helicity_neg(k,1:nCellsSolve) &
+                                                    + uh_smooth*smooth_helicity_neg(k,1:nCellsSolve)
+                enddo
+
+                deallocate(smooth_helicity)
+                deallocate(smooth_helicity_neg)
 !
 !  compute diagnostics
 !
                 do iCell=1,nCellsSolve
-    
+
                   ! compute above ground level (AGL) heights
                   z_agl(1:nVertLevelsP1) = zgrid(1:nVertLevelsP1,iCell) - zgrid(1,iCell)
                   if (is_needed_updraft_helicity) then
@@ -620,15 +669,15 @@ module mpas_convective_diagnostics
                     uph = integral_zstaggered(updraft_helicity_neg(1:nVertLevels,iCell),z_agl,0.0_RKIND,3000.0_RKIND,nVertLevels,nVertLevelsP1)
                     updraft_helicity_min_03(iCell) = min(updraft_helicity_min_03(iCell),uph)
                   endif
-        
+
                 end do
                 call mpas_log_write('Min, max uh_min = $r, $r',realArgs=(/minval(updraft_helicity_min),maxval(updraft_helicity_min)/))
                 deallocate(updraft_helicity, updraft_helicity_neg)
             end if
-    
+
             deallocate(z_agl,pres)
         end if
-   
+
     end subroutine convective_diagnostics_update
 
 
@@ -685,7 +734,7 @@ module mpas_convective_diagnostics
         real (kind=RKIND), dimension(:), pointer :: temperature_surface
         real (kind=RKIND), dimension(:), pointer :: dewpoint_surface
 
-        ! Other fields used in the computation of convective diagnostics 
+        ! Other fields used in the computation of convective diagnostics
         ! defined above
         real (kind=RKIND), dimension(:,:), pointer :: height
         real (kind=RKIND), dimension(:,:), pointer :: uzonal
@@ -854,7 +903,7 @@ module mpas_convective_diagnostics
                    !  calculate horizontal vorticity
 
                    do k=2, nVertLevels-1
-                       dudz(k) = (uzonal(k,iCell)     -uzonal(k-1,iCell)     )/(0.5*(height(k+1,iCell)-height(k-1,iCell)))      
+                       dudz(k) = (uzonal(k,iCell)     -uzonal(k-1,iCell)     )/(0.5*(height(k+1,iCell)-height(k-1,iCell)))
                        dvdz(k) = (umeridional(k,iCell)-umeridional(k-1,iCell))/(0.5*(height(k+1,iCell)-height(k-1,iCell)))
                    end do
                    dudz(1) = dudz(2)
@@ -893,8 +942,8 @@ module mpas_convective_diagnostics
 
                  !   do k=1,nVertLevels
                  !     relhum(k,iCell) = max(1.e-08,min(1.,relhum(k,iCell)))
-                 !     td_in(k) = 243.04*(log(relhum(k,iCell))+((17.625*t_in(k))/(243.04+t_in(k)))) & 
-                 !                      /(17.625-log(relhum(k,iCell))-((17.625*t_in(k))/(243.04+t_in(k)))) 
+                 !     td_in(k) = 243.04*(log(relhum(k,iCell))+((17.625*t_in(k))/(243.04+t_in(k)))) &
+                 !                      /(17.625-log(relhum(k,iCell))-((17.625*t_in(k))/(243.04+t_in(k))))
                  !   end do
 
                     call getcape( nVertLevels, p_in, t_in, td_in, cape_out, cin_out )
@@ -925,8 +974,8 @@ module mpas_convective_diagnostics
     !  routine convective_diagnostics_reset
     !
     !> \brief Reset maximum values for convective diagnostics
-    !> \author 
-    !> \date   
+    !> \author
+    !> \date
     !> \details
     !>  Resets the maximum pointwise values for updraft helicity, w velocity,
     !>  and lowest-model-level wind speed.
@@ -1086,7 +1135,7 @@ module mpas_convective_diagnostics
         if(z(k) <= z_interp) kz = k
       end do
       kz = min(kz,n-1)
-      
+
       wz = (z(kz+1)-z_interp)/(z(kz+1)-z(kz))
       wzp1 = 1. - wz
       column_height_value = wz*column_values(kz) + wzp1*column_values(kz+1)
@@ -1109,7 +1158,7 @@ module mpas_convective_diagnostics
       kzb = min(kzb,n-1)
       kzt = min(kzt,n-1)
 
-      if (kzt <= kzb) call mpas_log_write('col_depth_max: top height not above bottom height', messageType=MPAS_LOG_ERR) 
+      if (kzt <= kzb) call mpas_log_write('col_depth_max: top height not above bottom height', messageType=MPAS_LOG_ERR)
 
       col_depth_max = maxval(column_values(kzb:kzt))
 
@@ -1180,8 +1229,8 @@ module mpas_convective_diagnostics
           nlevs = nlevs + 1
         endif
       enddo
-      mean_pressure = mean_pressure / real(nlevs) 
- 
+      mean_pressure = mean_pressure / real(nlevs)
+
       end function mean_pressure
 
 !-----------------------------------------------------------------------
@@ -1232,7 +1281,7 @@ module mpas_convective_diagnostics
 
     real (kind=RKIND), parameter :: pinc = 100.0   ! Pressure increment (Pa)
                                       ! (smaller number yields more accurate
-                                      !  results,larger number makes code 
+                                      !  results,larger number makes code
                                       !  go faster)
 
     integer, parameter :: source = 2    ! Source parcel:
@@ -1240,7 +1289,7 @@ module mpas_convective_diagnostics
                                         ! 2 = most unstable (max theta-e)
                                         ! 3 = mixed-layer (specify ml_depth)
 
-    real (kind=RKIND), parameter :: ml_depth =  200.0  ! depth (m) of mixed layer 
+    real (kind=RKIND), parameter :: ml_depth =  200.0  ! depth (m) of mixed layer
                                           ! for source=3
 
     integer, parameter :: adiabat = 1   ! Formulation of moist adiabat:
