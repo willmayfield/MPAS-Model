@@ -817,6 +817,7 @@
     rhosnf_p,           &!density of snowfall                                                             [kg m-3]
     precipfr_p,         &!water equivalent of frozen precipitation                                            [mm]
     qsg_p,              &!saturated mixing ratio at the surface                                          [kg kg-1]
+    cqs_p,              &!cqs at the first model layer used in 2-m diagnostics 
     qvg_p,              &!water vapor mixing ratio at the surface                                        [kg kg-1]
     dew_p,              &!dew                                                                             [kg m-2]
     soilt1_p,           &!snow temperature at 7.5cm depth                                                      [K]

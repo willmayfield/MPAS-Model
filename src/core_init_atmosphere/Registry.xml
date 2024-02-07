@@ -538,8 +538,6 @@
 			<var name="landusef"/>
 			<var name="soilf"/>
                         <var name="isltyp"/>
-                        <var name="landusef"/>
-                        <var name="soilf"/>
                         <var name="snoalb"/>
                         <var name="soiltemp"/>
                         <var name="greenfrac"/>

@@ -294,7 +294,7 @@
     
  elseif(.not. (config_lsm_scheme .eq. 'off ' .or. &
                config_lsm_scheme .eq. 'sf_noah' .or. &
-               config_lsm_scheme .eq. 'ruc')) then
+               config_lsm_scheme .eq. 'sf_ruc')) then
  
     write(mpas_err_message,'(A,A10)') 'illegal value for land surface scheme: ', &
           trim(config_lsm_scheme)
@@ -374,7 +374,7 @@
              dzs(4,iCell) = 1.00_RKIND
           enddo
 
-       case("ruc")
+       case("sf_ruc")
          do iCell = 1,nCells
              dzs(1,iCell) = 0.005_RKIND
              dzs(2,iCell) = 0.025_RKIND

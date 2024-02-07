@@ -138,7 +138,7 @@
  integer :: imax,jmax
  integer:: iCell,iEdge,iVtx,iPoint,iTileStart,iTileEnd,jTileStart,jTileEnd
  integer,dimension(5) :: interp_list
- integer,dimension(:),allocatable  :: nhs
+ !integer,dimension(:),allocatable  :: nhs
       
  real(kind=RKIND), pointer :: scalefactor_ptr
  real(kind=RKIND) :: scalefactor
@@ -186,7 +186,6 @@
  real (kind=RKIND) :: fillval
  real (kind=RKIND), pointer :: missing_value
  integer, dimension(:), pointer :: lu_index
- real, dimension(:,:), pointer  :: landusef
  integer, dimension(:), pointer :: soilcat_top
  real, dimension(:,:), pointer  :: soilf 
  integer, dimension(:), pointer :: landmask
@@ -268,7 +267,6 @@
  call mpas_pool_get_array(mesh, 'verticesOnCell', verticesOnCell)
 
  call mpas_pool_get_array(mesh, 'lu_index', lu_index)
- call mpas_pool_get_array(mesh, 'landusef', landusef)
  call mpas_pool_get_array(mesh, 'mminlu', mminlu)
  call mpas_pool_get_array(mesh, 'isice_lu', isice_lu)
  call mpas_pool_get_array(mesh, 'iswater_lu', iswater_lu)
@@ -1645,8 +1643,7 @@ else
 
     integer :: iCell
     integer :: ierr
-
-    ierr = mgr % init(trim(geog_data_path))
+    integer :: nans_1, nans_2, nans_3
     if (ierr /= 0) then
         call mpas_log_write("Error occurred initializing interpolation for "//trim(geog_data_path), messageType=MPAS_LOG_CRIT)
         return ! Program execution should not reach this statement since the preceding message is a critical error
@@ -1676,7 +1673,6 @@ else
        ter(iCell) = real(real(ter_integer(iCell), kind=R8KIND) / real(nhs(iCell), kind=R8KIND), kind=RKIND)
        ter(iCell) = ter(iCell) * scalefactor
     end do
-
     deallocate(ter_integer)
     deallocate(nhs)
 
@@ -1765,7 +1761,7 @@ else
  !-----------------------------------------------------------------------
  subroutine interp_landuse(mesh, kdtree, geog_data_path, isice_lu, iswater_lu, supersample_fac)
 
-     implicit none
+     implicit none  
 
      ! Input variables
      type (mpas_pool_type), intent(inout) :: mesh
@@ -1809,10 +1805,9 @@ else
      allocate(ncat(category_min:category_max, nCells))
      ncat(:,:) = 0
      landusef(:,:) = 0.0
-
+     
      call init_atm_map_static_data(mesh, mgr, kdtree, categorical_interp_criteria, categorical_interp_accumulation, &
                                    supersample_fac=supersample_fac)
-
      do iCell = 1, nCells
          ! Because maxloc returns the location of the maximum value of an array as if the
          ! starting index of the array is 1, and dataset categories do not necessarily start

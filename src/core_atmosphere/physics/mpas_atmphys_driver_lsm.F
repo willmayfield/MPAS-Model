@@ -22,7 +22,7 @@
  use module_sf_noah_seaice_drv
  use module_sf_ruclsm
  use module_sf_sfcdiags
- 
+ use module_sf_sfcdiags_ruclsm 
  implicit none
  private
  public:: init_lsm,       &
@@ -201,7 +201,7 @@
     if(.not.allocated(snowsi_p)  ) allocate(snowsi_p(ims:ime,jms:jme)  )
  endif
 
- if(config_lsm_scheme=='ruc') then
+ if(config_lsm_scheme=='sf_ruc') then
     if(.not.allocated(rhosnf_p)   )  allocate(rhosnf_p(ims:ime,jms:jme)    )
     if(.not.allocated(precipfr_p) )  allocate(precipfr_p(ims:ime,jms:jme)  )
     if(.not.allocated(qcg_p)      )  allocate(qcg_p(ims:ime,jms:jme)       )
@@ -225,6 +225,7 @@
     if(.not.allocated(landusef_p) )  allocate(landusef_p(ims:ime,1:num_landcat,jms:jme)   )
     if(.not.allocated(soilf_p)    )  allocate(soilf_p(ims:ime,1:num_soilcat,jms:jme)      )
     if(.not.allocated(keepfr3d_p) )  allocate(keepfr3d_p(ims:ime,1:num_soils,jms:jme)     )
+    if(.not.allocated(cqs_p)      )  allocate(cqs_p(ims:ime,jms:jme)       )
  endif
 
  end subroutine allocate_lsm
@@ -326,7 +327,7 @@
     if(allocated(snowsi_p)  ) deallocate(snowsi_p  )
  endif
 
- if (config_lsm_scheme == "ruc") then
+ if (config_lsm_scheme == "sf_ruc") then
     if(allocated(rhosnf_p)    ) deallocate(rhosnf_p    )
     if(allocated(precipfr_p)  ) deallocate(precipfr_p  )
     if(allocated(qsg_p)       ) deallocate(qsg_p       )
@@ -350,6 +351,7 @@
     if(allocated(soilf_p)     ) deallocate(soilf_p     )
     if(allocated(smfr3d_p)    ) deallocate(smfr3d_p    )
     if(allocated(keepfr3d_p)  ) deallocate(keepfr3d_p  )
+    if(allocated(cqs_p)       ) deallocate(cqs_p       )
  endif
 
  end subroutine deallocate_lsm
@@ -437,7 +439,7 @@
  call mpas_pool_get_array(diag_physics,'t2m'              ,t2m              )
  call mpas_pool_get_array(diag_physics,'th2m'             ,th2m             )
  call mpas_pool_get_array(diag_physics,'q2'               ,q2               )
- if (config_lsm_scheme .eq. "ruc") then
+ if (config_lsm_scheme .eq. "sf_ruc") then
    call mpas_pool_get_array(diag_physics,'rhosnf'         ,rhosnf           )
    call mpas_pool_get_array(diag_physics,'precipfr'       ,precipfr         )
    call mpas_pool_get_array(diag_physics,'qsg'            ,qsg              )
@@ -482,7 +484,7 @@
  call mpas_pool_get_array(sfc_input,'smcrel'    ,smcrel    )
  call mpas_pool_get_array(sfc_input,'smois'     ,smois     )
  call mpas_pool_get_array(sfc_input,'tslb'      ,tslb      )
- if(config_lsm_scheme .eq. "ruc") then
+ if(config_lsm_scheme .eq. "sf_ruc") then
    call mpas_pool_get_array(sfc_input,'landusef'       ,landusef         )
    call mpas_pool_get_array(sfc_input,'soilf'          ,soilf            )
  endif
@@ -500,7 +502,7 @@
     smcrel_p(i,n,j) = smcrel(n,i)
     smois_p(i,n,j)  = smois(n,i)
     tslb_p(i,n,j)   = tslb(n,i)
-    if(config_lsm_scheme .eq. "ruc") then
+    if(config_lsm_scheme .eq. "sf_ruc") then
         smfr3d_p(i,n,j) = smfr3d(n,i)
         keepfr3d_p(i,n,j) = keepfr3d(n,i)
     endif
@@ -508,7 +510,7 @@
  enddo
  enddo
 
- if (config_lsm_scheme .eq. "ruc") then
+ if (config_lsm_scheme .eq. "sf_ruc") then
      do j = jts,jte
      do n = 1,num_landcat
      do i = its,ite
@@ -593,7 +595,7 @@
     ust_urb_p(i,j)    = 0._RKIND
     utype_urb_p(i,j)  = 0
 
-    if (config_lsm_scheme == 'ruc') then
+    if (config_lsm_scheme == 'sf_ruc') then
         rhosnf_p(i,j) = rhosnf(i)
         precipfr_p(i,j) = precipfr(i)
         qsg_p(i,j) = qsg(i)
@@ -613,6 +615,7 @@
         sfcevp_p(i,j) = sfcevp(i)
         lakemask_p(i,j) = 0
         mavail_p(i,j) = mavail(i)
+        cqs_p(i,j) = flqc(i) / (mavail(i) * rho_p(i,kts,j))
     endif
  enddo
  enddo
@@ -770,7 +773,7 @@
  call mpas_pool_get_array(diag_physics,'t2m'       ,t2m       )
  call mpas_pool_get_array(diag_physics,'th2m'      ,th2m      )
  call mpas_pool_get_array(diag_physics,'q2'        ,q2        )
- if (config_lsm_scheme .eq. "ruc") then
+ if (config_lsm_scheme .eq. "sf_ruc") then
    call mpas_pool_get_array(diag_physics,'rhosnf'         ,rhosnf     )
    call mpas_pool_get_array(diag_physics,'precipfr'       ,precipfr   )
    call mpas_pool_get_array(diag_physics,'qsg'            ,qsg        )
@@ -820,7 +823,7 @@
     smcrel(n,i) = smcrel_p(i,n,j)
     smois(n,i)  = smois_p(i,n,j)
     tslb(n,i)   = tslb_p(i,n,j)
-    if(config_lsm_scheme == 'ruc') then
+    if(config_lsm_scheme == 'sf_ruc') then
         smfr3d(n,i) = smfr3d_p(i,n,j)
         keepfr3d(n,i) = keepfr3d_p(i,n,j)
     endif
@@ -876,7 +879,7 @@
     xice(i)       = xice_p(i,j)
     xland(i)      = xland_p(i,j)
 
-    if(config_lsm_scheme .eq. "ruc") then
+    if(config_lsm_scheme .eq. "sf_ruc") then
         rhosnf(i) = rhosnf_p(i,j)
         precipfr(i) = precipfr_p(i,j)
         qsg(i) = qsg_p(i,j)
@@ -958,7 +961,7 @@
 
     case ("sf_noah")
        call noah_init_forMPAS(dminfo,mesh,configs,diag_physics,sfc_input)
-    case ("ruc") 
+    case ("sf_ruc") 
        call ruc_init_forMPAS(dminfo,mesh,configs,diag_physics,sfc_input)
     case default
  
@@ -1104,7 +1107,7 @@
                     )
        call mpas_timer_stop('sf_noah')
        
-    case("ruc")
+    case("sf_ruc")
        call mpas_timer_start('sf_ruc')
        myjpbl = pbl_scheme(1:3)=="myj"
 
@@ -1142,7 +1145,16 @@
                     ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde ,  &
                     ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme ,  &
                     its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte    &
-                          ) 
+                          )
+       call sfcdiags_ruclsm( &
+                hfx     = hfx_p  , qfx     = qfx_p   , tsk  = tsk_p       , qsfc = qsfc_p , chs = chs_p , &
+                chs2    = chs2_p , cqs2    = cqs2_p  , t2   = t2m_p       , th2  = th2m_p , q2  = q2_p  , &
+                psfc2d  = psfc_p , t3d     = t_p     , qv3d = qv_p        , cp   = cp     , R_d = R_d   , &
+                rovcp   = rcp    , rho3d   = rho_p   , p3d  = pres2_hyd_p , snow = snow_p , cqs = cqs_p,  &
+                ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde ,                   &
+                ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme ,                   &
+                its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte                     &
+                    ) 
         call mpas_timer_stop('sf_ruc')
     case default
 
