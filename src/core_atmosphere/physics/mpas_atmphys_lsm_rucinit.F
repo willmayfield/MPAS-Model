@@ -253,10 +253,12 @@ endif
 
 !local variables:
  character*128:: mess , message
+ character*256 :: a_string
 
  integer,parameter:: open_ok = 0
  integer:: lumatch,iindex,lc,num_slope
- integer:: istat
+ integer:: istat,loop_count
+ integer,parameter:: loop_max = 10
 
 !-----SPECIFY VEGETATION RELATED CHARACTERISTICS :
 !ALBBCK: SFC albedo (in percentage)
@@ -292,9 +294,10 @@ call mpas_log_write('       enter subroutine soil_veg_gen_parm:')
        call physics_error_fatal('subroutine RUCLSM_SOILVEGPARM: ' // &
                                 'failure opening VEGPARM.TBL')
 
-    lumatch=0
+    lumatch = 0
+    loop_count = 0
+    read(16,*,end=2002) a_string
     find_lutype : do while (lumatch == 0)
-       read(16,*,end=2002)
        read(16,*,end=2002) lutype
        read(16,*) lucats,iindex
 
@@ -303,16 +306,26 @@ call mpas_log_write('       enter subroutine soil_veg_gen_parm:')
                         lucats, ' categories'
           call physics_message(mess)
           lumatch=1
-       elseif(trim(lutype) .eq. 'USGS-RUC' .or. lutype .eq. 'MODI-RUC') then
-         call physics_message('    skipping over lutype = ' // trim ( lutype ))
-          do lc = 1, lucats+16
-             read(16,*)
-          enddo
+      ! elseif(trim(lutype) .eq. 'USGS-RUC' .or. lutype .eq. 'MODI-RUC') then
+      !   call physics_message('    skipping over lutype = ' // trim ( lutype ))
+      !    do lc = 1, lucats+16
+      !       read(16,*)
+      !    enddo
        else
-          call physics_message('    skipping over lutype = ' // trim ( lutype ))
-          do lc = 1, lucats+20
-             read(16,*)
-          enddo
+      !    call physics_message('    skipping over lutype = ' // trim ( lutype ))
+      !    do lc = 1, lucats+20
+      !       read(16,*)
+      !    enddo
+         loop_count = loop_count+1
+         call physics_message ( "Skipping over LUTYPE = " // TRIM ( LUTYPE ) )
+         FIND_VEGETATION_PARAMETER_FLAG : DO
+            READ (16,FMT='(A)', END=2002) a_string
+            IF ( a_string(1:21) .EQ. 'Vegetation Parameters' ) THEN
+               EXIT FIND_VEGETATION_PARAMETER_FLAG
+            ELSE IF ( loop_count .GE. loop_max ) THEN
+               CALL physics_error_fatal ( 'Too many loops in VEGPARM.TBL')
+            ENDIF
+         ENDDO FIND_VEGETATION_PARAMETER_FLAG 
        endif
     enddo find_lutype
 
