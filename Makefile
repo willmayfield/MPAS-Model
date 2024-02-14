@@ -122,7 +122,7 @@ ftn:   # BUILDTARGET Cray compilers
 vecna_ifort:
 	( $(MAKE) all \
 	"FC_PARALLEL = mpif90" \
-	"CC_PARALLEL = mpicc -cc=icx -diag-disable=10441"  \
+	"CC_PARALLEL = mpicc -diag-disable=10441"  \
 	"CXX_PARALLEL = mpiicpc" \
 	"FC_SERIAL = ifort" \
 	"CC_SERIAL = icx" \

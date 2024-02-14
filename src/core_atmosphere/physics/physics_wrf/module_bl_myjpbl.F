@@ -11,7 +11,7 @@
 
       implicit none
       private
-      public:: myjpbl 
+      public:: myjpbl
 #else
       USE MODULE_MODEL_CONSTANTS
 #endif
@@ -44,7 +44,7 @@
       REAL,PARAMETER :: EPSL=0.32,EPSRU=1.E-7,EPSRS=1.E-7               &
      &                 ,EPSTRB=1.E-24
       REAL,PARAMETER :: EPSA=1.E-8,EPSIT=1.E-4,EPSU2=1.E-4,EPSUST=0.07  &
-     &                 ,FH=1.01 
+     &                 ,FH=1.01
       REAL,PARAMETER :: ALPH=0.30,BETA=1./273.,EL0MAX=1000.,EL0MIN=1.   &
      &                 ,ELFC=0.23*0.5,GAM1=0.2222222222222222222        &
      &                 ,PRT=1.
@@ -69,16 +69,16 @@
      &                 ,RB1=1./B1,RTVISC=1./TVISC,RVISC=1./VISC         &
      &                 ,ZQRZT=SQSC/SQPR
 !
-      REAL,PARAMETER :: ADNH= 9.*A1*A2x*A2x*(12.*A1+3.*B2)*BTG*BTG      &                  
-     &                 ,ADNM=18.*A1*A1*A2x*(B2-3.*A2x)*BTG              & 
+      REAL,PARAMETER :: ADNH= 9.*A1*A2x*A2x*(12.*A1+3.*B2)*BTG*BTG      &
+     &                 ,ADNM=18.*A1*A1*A2x*(B2-3.*A2x)*BTG              &
      &                 ,ANMH=-9.*A1*A2x*A2x*BTG*BTG                     &
      &                 ,ANMM=-3.*A1*A2x*(3.*A2x+3.*B2*C1+18.*A1*C1-B2)  &
-     &                                *BTG                              &   
+     &                                *BTG                              &
      &                 ,BDNH= 3.*A2x*(7.*A1+B2)*BTG                     &
      &                 ,BDNM= 6.*A1*A1                                  &
      &                 ,BEQH= A2x*B1*BTG+3.*A2x*(7.*A1+B2)*BTG          &
      &                 ,BEQM=-A1*B1*(1.-3.*C1)+6.*A1*A1                 &
-     &                 ,BNMH=-A2x*BTG                                   &     
+     &                 ,BNMH=-A2x*BTG                                   &
      &                 ,BNMM=A1*(1.-3.*C1)                              &
      &                 ,BSHH=9.*A1*A2x*A2x*BTG                          &
      &                 ,BSHM=18.*A1*A1*A2x*C1                           &
@@ -120,7 +120,7 @@
 !-----------------------------------------------------------------------
 !***  NEAR ISOTROPY FOR SHEAR TURBULENCE, WW/Q2 LOWER LIMIT
 !-----------------------------------------------------------------------
-! 
+!
       REAL,PARAMETER :: UBRYL=(18.*REQU*A1*A1*A2x*B2*C1*BTG             &
      &                         +9.*A1*A2x*A2x*B2*BTG*BTG)               &
      &                        /(REQU*ADNM+ADNH)                         &
@@ -183,7 +183,7 @@
 !
       REAL, INTENT(OUT), DIMENSION(IMS:IME,KMS:KME,JMS:JME) ::         &   !BSF
      &                                         EL_MYJ,RTHBLTEN         &   !BSF
-     &                                        ,RUBLTEN,RVBLTEN        
+     &                                        ,RUBLTEN,RVBLTEN
 !
       REAL,OPTIONAL,INTENT(OUT),DIMENSION(IMS:IME,KMS:KME,JMS:JME)::   &   !BSF
      &                                             RQCBLTEN,RQVBLTEN   &   !BSF
@@ -439,8 +439,8 @@
      &               ,IMS,IME,JMS,JME,KMS,KME                          &
      &               ,ITS,ITE,JTS,JTE,KTS,KTE,PRINT_DIAG)   ! debug
 !
-!***  COUNTING DOWNWARD FROM THE TOP, THE EXCHANGE COEFFICIENTS AKH 
-!***  ARE DEFINED ON THE BOTTOMS OF THE LAYERS KTS TO KTE-1.  
+!***  COUNTING DOWNWARD FROM THE TOP, THE EXCHANGE COEFFICIENTS AKH
+!***  ARE DEFINED ON THE BOTTOMS OF THE LAYERS KTS TO KTE-1.
 !***  COUNTING UPWARD FROM THE BOTTOM, THOSE SAME COEFFICIENTS AS
 !***  EXCH_H ARE DEFINED ON THE BOTTOMS OF THE LAYERS KTS TO KTE-1
 !***  THUS EXCH_H INDICES INCREASE UPWARD WITH K=KTS AT THE GROUND.
@@ -556,7 +556,7 @@
 !
           IF(SEAMASK<0.5)THEN
             QFC1=XLV*CHKLOWQ(I,J)*AKHS_DENS
-!           
+!
 !            IF(SNOW(I,J)>0.) THEN
 !                print*, "snow > 0 at ",SNOW(I,J), I,J
 !            ENDIF
@@ -876,7 +876,7 @@
         RDZ=2./(Z(K)-Z(K+2))
         GML=((U(K)-U(K+1))**2+(V(K)-V(K+1))**2)*RDZ*RDZ
         GM(K)=MAX(GML,EPSGM)
-        !if(GML<EPSGM) print*, "GML,EPSGM,GM(K)", GML, EPSGM, GM(K) 
+        !if(GML<EPSGM) print*, "GML,EPSGM,GM(K)", GML, EPSGM, GM(K)
 !
         TEM=(T(K)+T(K+1))*0.5
         THM=(THE(K)+THE(K+1))*0.5
@@ -912,8 +912,8 @@
             if (AUBR == 0.0) print*, K,AUBR,AUBM, GML, AUBH, GHL, &
                 DTH(K),T(K),T(K+1),THE(K),THE(K+1),Q(K),Q(K+1), &
                 U(K),U(K+1),V(K),V(K+1),Z(K),Z(K+2), &
-                CWM(K),CWM(K+1),ELOCP,P608 
-            #IF (AUBR<= 0.0) AUBR = 1.0E-12
+                CWM(K),CWM(K+1),ELOCP,P608
+            !IF (AUBR<= 0.0) AUBR = 1.0E-12
             BUBR= BUBM*GML+BUBH*GHL
 
             !if (AUBR == 0.0) then
@@ -932,7 +932,7 @@
                 U(K),U(K+1),V(K),V(K+1),Z(K),Z(K+2), &
                 CWM(K),CWM(K+1),Q2(K),ELOCP,P608
                 !ELOQ2X=1./QOL2ST
-                ELOQ2X=1./MAX(EPSGH, QOL2ST)
+                ELOQ2X=1./MAX(EPSGH, REAL(QOL2ST) )
                 ELM(K)=MAX(SQRT(ELOQ2X*Q2(K)),EPSL)
           ENDIF
         ELSE
@@ -1591,7 +1591,7 @@
       REAL,DIMENSION(KTS:KTE),INTENT(IN) :: RHO
       REAL,DIMENSION(KTS:KTE+1),INTENT(IN) :: Z
       REAL,DIMENSION(KTS:KTE),INTENT(INOUT) :: DUST1,DUST2
-! 
+!
 !----------------------------------------------------------------------
 !***
 !***  LOCAL VARIABLES

@@ -559,9 +559,9 @@ module mpas_convective_diagnostics
                   do j=1,nvertexDegree
                     iCell = cellsOnVertex(j,i)
                     updraft_helicity(1:nVertLevels,iCell) = updraft_helicity(1:nVertLevels,iCell)             &
-		                                          + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
+                                                          + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
                     updraft_helicity_neg(1:nVertLevels,iCell) = updraft_helicity_neg(1:nVertLevels,iCell)     &
-		                                              + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
+                                                          + kiteAreasOnVertex(j,i)*vorticity(1:nVertLevels,i)
                   end do
                 end do
                 call mpas_log_write('Min, max uh_neg 1 = $r, $r',realArgs=(/minval(updraft_helicity_neg),maxval(updraft_helicity_neg)/))
