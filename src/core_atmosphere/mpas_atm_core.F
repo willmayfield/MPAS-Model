@@ -119,6 +119,15 @@ module atm_core
       call mpas_pool_get_config(domain % blocklist % configs, 'config_dt', dt)
 
       !
+      ! By default, the 'invariant' stream has an input_interval of "none", so
+      ! the following stream read has no effect. However, in case the 'invariant'
+      ! stream is defined with an input_interval of "initial_only", we read
+      ! time-invariant fields first.
+      !
+      call MPAS_stream_mgr_read(domain % streamManager, streamID='invariant', whence=MPAS_STREAM_NEAREST, ierr=ierr)
+      call MPAS_stream_mgr_reset_alarms(domain % streamManager, streamID='invariant', direction=MPAS_STREAM_INPUT, ierr=ierr)
+
+      !
       ! If this is a restart run, read the restart stream, else read the input
       ! stream.
       ! Regardless of which stream we read for initial conditions, reset the
@@ -648,7 +657,7 @@ module atm_core
       end if
       call mpas_timer_start('diagnostic_fields')
       call mpas_atm_diag_reset()
-      call mpas_atm_diag_update(domain % blocklist % configs, domain % streamManager,dt)
+      call mpas_atm_diag_update()
       call mpas_atm_diag_compute()
       call mpas_timer_stop('diagnostic_fields')
 
@@ -810,7 +819,7 @@ module atm_core
          end if
 
          call mpas_timer_start('diagnostic_fields')
-         call mpas_atm_diag_update(domain % blocklist % configs, domain % streamManager,dt)
+         call mpas_atm_diag_update()
          call mpas_atm_diag_compute()
          call mpas_timer_stop('diagnostic_fields')
          call mpas_dmpar_get_time(diag_stop_time)
