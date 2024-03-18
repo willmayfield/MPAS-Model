@@ -8,7 +8,7 @@
 !=================================================================================================================
  module mpas_atmphys_packages
  use mpas_kind_types
- use mpas_derived_types,only : mpas_pool_type,mpas_io_context_type,MPAS_LOG_ERR
+ use mpas_derived_types,only : mpas_pool_type,mpas_io_context_type,MPAS_LOG_ERR, MPAS_streamInfo_type
  use mpas_pool_routines,only : mpas_pool_get_config,mpas_pool_get_package
  use mpas_log,only : mpas_log_write
 
@@ -24,11 +24,12 @@
 
 
 !=================================================================================================================
- function atmphys_setup_packages(configs,packages,iocontext) result(ierr)
+ function atmphys_setup_packages(configs,streamInfo,packages,iocontext) result(ierr)
 !=================================================================================================================
 
 !inout arguments:
  type (mpas_pool_type), intent(inout) :: configs
+ type (MPAS_streamInfo_type), intent(in) :: streamInfo    ! SH (Mar-17-2024): Not used in this function. 
  type (mpas_pool_type), intent(inout) :: packages
  type (mpas_io_context_type), intent(inout) :: iocontext
 
