@@ -100,7 +100,7 @@
 
                 <nml_option name="config_interface_projection" type="character"     default_value="linear_interpolation"
                      units="-"
-                     description="projecting layer values to the interface, linear vertical interpolation or integral" 
+                     description="projecting layer values to the interface, linear vertical interpolation or integral"
                      possible_values="'linear_interpolation' or 'layer_integral' (layer average value)"/>
 
         </nml_record>
@@ -535,8 +535,8 @@
                         <var name="isice_lu"/>
                         <var name="iswater_lu"/>
                         <var name="ivgtyp"/>
-			<var name="landusef"/>
-			<var name="soilf"/>
+                        <var name="landusef"/>
+                        <var name="soilf"/>
                         <var name="isltyp"/>
                         <var name="snoalb"/>
                         <var name="soiltemp"/>
@@ -612,6 +612,7 @@
                         <var name="q2" packages="met_stage_out"/>
                         <var name="rh2" packages="met_stage_out"/>
                         <var name="t2m" packages="met_stage_out"/>
+                        <var name="refl10cm" packages="met_stage_out"/>
                         <var name="uReconstructZonal" packages="met_stage_out"/>
                         <var name="uReconstructMeridional" packages="met_stage_out"/>
 		</stream>
@@ -830,7 +831,7 @@
 
                 <var name="albedo12m" type="real" dimensions="nMonths nCells" units="unitless"
                      description="monthly-mean climatological surface albedo"/>
-                     
+
                 <var name="lai12m" type="real" dimensions="nMonths nCells" units="unitless"
                      description="monthly-mean climatological leaf area index"/>
 
@@ -1026,6 +1027,9 @@
                         <var name="qg" array_group="moist" units="kg kg^{-1}"
                              description="Graupel mixing ratio"/>
 
+                        <var name="qh" array_group="moist" units="kg kg^{-1}"
+                             description="hail mixing ratio"/>
+
                         <var name="ni" array_group="number" units="nb kg^{-1}"
                              description="Cloud ice number concentration"/>
 
@@ -1041,6 +1045,14 @@
                         <var name="ng" array_group="number" units="nb kg^{-1}"
                              description="Graupel number concentration"/>
 
+                        <var name="nh" array_group="number" units="nb kg^{-1}"
+                             description="Hail number concentration"/>
+
+                        <var name="volg" array_group="volume" units="m^{3} kg^{-1}"
+                             description="Graupel particle volume"/>
+
+                        <var name="volh" array_group="volume" units="m^{3} kg^{-1}"
+                             description="Hail particle volume"/>
                 </var_array>
 
                 <!-- Climatology for ocean mixed-layer depth -->
@@ -1085,6 +1097,9 @@
                         <var name="lbc_qg" array_group="moist" units="kg kg^{-1}"
                              description="Lateral boundary tendency of graupel mixing ratio"/>
 
+                       <var name="lbc_qh" array_group="moist"  units="kg kg^{-1} s^{-1}"
+                             description="Lateral boundary tendency of hail mixing ratio"/>
+
                         <var name="lbc_nr" array_group="number" units="kg^{-1}"
                              description="Lateral boundary tendency of rain number concentration"/>
 
@@ -1100,6 +1115,17 @@
                         <var name="lbc_ng" array_group="number" units="kg^{-1}"
                              description="Lateral boundary tendency of graupel number concentration"/>
 
+                        <var name="lbc_nh" array_group="number" units="m^{-3} s^{-1}"
+                             description="Lateral boundary tendency of hail number concentration"/>
+
+                        <var name="lbc_nccn" array_group="number" units="m^{-3} s^{-1}"
+                             description="Lateral boundary tendency of CCN number concentration"/>
+
+                        <var name="lbc_volg" array_group="volume" units="m^{3} s^{-1}"
+                             description="Lateral boundary tendency of graupel particle volume"/>
+
+                        <var name="lbc_volh" array_group="volume" units="m^{3} s^{-1}"
+                             description="Lateral boundary tendency of hail particle volume"/>
                 </var_array>
 
         </var_struct>
@@ -1395,5 +1421,10 @@
                 <var name="precipw" type="real" dimensions="nCells Time" units="kg m^{-2}"
                      description="precipitable water"
                      packages="met_stage_out"/>
-        </var_struct>
+
+                <var name="refl10cm" type="real" dimensions="nVertLevels nCells Time" units="dBZ"
+                     description="10 cm radar reflectivity"
+                     packages="met_stage_out"/>
+</var_struct>
+
 </registry>
