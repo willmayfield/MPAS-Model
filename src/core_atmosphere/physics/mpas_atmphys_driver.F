@@ -17,6 +17,7 @@
  use mpas_atmphys_driver_pbl
  use mpas_atmphys_driver_radiation_lw
  use mpas_atmphys_driver_radiation_sw 
+ use mpas_atmphys_driver_seaice,only: allocate_seaice,deallocate_seaice,driver_seaice
  use mpas_atmphys_driver_sfclayer
  use mpas_atmphys_driver_oml
  use mpas_atmphys_constants
@@ -202,10 +203,10 @@
 
     !call to cloud scheme:
     if(l_radtlw .or. l_radtsw) then
-       call allocate_cloudiness
+       call allocate_cloudiness(block%configs)
 !$OMP PARALLEL DO
        do thread=1,nThreads
-          call driver_cloudiness(block%configs,mesh,diag_physics,sfc_input, &
+          call driver_cloudiness(itimestep,block%configs,mesh,diag_physics,sfc_input, &
                                  cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
        end do
 !$OMP END PARALLEL DO
@@ -249,7 +250,7 @@
 
     !deallocate all radiation arrays:
     if(config_radt_sw_scheme.ne.'off' .or. config_radt_lw_scheme.ne.'off') &
-       call deallocate_cloudiness
+       call deallocate_cloudiness(block%configs)
     if(config_radt_sw_scheme.ne.'off') call deallocate_radiation_sw(block%configs)
     if(config_radt_lw_scheme.ne.'off') call deallocate_radiation_lw(block%configs)
 
@@ -278,7 +279,19 @@
        end do
 !$OMP END PARALLEL DO
        call deallocate_lsm(config_frac_seaice,config_lsm_scheme)
-    endif
+
+       if(config_lsm_scheme .ne. 'sf_ruc') then
+          call allocate_seaice
+!$OMP PARALLEL DO
+          do thread=1,nThreads
+             call driver_seaice(block%configs,diag_physics,sfc_input, &
+                                cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
+          enddo
+!$OMP END PARALLEL DO
+          call deallocate_seaice
+       endif ! sf_ruc
+    endif ! lsm off
+
 
     !call to pbl schemes:
     if(config_pbl_scheme .ne. 'off' .and. config_sfclayer_scheme .ne. 'off') then

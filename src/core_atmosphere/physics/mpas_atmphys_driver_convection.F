@@ -90,7 +90,10 @@
 !   Laura D. Fowler (laura@ucar.edu) / 2016-10-18.
 ! * since we removed the local variable convection_scheme from mpas_atmphys_vars.F, now defines convection_scheme
 !   as a pointer to config_convection_scheme.
-!   Laura D. Fowler (laura@ucar.edu) / 2917-02-16.
+!   Laura D. Fowler (laura@ucar.edu) / 2017-02-16.
+! * removed f_qv,f_qr,and f_qs in the calls to cu_tiedtke and cu_ntiedtke. removed f_qv and f_qc in the call to
+!   kf_eta_cps.
+!   Laura D. Fowler (laura@ucar.edu) / 2024-02-13.
 
 
  contains
@@ -156,6 +159,7 @@
        if(.not.allocated(gsw_p)          ) allocate(gsw_p(ims:ime,jms:jme)              )
        if(.not.allocated(hfx_p)          ) allocate(hfx_p(ims:ime,jms:jme)              )
        if(.not.allocated(qfx_p)          ) allocate(qfx_p(ims:ime,jms:jme)              )
+       if(.not.allocated(maxmfbl_p)      ) allocate(maxmfbl_p(ims:ime,jms:jme)          )
        if(.not.allocated(xland_p)        ) allocate(xland_p(ims:ime,jms:jme)            )
 
        if(.not.allocated(rthblten_p)     ) allocate(rthblten_p(ims:ime,kms:kme,jms:jme) )
@@ -301,6 +305,7 @@
        if(allocated(gsw_p)          ) deallocate(gsw_p          )
        if(allocated(hfx_p)          ) deallocate(hfx_p          )
        if(allocated(qfx_p)          ) deallocate(qfx_p          )
+       if(allocated(maxmfbl_p)      ) deallocate(maxmfbl_p      )
        if(allocated(xland_p)        ) deallocate(xland_p        )
        if(allocated(rthblten_p)     ) deallocate(rthblten_p     )
        if(allocated(rthdynten_p)    ) deallocate(rthdynten_p    )
@@ -426,6 +431,7 @@
  logical,pointer:: config_do_restart
  integer,pointer:: gfconv_closure_deep,gfconv_closure_shallow
  character(len=StrKIND),pointer:: convection_scheme
+ character(len=StrKIND),pointer:: pbl_scheme
  real(kind=RKIND),pointer:: len_disp
 
 !variables specific to Kain_Fritsch parameterization:
@@ -452,6 +458,7 @@
  call mpas_pool_get_config(configs,'config_len_disp'         ,len_disp         )
  call mpas_pool_get_config(configs,'config_do_restart'       ,config_do_restart)
  call mpas_pool_get_config(configs,'config_convection_scheme',convection_scheme)
+ call mpas_pool_get_config(configs,'config_pbl_scheme',pbl_scheme)
 
 !initialize instantaneous precipitation, and copy convective tendencies from the dynamics to
 !the physics grid:
@@ -501,9 +508,12 @@
              gdc             = qccu_p                 , gdc2          = qicu_p          , &
              rthcuten        = rthcuten_p             , rqvcuten      = rqvcuten_p      , & 
              rqccuten        = rqccuten_p             , rqicuten      = rqicuten_p      , &
+             rucuten         = rucuten_p              , rvcuten       = rvcuten_p       , &
              ichoice_deep    = gfconv_closure_deep                                      , &
              ichoice_shallow = gfconv_closure_shallow                                   , &
              ishallow_g3     = ishallow                                                 , &
+             pbl_scheme      = pbl_scheme             , maxmf         = maxmfbl_p       , &
+             qc3d            = qc_p                   , qi3d          = qi_p            , &
              ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde      , &
              ims = ims , ime = ime , jms = jms , jme = jme , kms = kds , kme = kme      , &
              its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte        &
@@ -518,7 +528,7 @@
        endif
 
        call mpas_timer_start('Kain-Fritsch')
-       call  kf_eta_cps ( &
+       call kf_eta_cps ( &
              pcps            = pres_hyd_p      , t         = t_p        ,            &
              dt              = dt_dyn          , ktau      = ktau       ,            &
              dxCell          = dx_p            , areaCell  = area_p     ,            &
@@ -538,8 +548,7 @@
              svpt0           = svpt0           , stepcu    = n_cu       ,            &
              cu_act_flag     = cu_act_flag     , warm_rain = warm_rain  ,            &
              cutop           = cutop_p         , cubot     = cubot_p    ,            &
-             qv              = qv_p            , f_qv      = f_qv       ,            &
-             f_qc            = f_qc            , f_qr      = f_qr       ,            &
+             qv              = qv_p            , f_qr      = f_qr       ,            &
              f_qi            = f_qi            , f_qs      = f_qs       ,            &
              rthcuten        = rthcuten_p      , rqvcuten  = rqvcuten_p ,            &
              rqccuten        = rqccuten_p      , rqrcuten  = rqrcuten_p ,            &
@@ -553,23 +562,22 @@
     case("cu_tiedtke")
        call mpas_timer_start('Tiedtke')
        call cu_tiedtke( &
-             pcps        = pres_hyd_p    , p8w       = pres2_hyd_p   ,               &
-             znu         = znu_hyd_p     , t3d       = t_p           ,               &
-             dt          = dt_dyn        , itimestep = initflag      ,               &
-             stepcu      = n_cu          , raincv    = raincv_p      ,               &
-             pratec      = pratec_p      , qfx       = qfx_p         ,               &
-             u3d         = u_p           , v3d       = v_p           ,               &
-             w           = w_p           , qv3d      = qv_p          ,               &
-             qc3d        = qc_p          , qi3d      = qi_p          ,               &
-             pi3d        = pi_p          , rho3d     = rho_p         ,               &
-             qvften      = rqvdynten_p   , qvpblten  = rqvdynblten_p ,               &
-             dz8w        = dz_p          , xland     = xland_p       ,               &
-             cu_act_flag = cu_act_flag   , f_qv      = f_qv          ,               &
-             f_qc        = f_qc          , f_qr      = f_qr          ,               &
-             f_qi        = f_qi          , f_qs      = f_qs          ,               &
-             rthcuten    = rthcuten_p    , rqvcuten  = rqvcuten_p    ,               &
-             rqccuten    = rqccuten_p    , rqicuten  = rqicuten_p    ,               &
-             rucuten     = rucuten_p     , rvcuten   = rvcuten_p     ,               &
+             pcps        = pres_hyd_p  , p8w       = pres2_hyd_p   ,                 &
+             znu         = znu_hyd_p   , t3d       = t_p           ,                 &
+             dt          = dt_dyn      , itimestep = initflag      ,                 &
+             stepcu      = n_cu        , raincv    = raincv_p      ,                 &
+             pratec      = pratec_p    , qfx       = qfx_p         ,                 &
+             u3d         = u_p         , v3d       = v_p           ,                 &
+             w           = w_p         , qv3d      = qv_p          ,                 &
+             qc3d        = qc_p        , qi3d      = qi_p          ,                 &
+             pi3d        = pi_p        , rho3d     = rho_p         ,                 &
+             qvften      = rqvdynten_p , qvpblten  = rqvdynblten_p ,                 &
+             dz8w        = dz_p        , xland     = xland_p       ,                 &
+             cu_act_flag = cu_act_flag , f_qc      = f_qc          ,                 &
+             f_qi        = f_qi        , rthcuten  = rthcuten_p    ,                 &
+             rqvcuten    = rqvcuten_p  , rqccuten  = rqccuten_p    ,                 &
+             rqicuten    = rqicuten_p  , rucuten   = rucuten_p     ,                 &
+             rvcuten     = rvcuten_p   ,                                             &
              ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde , &
              ims = ims , ime = ime , jms = jms , jme = jme , kms = kds , kme = kme , &
              its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte   &
@@ -579,28 +587,27 @@
     case("cu_ntiedtke")
        call mpas_timer_start('cu_ntiedtke')
        call cu_ntiedtke_driver( &
-             pcps      = pres_hyd_p  , p8w         = pres2_hyd_p ,                   &
-             t3d       = t_p         , dz8w        = dz_p        ,                   &
-             dt        = dt_dyn      , itimestep   = initflag    ,                   &
-             stepcu    = n_cu        , raincv      = raincv_p    ,                   & 
-             pratec    = pratec_p    , qfx         = qfx_p       ,                   &
-             hfx       = hfx_p       , xland       = xland_p     ,                   &
-             dx        = dx_p        , u3d         = u_p         ,                   &
-             v3d       = v_p         , w           = w_p         ,                   &
-             qv3d      = qv_p        , qc3d        = qc_p        ,                   &
-             qi3d      = qi_p        , pi3d        = pi_p        ,                   &
-             rho3d     = rho_p       , qvften      = rqvften_p   ,                   &
-             thften    = rthften_p   , cu_act_flag = cu_act_flag ,                   &
-             f_qv      = f_qv        , f_qc        = f_qc        ,                   &
-             f_qr      = f_qr        , f_qi        = f_qi        ,                   &
-             f_qs      = f_qs        , rthcuten    = rthcuten_p  ,                   &
-             rqvcuten  = rqvcuten_p  , rqccuten    = rqccuten_p  ,                   &
-             rqicuten  = rqicuten_p  , rucuten     = rucuten_p   ,                   &
-             rvcuten   = rvcuten_p   , grav        = gravity     ,                   &
-             xlf       = xlf         , xls         = xls         ,                   &
-             xlv       = xlv         , rd          = R_d         ,                   &
-             rv        = R_v         , cp          = cp          ,                   &
-             errmsg    = errmsg      , errflg      = errflg      ,                   &
+             pcps     = pres_hyd_p , p8w         = pres2_hyd_p ,                     &
+             t3d      = t_p        , dz8w        = dz_p        ,                     &
+             dt       = dt_dyn     , itimestep   = initflag    ,                     &
+             stepcu   = n_cu       , raincv      = raincv_p    ,                     &
+             pratec   = pratec_p   , qfx         = qfx_p       ,                     &
+             hfx      = hfx_p      , xland       = xland_p     ,                     &
+             dx       = dx_p       , u3d         = u_p         ,                     &
+             v3d      = v_p        , w           = w_p         ,                     &
+             qv3d     = qv_p       , qc3d        = qc_p        ,                     &
+             qi3d     = qi_p       , pi3d        = pi_p        ,                     &
+             rho3d    = rho_p      , qvften      = rqvften_p   ,                     &
+             thften   = rthften_p  , cu_act_flag = cu_act_flag ,                     &
+             f_qc     = f_qc       , f_qi        = f_qi        ,                     &
+             rthcuten = rthcuten_p , rqvcuten    = rqvcuten_p  ,                     &
+             rqccuten = rqccuten_p , rqicuten    = rqicuten_p  ,                     &
+             rucuten  = rucuten_p  , rvcuten     = rvcuten_p   ,                     &
+             grav     = gravity    , xlf         = xlf         ,                     &
+             xls      = xls        , xlv         = xlv         ,                     &
+             rd       = R_d        , rv          = R_v         ,                     &
+             cp       = cp         ,                                                 &
+             errmsg   = errmsg     , errflg      = errflg      ,                     &
              ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde , &
              ims = ims , ime = ime , jms = jms , jme = jme , kms = kds , kme = kme , &
              its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte   &
@@ -744,7 +751,7 @@
              rqvblten_p(i,k,j)  = rqvblten(k,i)
              rqvdynten_p(i,k,j) = rqvdynten(k,i)
              rucuten_p(i,k,j)   = rucuten(k,i)
-             rvcuten_p(i,k,j)   = rvcuten(k,k)
+             rvcuten_p(i,k,j)   = rvcuten(k,i)
           enddo
        enddo
        enddo
@@ -941,7 +948,7 @@
              qc_cu(k,i)    = qccu_p(i,k,j)
              qi_cu(k,i)    = qicu_p(i,k,j)
              rucuten(k,i)  = rucuten_p(i,k,j)
-             rvcuten(k,k)  = rvcuten_p(i,k,j)
+             rvcuten(k,i)  = rvcuten_p(i,k,j)
           enddo
        enddo
        enddo
