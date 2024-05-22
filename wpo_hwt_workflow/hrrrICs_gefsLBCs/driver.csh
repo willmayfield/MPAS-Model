@@ -88,6 +88,9 @@ setenv RUN_UPP                 true
 
 setenv   SCRIPT_DIR           /scratch2/BMC/fv3lam/HWT/expt_1/mpas_scripts  # Location of all these .csh scripts
 
+# Path to directory where job submission logs will go
+setenv   LOG_DIR              $SCRIPT_DIR/logs
+
 # Path to MPAS initialization code
 setenv   MPAS_INIT_CODE_DIR   /scratch2/BMC/fv3lam/HWT/code/MPAS-Model-NSSL_develop
 
@@ -216,6 +219,8 @@ setenv physics_suite        "convection_permitting" #"mesoscale_reference" #"con
 # NOTHING BELOW HERE SHOULD NEED CHANGING (HOPEFULLY...)
 #
 #########################################################
+
+mkdir -p $LOG_DIR
 
 set ff = ( $NAMELIST_TEMPLATE  $STREAMS_TEMPLATE )
 foreach f ( $ff ) 

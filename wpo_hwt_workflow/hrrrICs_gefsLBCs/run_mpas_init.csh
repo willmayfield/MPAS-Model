@@ -21,8 +21,8 @@
 ##PBS -V 
 
 #
-#SBATCH -J mpas_init
-#SBATCH -o mpas_init.o%j
+#SBATCH -J logs/mpas_init
+#SBATCH -o logs/mpas_init.o%j
 #SBATCH -N 30
 #SBATCH -n 1200
 ##SBATCH -p hera

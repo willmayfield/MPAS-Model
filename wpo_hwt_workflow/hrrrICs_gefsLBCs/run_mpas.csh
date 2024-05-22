@@ -23,8 +23,8 @@
 ##PBS -V
 
 #SBATCH -J mpas
-#SBATCH -o mpas.%j
-#SBATCH -e mpas.%j
+#SBATCH -o logs/mpas.%j
+#SBATCH -e logs/mpas.%j
 #SBATCH -n 1200
 #SBATCH --exclusive
 #SBATCH --partition=hera

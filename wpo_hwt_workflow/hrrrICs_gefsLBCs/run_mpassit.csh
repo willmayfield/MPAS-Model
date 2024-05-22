@@ -23,8 +23,8 @@
 ##PBS -V
 
 #SBATCH -J mpassit
-#SBATCH -o mpassit.%j
-#SBATCH -e mpassit.%j
+#SBATCH -o logs/mpassit.%j
+#SBATCH -e logs/mpassit.%j
 #SBATCH -n 1200
 #SBATCH --exclusive
 #SBATCH --partition=hera

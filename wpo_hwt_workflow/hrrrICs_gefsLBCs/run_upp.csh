@@ -23,8 +23,8 @@
 ##PBS -V
 
 #SBATCH -J upp
-#SBATCH -o upp.%j
-#SBATCH -e upp.%j
+#SBATCH -o logs/upp.%j
+#SBATCH -e logs/upp.%j
 #SBATCH -n 20
 #SBATCH --exclusive
 #SBATCH --partition=hera
