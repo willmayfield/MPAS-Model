@@ -29,7 +29,7 @@
 #SBATCH --exclusive
 #SBATCH --partition=hera
 #SBATCH -t 02:00:00
-#SBATCH -A fv3lam
+#SBATCH -A hmtb
 
 #
 # This script runs MPASSIT
@@ -52,7 +52,7 @@ else
    exit 2
 endif
 
-set start_init = $DATE   # From driver
+set start_init = $start_init   # From driver
 set DATE = $DATE   # From driver
 set diag_output_interval = $diag_output_interval   # From driver
 set end_time = `$TOOL_DIR/da_advance_time.exe $DATE $FCST_RANGE`

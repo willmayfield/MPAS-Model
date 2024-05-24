@@ -25,11 +25,12 @@
 #SBATCH -J upp
 #SBATCH -o logs/upp.%j
 #SBATCH -e logs/upp.%j
-#SBATCH -n 20
+#SBATCH -n 1
+#SBATCH -N 1
 #SBATCH --exclusive
 #SBATCH --partition=hera
 #SBATCH -t 01:30:00
-#SBATCH -A fv3lam
+#SBATCH -A hmtb
 
 #
 # This script runs UPP
@@ -63,7 +64,7 @@ else
    exit 2
 endif
 
-set start_init = $DATE   # From driver
+set start_init = $start_init   # From driver
 set DATE = $DATE   # From driver
 set diag_output_interval = $diag_output_interval   # From driver
 set end_time = `$TOOL_DIR/da_advance_time.exe $DATE $FCST_RANGE`
@@ -91,10 +92,12 @@ while ( $DATE <= $end_time)
    #-----------------------------------------------------------
    # MH note - this could be more generlaized; currently hard-coded to hrrr.
    ln -sf ${UPP_CODE_DIR}/bin/unipost.exe .
-   ln -sf ${SCRIPT_DIR}/upp_files/hrrr_params_grib2_tbl_new params_grib2_tbl_new
-   ln -sf ${SCRIPT_DIR}/upp_files/hrrr_post_avblflds.xml post_avblflds.xml
-   ln -sf ${SCRIPT_DIR}/upp_files/hrrr_postcntrl.xml postcntrl.xml
-   ln -sf ${SCRIPT_DIR}/upp_files/hrrr_postxconfig-NT.txt postxconfig-NT.txt
+   #   ln -sf ${SCRIPT_DIR}/upp_files/hrrr_params_grib2_tbl_new params_grib2_tbl_new
+   #ln -sf ${SCRIPT_DIR}/upp_files/hrrr_post_avblflds.xml post_avblflds.xml
+   #ln -sf ${SCRIPT_DIR}/upp_files/hrrr_postcntrl.xml postcntrl.xml
+   #ln -sf ${SCRIPT_DIR}/upp_files/hrrr_postxconfig-NT.txt postxconfig-NT.txt
+   ln -sf ${SCRIPT_DIR}/upp_files/params_grib2_tbl_new params_grib2_tbl_new
+   ln -sf ${SCRIPT_DIR}/upp_files/postxconfig-NT.txt postxconfig-NT.txt
    ln -sf ${SCRIPT_DIR}/upp_files/ETAMPNEW_DATA nam_micro_lookup.dat
    ln -sf ${SCRIPT_DIR}/upp_files/ETAMPNEW_DATA.expanded_rain hires_micro_lookup.dat
 
@@ -110,7 +113,8 @@ while ( $DATE <= $end_time)
    rm -f ./*.err
 
    #   $run_cmd ./unipost.exe  # Run UPP!
-   mpirun -np 20 ./unipost.exe > run.ouput  # Run UPP! # MH note - this run command works but should be updated to not be hardcoded.
+   #mpirun -np 20 ./unipost.exe > run.ouput  # Run UPP! # MH note - this run command works but should be updated to not be hardcoded.
+   mpirun -np 1 ./unipost.exe > run.ouput
 
    #   mv WRF* ../mpas.t00z.prslev.f0${fhr}.conus_3km.grib2
 

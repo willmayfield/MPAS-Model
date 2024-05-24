@@ -37,7 +37,7 @@
 #SBATCH -n 1
 ##SBATCH -p hera
 #SBATCH -t 01:00:00 
-#SBATCH -A fv3lam
+#SBATCH -A hmtb
 
 
 # MH Load modules and set envars for MPAS on Hera (updated for Rocky 8):
@@ -79,17 +79,14 @@ setenv mpas_queue     "hera"   # system queue
 setenv RUN_UNGRIB              false  # (true, false )
 setenv RUN_MPAS_INITIALIZE     false 
 setenv RUN_MPAS_FORECAST       false
-setenv RUN_MPASSIT             false 
-setenv RUN_UPP                 true
+setenv RUN_MPASSIT             true
+setenv RUN_UPP                 false
 
 #######################################
 # Directories pointing to source code #
 #######################################
 
 setenv   SCRIPT_DIR           /scratch2/BMC/fv3lam/HWT/expt_1/mpas_scripts  # Location of all these .csh scripts
-
-# Path to directory where job submission logs will go
-setenv   LOG_DIR              $SCRIPT_DIR/logs
 
 # Path to MPAS initialization code
 setenv   MPAS_INIT_CODE_DIR   /scratch2/BMC/fv3lam/HWT/code/MPAS-Model-NSSL_develop
@@ -101,8 +98,8 @@ setenv   MPAS_CODE_DIR        $MPAS_INIT_CODE_DIR
 setenv   MPASSIT_CODE_DIR     /scratch2/BMC/fv3lam/HWT/code/MPASSIT
 
 # Path to UPP code
-setenv   UPP_CODE_DIR        /scratch2/BMC/fv3lam/HWT/code/UPP_NSSL
-#setenv   UPP_CODE_DIR        /scratch2/BMC/fv3lam/ajohns/mpas_pp
+#setenv   UPP_CODE_DIR        /scratch2/BMC/fv3lam/HWT/code/UPP_NSSL
+setenv   UPP_CODE_DIR        /scratch2/BMC/fv3lam/ajohns/mpas_pp
 
 # Path to WPS; need ungrib.exe for MPAS initialization
 setenv   WPS_DIR              /scratch2/BMC/fv3lam/HWT/code/WPS
@@ -219,8 +216,6 @@ setenv physics_suite        "convection_permitting" #"mesoscale_reference" #"con
 # NOTHING BELOW HERE SHOULD NEED CHANGING (HOPEFULLY...)
 #
 #########################################################
-
-mkdir -p $LOG_DIR
 
 set ff = ( $NAMELIST_TEMPLATE  $STREAMS_TEMPLATE )
 foreach f ( $ff ) 
