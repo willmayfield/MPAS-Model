@@ -64,13 +64,12 @@ while ( $DATE <= $end_time)
    # -------------------------------------
    set date_file_format =  `${TOOL_DIR}/da_advance_time.exe $DATE 0 -f ccyy-mm-dd_hh.nn.ss`
    echo "Date in format is: ${date_file_format}"
-   set fhr = `echo ${date_file_format} | cut -c12-13`
-   echo "Forecast hour is: ${fhr}"
+   set vhr = `echo ${date_file_format}`
 
    # ----------------------------------
    # Make and go to working directory
    # ----------------------------------
-   set rundir = $MPASSIT_OUTPUT_DIR_TOP/$start_init/ens_${mem}/f${fhr}
+   set rundir = $MPASSIT_OUTPUT_DIR_TOP/$start_init/ens_${mem}/${vhr}
    mkdir -p $rundir
    cd $rundir
 

@@ -29,7 +29,7 @@
 #SBATCH -N 1
 #SBATCH --exclusive
 #SBATCH --partition=hera
-#SBATCH -t 01:30:00
+#SBATCH -t 02:30:00
 #SBATCH -A hmtb
 
 #
@@ -77,25 +77,19 @@ while ( $DATE <= $end_time)
    setenv date_file_format `${TOOL_DIR}/da_advance_time.exe $DATE 0 -f ccyy-mm-dd_hh.nn.ss`
    setenv date_file_format_colon `${TOOL_DIR}/da_advance_time.exe $DATE 0 -w`
    echo "Date in format is: ${date_file_format}"
-   set fhr = `echo ${date_file_format} | cut -c12-13`
-   echo "Forecast hour is: ${fhr}"
+   set vhr = `echo ${date_file_format}`
 
    # ----------------------------------
    # Make and go to working directory
    # ----------------------------------
-   set rundir = ${UPP_OUTPUT_DIR_TOP}/$start_init/ens_${mem}/f${fhr}
+   set rundir = ${UPP_OUTPUT_DIR_TOP}/$start_init/ens_${mem}/${vhr}
    mkdir -p $rundir
    cd $rundir
 
    #-----------------------------------------------------------
    # Link necessary input files and code and fill namelist
    #-----------------------------------------------------------
-   # MH note - this could be more generlaized; currently hard-coded to hrrr.
    ln -sf ${UPP_CODE_DIR}/bin/unipost.exe .
-   #   ln -sf ${SCRIPT_DIR}/upp_files/hrrr_params_grib2_tbl_new params_grib2_tbl_new
-   #ln -sf ${SCRIPT_DIR}/upp_files/hrrr_post_avblflds.xml post_avblflds.xml
-   #ln -sf ${SCRIPT_DIR}/upp_files/hrrr_postcntrl.xml postcntrl.xml
-   #ln -sf ${SCRIPT_DIR}/upp_files/hrrr_postxconfig-NT.txt postxconfig-NT.txt
    ln -sf ${SCRIPT_DIR}/upp_files/params_grib2_tbl_new params_grib2_tbl_new
    ln -sf ${SCRIPT_DIR}/upp_files/postxconfig-NT.txt postxconfig-NT.txt
    ln -sf ${SCRIPT_DIR}/upp_files/ETAMPNEW_DATA nam_micro_lookup.dat
@@ -116,7 +110,8 @@ while ( $DATE <= $end_time)
    #mpirun -np 20 ./unipost.exe > run.ouput  # Run UPP! # MH note - this run command works but should be updated to not be hardcoded.
    mpirun -np 1 ./unipost.exe > run.ouput
 
-   #   mv WRF* ../mpas.t00z.prslev.f0${fhr}.conus_3km.grib2
+   set fhr = `ls WRFPRS* | cut -c12-13`
+   mv WRFPRS.GrbF${fhr}* ../mpas.t00z.prslev.f0${fhr}.conus_3km.grib2
 
    if ( $status != 0 ) then
       echo "UPP failed. Exit." >> ./FAIL
