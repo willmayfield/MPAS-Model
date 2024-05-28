@@ -1,0 +1,21 @@
+&config 
+grid_file_input_grid="DDDD/init.nc" 
+hist_file_input_grid="DDDD/history.TTTT.nc" 
+diag_file_input_grid="DDDD/diag.TTTT.nc" 
+file_target_grid="/scratch/wicker/27April2011/ICs/wrfinput_d01" 
+output_file="RRRR/out_hist_diag.nc" 
+target_grid_type = 'lambert' 
+interp_diag=.true. 
+interp_hist=.true. 
+wrf_mod_vars         = .true.
+esmf_log=.false. 
+nx = 1578 
+ny = 925
+dx = 3000.0 
+dy = 3000.0 
+ref_lat = 38.4 
+ref_lon = -97.0 
+truelat1 = 38.4 
+truelat2 = 38.4 
+stand_lon = -97.0 /
+

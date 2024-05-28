@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH -J mpasit
+#SBATCH -o DDDD/logfile.o%j
+#SBATCH -N 10
+#SBATCH -n 400
+#SBATCH -t 1:00:00 
+#SBATCH -A fv3lam
+cd DDDD
+
+module load intel/2022.1.2
+module load impi/2022.1.2
+
+cp /scratch2/BMC/fv3lam/ajohns/mpas_pp/bin/mpassit ./
+ 
+
+mpirun -np 400 ./mpassit namelist.input > run.output
+
+module load intelpython
+
+python /scratch2/BMC/fv3lam/ajohns/mpas_pp/templatesmpassit/changedx.py out_hist_diag.nc
+
