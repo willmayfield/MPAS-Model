@@ -51,9 +51,9 @@ restart_timestamp
 .mpas_core_*
 
 # Ignore all runtime config files
-namelist.*
-streams.*
-stream_list.*
+#namelist.*
+#streams.*
+#stream_list.*
 
 # Intermediate files that may be produced by Intel compilers
 *.i
