@@ -36,7 +36,7 @@ restart_timestamp
 *.abort
 
 # Text files (For statistical output from ocean model)
-*.txt
+#*.txt
 
 # Directories with individual .gitignore files are:
 # src/external (Externals might have a different compilation method)
@@ -45,7 +45,7 @@ restart_timestamp
 
 # Ignore WRF Physics Files
 *.TBL
-*DATA*
+#*DATA*
 
 # Ignore MPAS core build files.
 .mpas_core_*
