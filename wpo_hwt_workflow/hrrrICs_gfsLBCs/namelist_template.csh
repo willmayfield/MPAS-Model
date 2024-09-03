@@ -262,6 +262,7 @@ output_file="${output_file}"
 target_grid_type = 'lambert'
 interp_diag=.true.
 interp_hist=.true.
+wrf_mod_vars         = .true.
 esmf_log=.false.
 nx = 1578
 ny = 925
