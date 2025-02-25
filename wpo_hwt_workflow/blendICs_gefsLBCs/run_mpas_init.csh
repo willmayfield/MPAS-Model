@@ -60,13 +60,26 @@ set sdate_lbc = `echo "$START_DATE_LBC" | cut -c 1-13`
 #setenv z_top_meters `expr $z_top_km \* 1000` # needed for namelist
 setenv z_top_meters 
 
-# MH Took out GFS and GFS_new -- this is for GFS FV3
-if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL == GFS ) then # GFS FV3
-   setenv num_ungrib_vertical_levels_lbc  51 # Could be as many as 50
-else if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL == GEFS ) then
-   setenv num_ungrib_vertical_levels_lbc 32 # 27 32
+#atj added this block since difference source of LBC data than IC data:
+if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL_CTL == GFS || $COLD_START_BOUNDARY_CONDITIONS_MODEL_CTL == GFS_new ) then # Change if GFS after May 2016 to 32 levels
+   setenv num_ungrib_vertical_levels_lbc  51 #27
+else if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL_CTL == GFS_FV3 ) then # GFS FV3
+   setenv num_ungrib_vertical_levels_lbc  50 # Could be as many as 50
+else if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL_CTL == GEFS ) then
+   setenv num_ungrib_vertical_levels_lbc 32 # 27
 else
-   echo "$COLD_START_BOUNDARY_CONDITIONS_MODEL not valid.  Specify a valid one. exit"
+   echo "$COLD_START_BOUNDARY_CONDITIONS_MODEL_CTL not valid.  Specify a valid one. exit"
+   exit
+endif
+#atj added this block since difference source of LBC data for perturbtion members than control member:
+if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL_PERT == GFS || $COLD_START_BOUNDARY_CONDITIONS_MODEL_PERT == GFS_new ) then # Change if GFS after May 2016 to 32 levels
+   setenv num_ungrib_vertical_levels_lbcp  51 #27
+else if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL_PERT == GFS_FV3 ) then # GFS FV3
+   setenv num_ungrib_vertical_levels_lbcp  50 # Could be as many as 50
+else if ( $COLD_START_BOUNDARY_CONDITIONS_MODEL_PERT == GEFS ) then
+   setenv num_ungrib_vertical_levels_lbcp 32 # 27
+else
+   echo "$COLD_START_BOUNDARY_CONDITIONS_MODEL_PERT not valid.  Specify a valid one. exit"
    exit
 endif
 
@@ -213,7 +226,11 @@ foreach iter ( 3 4 5 )
 	 setenv lbc_output_interval  "${LBC_FREQ}:00:00"
 
          setenv this_ungrib_soil_levels $num_ungrib_soil_levels #atj added
-         setenv this_ungrib_vertical_levels $num_ungrib_vertical_levels #atj added
+         if ( $mem == 1 ) then
+           setenv this_ungrib_vertical_levels $num_ungrib_vertical_levels_lbc #atj added
+         else
+           setenv this_ungrib_vertical_levels $num_ungrib_vertical_levels_lbcp #atj added
+         endif
 
 	 set suffix = "met_data_lbcs_f00"
       endif
@@ -251,8 +268,11 @@ foreach iter ( 3 4 5 )
          setenv lbc_output_interval  "${LBC_FREQ}:00:00"
 
          setenv this_ungrib_soil_levels $num_ungrib_soil_levels_lbc #atj added
-         setenv this_ungrib_vertical_levels $num_ungrib_vertical_levels_lbc #atj added
-
+         if ( $mem == 1 ) then
+           setenv this_ungrib_vertical_levels $num_ungrib_vertical_levels_lbc #atj added
+         else
+           setenv this_ungrib_vertical_levels $num_ungrib_vertical_levels_lbcp #atj added
+         endif
          set suffix = "met_data_lbcs"
       else
          continue # move on (b/c $iter == 4 here, this will exit the loop)

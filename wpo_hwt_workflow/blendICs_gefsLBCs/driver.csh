@@ -36,28 +36,28 @@
 #SBATCH -N 1
 #SBATCH -n 1
 ##SBATCH -p hera
-#SBATCH -t 01:00:00 
+#SBATCH -t 02:00:00 
 #SBATCH -A fv3lam
 
 
 # MH Load modules and set envars for MPAS on Hera (updated for Rocky 8):
-module purge
+#module purge
 
-module load cmake/3.28.1
-module load gnu
-module load intel/2023.2.0
-module load impi/2023.2.0
-module load pnetcdf/1.12.3
-module load szip
-module load hdf5parallel/1.10.5
-module load netcdf-hdf5parallel/4.7.0
+#module load cmake/3.28.1
+#module load gnu
+#module load intel/2023.2.0
+#module load impi/2023.2.0
+#module load pnetcdf/1.12.3
+#module load szip
+#module load hdf5parallel/1.10.5
+#module load netcdf-hdf5parallel/4.7.0
 
-setenv PNETCDF /apps/pnetcdf/1.12.3/intel_2023.2.0-impi
-setenv CMAKE_C_COMPILER mpiicc
-setenv CMAKE_CXX_COMPILER mpiicpc
-setenv CMAKE_Fortran_COMPILER mpiifort
+#setenv PNETCDF /apps/pnetcdf/1.12.3/intel_2023.2.0-impi
+#setenv CMAKE_C_COMPILER mpiicc
+#setenv CMAKE_CXX_COMPILER mpiicpc
+#setenv CMAKE_Fortran_COMPILER mpiifort
 
-setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch2/BMC/fv3lam/HWT/code/jasper/miniconda3_RL/lib
+#setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch2/BMC/fv3lam/HWT/code/jasper/miniconda3_RL/lib
 
 # Basic system information
 setenv batch_system         SBATCH # Type of submission system. 
@@ -76,9 +76,9 @@ setenv mpas_account   "fv3lam"  # core-hour account
 setenv mpas_queue     "hera"   # system queue
 
 # Decide which stages to run (run if true; lowercase):
-setenv RUN_UNGRIB              true  # (true, false )
+setenv RUN_UNGRIB              false  # (true, false )
 setenv RUN_MPAS_INITIALIZE     false
-setenv RUN_BLEND               flase
+setenv RUN_BLEND               true
 setenv RUN_MPAS_FORECAST       false
 setenv RUN_MPASSIT             false
 setenv RUN_UPP                 false
@@ -87,12 +87,12 @@ setenv RUN_UPP                 false
 # Directories pointing to source code #
 #######################################
 
-setenv   SCRIPT_DIR           /scratch2/BMC/fv3lam/mayfield/wpo/blending/ic_data/gefs/MPAS-Model_workflow/wpo_hwt_workflow/blendICs_gefsLBCs  # Location of all these .csh scripts
+setenv   SCRIPT_DIR           /scratch2/BMC/fv3lam/HWT/expt_blend/MPAS-Model_workflow_blend/wpo_hwt_workflow/blendICs_gefsLBCs  # Location of all these .csh scripts
 
 # Path to MPAS initialization code
 setenv   MPAS_INIT_CODE_DIR   /scratch2/BMC/fv3lam/HWT/code/MPAS-Model-NSSL_develop
 
-# Path with the compiled blending code and configuration files
+# Paths with the compiled blending code and grid files
 setenv BLEND_CODE_DIR /scratch2/BMC/fv3lam/mayfield/wpo/blending/mpas_blending/bin
 setenv BLEND_GRID_DIR /scratch2/BMC/fv3lam/mayfield/wpo/blending/grids
 
@@ -118,7 +118,7 @@ setenv   WPS_GEOG_DIR         /scratch2/BMC/fv3lam/WPS_GEOG  #Directory with WPS
 ############################################################
 
 setenv MESH      hwt_mpas  # The MPAS mesh. Can really name whatever you want
-setenv EXPT      blend_test_1      # The experiment name that you are running
+setenv EXPT      ensemble_blend_test      # The experiment name that you are running
 
 ###########################
 # Time/Experiment control #
@@ -140,7 +140,9 @@ setenv LBC_FREQ 6          # LBC frequency for a regional run (hours)
 #This is the model providing initial conditions for MPAS. Mostly needed to tell the MPAS initialization
 #  how many vertical levels to expect in the GRIB files.  See run_mpas_init.csh
 setenv  COLD_START_INITIAL_CONDITIONS_MODEL GEFS # (GFS, GEFS, RRFS, HRRR.pressure)
-setenv  COLD_START_BOUNDARY_CONDITIONS_MODEL GFS
+setenv  COLD_START_BOUNDARY_CONDITIONS_MODEL_CTL GFS #atj: new variable                                                                                  
+setenv  COLD_START_BOUNDARY_CONDITIONS_MODEL_PERT GEFS #atj: new variable 
+#setenv  COLD_START_BOUNDARY_CONDITIONS_MODEL GFS
 
 setenv ENS_SIZE             3 # Ensemble size for the forecasts. Ensemble forecasts for all members are run all at once.
 set    ie        =          1  # What ensemble member to start with?  Usually set to 1. Members ${ie} - ${ENS_SIZE} will be run
@@ -156,6 +158,7 @@ setenv      STREAMS_TEMPLATE         ${SCRIPT_DIR}/streams_template.csh # Templa
   #  this directory needs to be there, with the data. For the input directories, the date needs to be last (after the member).
 #setenv      GRIB_INPUT_DIR_MODEL     /scratch2/BMC/fv3lam/HWT/expt_1/grib_data_ic_lbc # Location of global GRIB files (sub-directories by ensemble member and initialization time)
 setenv      GRIB_INPUT_DIR_MODEL      /scratch2/BMC/fv3lam/ens_design_RRFS/data/GEFS/pgrb2_combined_bn# Location of global GRIB files (sub-directories by ensemble member and initialization time)
+#setenv      GRIB_INPUT_DIR_MODEL     /scratch2/BMC/fv3lam/ajohns/allgribdata   #GEFS
 setenv      GRIB_INPUT_DIR_SST       $GRIB_INPUT_DIR_MODEL  # Where you could put GRIB files for SST
 
 setenv      ungrib_prefx_model   "FILE"  # Probably never need to change, but there might be some need to in the future
@@ -278,7 +281,7 @@ while ( $DATE <= $end_init )
 
    if ( $RUN_BLEND == true ) then
       foreach mem ( `seq $ie 1 $ENS_SIZE` )
-         ${SCRIPT_DIR}/run_blend.csh $mem # send the ensemble member into run_blend.csh
+         sbatch ${SCRIPT_DIR}/run_blend.csh $mem # send the ensemble member into run_blend.csh
       end
    endif
 

@@ -279,13 +279,30 @@ EOF3
 
 
 #--------------------------------------------
+# UPP itag
+#--------------------------------------------
+
+UPP:
+
+rm -f ./itag
+cat > ./itag << EOF4
+${mpassit_file}
+netcdf
+grib2
+${date_file_format_colon}
+RAPR
+EOF4
+
+#------------------------------------------
+
+#--------------------------------------------
 # BLEND namelist
 #--------------------------------------------
 
 BLEND:
 
 rm -f ./input.nml
-cat > ./input.nml << EOF4
+cat > ./input.nml << EOF5
 &share
    grid_info_file = './grid_info.txt'
    large_scale_file = "${large_file}"
@@ -314,23 +331,6 @@ cat > ./input.nml << EOF4
    dx_in_degrees = 0.03
    extrap_method_latlon = 'none'
 /
-EOF4
-
-#--------------------------------------------
-# UPP itag
-#--------------------------------------------
-
-UPP:
-
-rm -f ./itag
-cat > ./itag << EOF5
-${mpassit_file}
-netcdf
-grib2
-${date_file_format_colon}
-RAPR
 EOF5
-
-#------------------------------------------
 
 exit 0

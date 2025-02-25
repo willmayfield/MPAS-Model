@@ -23,6 +23,9 @@ foreach iter ( 0 1 2 )
       @ LBC_FREQ_SEC = 86400
    endif
 
+
+   @ mem2=($mem - 1) 
+
    if ( $iter == 0 ) then
       set output_dir = ${UNGRIB_OUTPUT_DIR_MODEL}/${DATE}/ens_${mem}
       set output_prefx = $ungrib_prefx_model # From driver
@@ -33,8 +36,15 @@ foreach iter ( 0 1 2 )
    else if ( $iter == 1 ) then
       set output_dir = ${UNGRIB_OUTPUT_DIR_MODEL}/${DATE}/lbc_${mem}
       set output_prefx = $ungrib_prefx_model # From driver
-      set VTABLE_TYPE = $COLD_START_BOUNDARY_CONDITIONS_MODEL
-      set UNGRIB_INPUT_DIR = ${GRIB_INPUT_DIR_MODEL}/lbc_${mem} # From driver
+
+      #set VTABLE_TYPE = $COLD_START_BOUNDARY_CONDITIONS_MODEL
+      if ( $mem2 == 0 ) then
+        set VTABLE_TYPE = $COLD_START_BOUNDARY_CONDITIONS_MODEL_CTL # From driver
+      else
+        set VTABLE_TYPE = $COLD_START_BOUNDARY_CONDITIONS_MODEL_PERT # From driver
+      endif
+
+      set UNGRIB_INPUT_DIR = ${GRIB_INPUT_DIR_MODEL}/lbc_${mem2} # From driver
 
    else if ( $iter == 2 ) then
       if ( $update_sst != .true. && $update_sst != true ) continue

@@ -64,7 +64,7 @@ else
    exit 2
 endif
 
-set start_init = $start_init   # From driver
+set start_init = $DATE   # From driver
 set DATE = $DATE   # From driver
 set diag_output_interval = $diag_output_interval   # From driver
 set end_time = `$TOOL_DIR/da_advance_time.exe $DATE $FCST_RANGE`

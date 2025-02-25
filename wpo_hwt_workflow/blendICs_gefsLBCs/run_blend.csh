@@ -27,7 +27,7 @@
 #SBATCH -e logs/blend.%j
 #SBATCH -N 30
 #SBATCH -n 270
-#SBATCH --exclusive
+##SBATCH --exclusive
 #SBATCH --partition=hera
 #SBATCH -t 03:00:00
 #SBATCH -A hmtb
@@ -59,7 +59,7 @@ else
    exit 2
 endif
 
-set start_init = $start_init   # From driver
+set start_init = $DATE   # From driver
 set DATE = $DATE   # From driver
 set diag_output_interval = $diag_output_interval   # From driver
 #set end_time = `$TOOL_DIR/da_advance_time.exe $DATE $FCST_RANGE`
@@ -91,7 +91,9 @@ ln -sf ${BLEND_GRID_DIR}/*.grid.nc .
 #setenv output_file $MPASSIT_OUTPUT_DIR_TOP/$start_init/ens_${mem}/proc.${date_file_format}.nc
 
 #enkf NOTE: these ensemble members go from 0 to 9!
-setenv small_file /scratch2/BMC/fv3lam/ajohns/enkf_forec_upponly/$start_init/ens_$((mem - 1))/init.nc
+@ mem2=($mem - 1) 
+set start_init_8 = `echo "$start_init" | cut -c 1-8`
+setenv small_file /scratch2/BMC/fv3lam/ajohns/enkf_forec_upponly/$start_init_8/ens_$mem2/init.nc
 #gefs out of maps_init
 setenv large_file $MPAS_INIT_OUTPUT_DIR_TOP/$start_init/ens_${mem}/init.nc
 #blend
@@ -122,5 +124,10 @@ module load nco
 
 ncks -h -A $small_file init_blend_combined.nc
 ncks -h -A $blend_file init_blend_combined.nc
+
+if ( $status != 0 ) then                                                                                                                                 
+  echo "BLEND recombine step failed. Exit." >> ./FAIL                                                                                                                   
+  exit 6                                                                                                                                                 
+endif
 
 exit 0
