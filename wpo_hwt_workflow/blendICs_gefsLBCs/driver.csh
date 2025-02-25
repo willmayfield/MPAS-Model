@@ -51,7 +51,6 @@
 #module load szip
 #module load hdf5parallel/1.10.5
 #module load netcdf-hdf5parallel/4.7.0
-
 #setenv PNETCDF /apps/pnetcdf/1.12.3/intel_2023.2.0-impi
 #setenv CMAKE_C_COMPILER mpiicc
 #setenv CMAKE_CXX_COMPILER mpiicpc
@@ -78,10 +77,10 @@ setenv mpas_queue     "hera"   # system queue
 # Decide which stages to run (run if true; lowercase):
 setenv RUN_UNGRIB              false  # (true, false )
 setenv RUN_MPAS_INITIALIZE     false
-setenv RUN_BLEND               true
+setenv RUN_BLEND               false
 setenv RUN_MPAS_FORECAST       false
 setenv RUN_MPASSIT             false
-setenv RUN_UPP                 false
+setenv RUN_UPP                 true
 
 #######################################
 # Directories pointing to source code #
@@ -125,7 +124,7 @@ setenv EXPT      ensemble_blend_test      # The experiment name that you are run
 ###########################
 
 setenv start_init    2022050200  # starting and ending forecast initialization times
-setenv end_init      2022050400
+setenv end_init      2022050500
 setenv inc_init      24  #Time (hours) between forecast initializations
 
 setenv FCST_RANGE              36    #Length of MPAS forecasts (hours)

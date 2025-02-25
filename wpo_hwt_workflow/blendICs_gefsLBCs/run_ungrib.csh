@@ -3,6 +3,23 @@
 #
 # This script runs UNGRIB, which is a serial code.
 #
+# MH Load modules and set envars for MPAS on Hera (updated for Rocky 8):
+module purge
+
+module load cmake/3.28.1
+module load gnu
+module load intel/2023.2.0
+module load impi/2023.2.0
+module load pnetcdf/1.12.3
+module load szip
+module load hdf5parallel/1.10.5
+module load netcdf-hdf5parallel/4.7.0
+setenv PNETCDF /apps/pnetcdf/1.12.3/intel_2023.2.0-impi
+setenv CMAKE_C_COMPILER mpiicc
+setenv CMAKE_CXX_COMPILER mpiicpc
+setenv CMAKE_Fortran_COMPILER mpiifort
+
+setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch2/BMC/fv3lam/HWT/code/jasper/miniconda3_RL/lib
 
 set DATE = $DATE   # From driver
 set START_DATE_WRF = `${TOOL_DIR}/da_advance_time.exe $DATE 0 -w`
