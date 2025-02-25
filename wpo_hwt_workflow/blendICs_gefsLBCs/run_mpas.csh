@@ -72,7 +72,8 @@ endif
 # ----------------------------------------------
 # Get the initial conditions
 # ---------------------------------------------- 
-set mpas_ics = ${MPAS_INIT_OUTPUT_DIR_TOP}/${DATE}/ens_${mem}/init.nc # This is the only input file needed
+#set mpas_ics = ${MPAS_INIT_OUTPUT_DIR_TOP}/${DATE}/ens_${mem}/init.nc # This is the only input file needed
+set mpas_ics = ${BLEND_OUTPUT_DIR_TOP}/${DATE}/ens_${mem}/init.nc # This is the only input file needed
 
 set pp = ( $mpas_ics ) # array incase you want to add other files to look for
 foreach p ( $pp )

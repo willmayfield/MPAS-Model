@@ -76,9 +76,9 @@ setenv mpas_account   "fv3lam"  # core-hour account
 setenv mpas_queue     "hera"   # system queue
 
 # Decide which stages to run (run if true; lowercase):
-setenv RUN_UNGRIB              false  # (true, false )
+setenv RUN_UNGRIB              true  # (true, false )
 setenv RUN_MPAS_INITIALIZE     false
-setenv RUN_BLEND               true
+setenv RUN_BLEND               flase
 setenv RUN_MPAS_FORECAST       false
 setenv RUN_MPASSIT             false
 setenv RUN_UPP                 false
@@ -87,7 +87,7 @@ setenv RUN_UPP                 false
 # Directories pointing to source code #
 #######################################
 
-setenv   SCRIPT_DIR           /scratch2/BMC/fv3lam/mayfield/wpo/blending/ic_data/gefs/MPAS-Model_workflow/wpo_hwt_workflow/hrrrICs_gfsLBCs  # Location of all these .csh scripts
+setenv   SCRIPT_DIR           /scratch2/BMC/fv3lam/mayfield/wpo/blending/ic_data/gefs/MPAS-Model_workflow/wpo_hwt_workflow/blendICs_gefsLBCs  # Location of all these .csh scripts
 
 # Path to MPAS initialization code
 setenv   MPAS_INIT_CODE_DIR   /scratch2/BMC/fv3lam/HWT/code/MPAS-Model-NSSL_develop
@@ -118,14 +118,14 @@ setenv   WPS_GEOG_DIR         /scratch2/BMC/fv3lam/WPS_GEOG  #Directory with WPS
 ############################################################
 
 setenv MESH      hwt_mpas  # The MPAS mesh. Can really name whatever you want
-setenv EXPT      blend_test      # The experiment name that you are running
+setenv EXPT      blend_test_1      # The experiment name that you are running
 
 ###########################
 # Time/Experiment control #
 ###########################
 
 setenv start_init    2022050200  # starting and ending forecast initialization times
-setenv end_init      $start_init
+setenv end_init      2022050400
 setenv inc_init      24  #Time (hours) between forecast initializations
 
 setenv FCST_RANGE              36    #Length of MPAS forecasts (hours)
@@ -142,7 +142,7 @@ setenv LBC_FREQ 6          # LBC frequency for a regional run (hours)
 setenv  COLD_START_INITIAL_CONDITIONS_MODEL GEFS # (GFS, GEFS, RRFS, HRRR.pressure)
 setenv  COLD_START_BOUNDARY_CONDITIONS_MODEL GFS
 
-setenv ENS_SIZE             2 # Ensemble size for the forecasts. Ensemble forecasts for all members are run all at once.
+setenv ENS_SIZE             3 # Ensemble size for the forecasts. Ensemble forecasts for all members are run all at once.
 set    ie        =          1  # What ensemble member to start with?  Usually set to 1. Members ${ie} - ${ENS_SIZE} will be run
 
 ####################################################
@@ -155,7 +155,7 @@ setenv      STREAMS_TEMPLATE         ${SCRIPT_DIR}/streams_template.csh # Templa
   # example directory for input data "by ensemble member and date" : /glade/scratch/schwartz/GEFS_grib_0.5deg/ens_3/2023052300
   #  this directory needs to be there, with the data. For the input directories, the date needs to be last (after the member).
 #setenv      GRIB_INPUT_DIR_MODEL     /scratch2/BMC/fv3lam/HWT/expt_1/grib_data_ic_lbc # Location of global GRIB files (sub-directories by ensemble member and initialization time)
-setenv      GRIB_INPUT_DIR_MODEL      /scratch2/BMC/fv3lam/mayfield/wpo/blending/ic_data/gefs# Location of global GRIB files (sub-directories by ensemble member and initialization time)
+setenv      GRIB_INPUT_DIR_MODEL      /scratch2/BMC/fv3lam/ens_design_RRFS/data/GEFS/pgrb2_combined_bn# Location of global GRIB files (sub-directories by ensemble member and initialization time)
 setenv      GRIB_INPUT_DIR_SST       $GRIB_INPUT_DIR_MODEL  # Where you could put GRIB files for SST
 
 setenv      ungrib_prefx_model   "FILE"  # Probably never need to change, but there might be some need to in the future
