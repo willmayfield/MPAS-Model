@@ -31,7 +31,7 @@ module atm_time_integration
    use mpas_atmphys_driver_microphysics
    use mpas_atmphys_todynamics
    use mpas_atmphys_utilities
-   use stochastic_physics_mpas, only : stochastic_physics_pattern_apply
+   use mpas_stochastic_physics, only : stochastic_physics_pattern_apply
 #endif
 
    use mpas_atm_boundaries, only : nSpecZone, nRelaxZone, nBdyZone, mpas_atm_get_bdy_state, mpas_atm_get_bdy_tend  ! regional_MPAS addition
