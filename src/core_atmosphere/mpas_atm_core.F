@@ -1010,7 +1010,7 @@ module atm_core
       endif
 #endif
 
-      call stochastic_physics_pattern_adv(domain, ierr)
+      call stochastic_physics_pattern_adv(domain, itimestep, ierr)
       call atm_timestep(domain, dt, currTime, itimestep, exchange_halo_group)
 
    end subroutine atm_do_timestep
