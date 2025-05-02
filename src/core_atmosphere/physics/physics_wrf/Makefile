@@ -2,6 +2,8 @@
 
 .PHONY: physics_wrf physics_wrf_lib
 
+.PHONY: physics_wrf physics_wrf_lib
+
 all: dummy physics_wrf
 
 dummy:
@@ -48,9 +50,9 @@ OBJS = \
 	module_ruc_land.o              \
 	module_ruc_ice.o               \
 	module_sf_sfcdiags_ruclsm.o    \
-        module_sf_noahlsm_glacial_only.o \
-        module_sf_noah_seaice.o        \
-        module_sf_noah_seaice_drv.o    \
+	module_sf_noahlsm_glacial_only.o \
+	module_sf_noah_seaice.o        \
+	module_sf_noah_seaice_drv.o    \
 	module_sf_oml.o                \
 	module_sf_sfclay.o             \
 	module_sf_sfclayrev.o          \
@@ -73,8 +75,8 @@ physics_wrf_lib:
 
 # DEPENDENCIES:
 module_bl_mynn.o: \
-        bl_mynn_post.o \
-        bl_mynn_pre.o
+	bl_mynn_post.o \
+	bl_mynn_pre.o
 
 module_mynnsfclay_driver.o: \
 	module_mynnsfclay.o \

@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <registry model="mpas" core="atmosphere" core_abbrev="atm" version="8.2.2-3.6">
 
-
 <!-- **************************************************************************************** -->
 <!-- ************************************** Dimensions ************************************** -->
 <!-- **************************************************************************************** -->
@@ -419,10 +418,11 @@
                 <package name="bl_ysu_in" description="parameterization of YSU Planetary Boundary Layer."/>
                 <package name="bl_mynn_in" description="parameterization of MYNN Planetary Boundary Layer."/>
                 <package name="bl_mynnedmf_in" description="parameterization of MYNN-EDMF Planetary Boundary Layer."/>
-                <package name="sf_noahmp_in" description="parameterization of NOAH-MP land surface scheme."/>
 		<package name="bl_myj_in" description="parameterization of MYJ Planetary Boundary Layer."/>
                 <package name="lsm_ruc_in" description="parameterization of the RUC land surface."/>
                 <package name="lsm_noah_in" description="parameterization of the Noah land surface."/>
+                <package name="sf_noahmp_in" description="parameterization of NOAH-MP land surface scheme."/>
+
                 <package name="iau" description="Incremental Analysis Update"/>
                 <package name="limited_area" description="Limited-area simulations, which have lateral boundaries"/>
                 <package name="jedi_da" description="Data Assimilation in JEDI framework"/>
@@ -2463,7 +2463,7 @@
                 <nml_option name="config_microp_scheme" type="character" default_value="suite" in_defaults="false"
                      units="-"
                      description="configuration for cloud microphysics schemes"
-                     possible_values="`suite',`mp_wsm6',`mp_tempo',`mp_thompson',`mp_thompson_aerosols', `mp_kessler',`mp_nssl2m',`off'"/>
+                     possible_values="`suite',`mp_wsm6',`mp_thompson',`mp_thompson_aerosols', `mp_kessler',`mp_tempo',`mp_nssl2m',`off'"/>
 
 		<nml_option name="config_tempo_hailaware" type="logical" default_value="false" in_defaults="false"
 		     units="-"
@@ -2503,7 +2503,7 @@
                 <nml_option name="config_lsm_scheme" type="character" default_value="suite" in_defaults="false"
                      units="-"
                      description="configuration for land-surface schemes"
-                     possible_values="`suite',`sf_noah',`sf_ruc',`sf_noahmp`, `off'"/>
+                     possible_values="`suite',`sf_noah',`sf_noahmp`,`sf_ruc', `off'"/>
 
 	        <nml_option name="config_lakemodel" type="integer" default_value="0" in_defaults="false"
                     units="-"
@@ -4037,6 +4037,14 @@
                      description="tendency of cloud liquid water number concentration due to pbl processes"
                      packages="bl_mynn_in;bl_mynnedmf_in"/>
 
+                <var name="rqsblten" type="real" dimensions="nVertLevels nCells Time" units="kg kg^{-1} s^{-1}"
+                     description="tendency of snow mixing ratio due to pbl processes"
+                     packages="bl_mynn_in"/>
+
+                <var name="rncblten" type="real" dimensions="nVertLevels nCells Time" units="nb kg^{-1} s^{-1}"
+                     description="tendency of cloud liquid water number concentration due to pbl processes"
+                     packages="bl_mynn_in"/>
+
                 <var name="rniblten" type="real" dimensions="nVertLevels nCells Time" units="nb kg^{-1} s^{-1}"
                      description="tendency of cloud ice number concentration due to pbl processes"
                      packages="bl_mynn_in;bl_mynnedmf_in"/>
@@ -4048,6 +4056,14 @@
                 <var name="rnwfablten" type="real" dimensions="nVertLevels nCells Time" units="nb kg^{-1} s^{-1}"
                      description="tendency of water-friendly aerosol number concentration due to pbl processes"
                      packages="bl_mynn_in;bl_mynnedmf_in"/>
+
+                <var name="rnifablten" type="real" dimensions="nVertLevels nCells Time" units="nb kg^{-1} s^{-1}"
+                     description="tendency of ice-friendly aerosol number concentration due to pbl processes"
+                     packages="bl_mynn_in"/>
+
+                <var name="rnwfablten" type="real" dimensions="nVertLevels nCells Time" units="nb kg^{-1} s^{-1}"
+                     description="tendency of water-friendly aerosol number concentration due to pbl processes"
+                     packages="bl_mynn_in"/>
 
 	        <!-- MGD should we add packages to the field below? -->
 	        <var name="rublten_Edge" type="real"     dimensions="nVertLevels nEdges Time"/>

@@ -761,8 +761,9 @@ if( trim(config_microp_scheme)=='mp_nssl2m' ) then
  if(config_microp_re) then
     if(trim(config_microp_scheme)=='mp_thompson'          .or. &
        trim(config_microp_scheme)=='mp_tempo'             .or. &
+       trim(config_microp_scheme)=='mp_nssl2m'            .or. &
        trim(config_microp_scheme)=='mp_thompson_aerosols' .or. &
-       trim(config_microp_scheme)=='mp_wsm6' .or. trim(config_microp_scheme)=='mp_nssl2m') then
+       trim(config_microp_scheme)=='mp_wsm6') then
        if(trim(config_radt_lw_scheme)=='rrtmg_lw' .and. trim(config_radt_sw_scheme)=='rrtmg_sw') then
           has_reqc = 1
           has_reqi = 1

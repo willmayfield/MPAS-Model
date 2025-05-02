@@ -479,6 +479,7 @@
  real(kind=RKIND),dimension(:),pointer   :: chlowq,thz0,qz0,uz0,vz0,ct,akhs,akms,lh,mixht
  real(kind=RKIND),dimension(:,:),pointer :: zgrid
  integer,dimension(:),pointer            :: lowlyr
+
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_config(configs,'config_pbl_scheme',pbl_scheme)
@@ -1139,6 +1140,31 @@
        enddo
        enddo
 
+       if(f_ni) then
+          call mpas_pool_get_array(tend_physics,'rniblten',rniblten)
+          do j = jts,jte
+             do k = kts,kte
+                do i = its,ite
+                   rniblten(k,i) = rniblten_p(i,k,j)
+                enddo
+             enddo
+          enddo
+       endif
+       if(f_nc .and. f_nifa .and. f_nwfa) then
+          call mpas_pool_get_array(tend_physics,'rncblten'  ,rncblten  )
+          call mpas_pool_get_array(tend_physics,'rnifablten',rnifablten)
+          call mpas_pool_get_array(tend_physics,'rnwfablten',rnwfablten)
+          do j = jts,jte
+             do k = kts,kte
+                do i = its,ite
+                   rncblten(k,i)   = rncblten_p(i,k,j)
+                   rnifablten(k,i) = rnifablten_p(i,k,j)
+                   rnwfablten(k,i) = rnwfablten_p(i,k,j)
+                enddo
+             enddo
+          enddo
+       endif
+
     case default
 
  end select pbl_select
@@ -1210,11 +1236,11 @@
                    bl_mynn_edmf_tke,    &
                    bl_mynn_edmf_output, &
                    bl_mynn_mixscalars,  &
-                   bl_mynn_mixaerosols, &
-                   bl_mynn_mixnumcon,   &
                    bl_mynn_cloudmix,    &
                    bl_mynn_mixqt,       &
-                   bl_mynn_tkebudget,   &
+                   bl_mynn_tkebudget
+integer,pointer::  bl_mynn_mixaerosols, &
+                   bl_mynn_mixnumcon,   &
                    icloud_bl,           &
                    spp_pbl
 
@@ -1297,6 +1323,7 @@
        call mpas_pool_get_config(configs,'config_mynn_tkebudget'  ,bl_mynn_tkebudget  )
        call mpas_pool_get_config(configs,'config_icloud_bl'       ,icloud_bl          )
        call mpas_pool_get_config(configs,'config_spp_pbl'         ,spp_pbl            )
+
 !      call mpas_log_write(' ')
 !      call mpas_log_write('--- enter subroutine mynn_bl_driver:')
 !      call mpas_log_write('--- config_mynn_cloudpdf    = $i',intArgs=(/bl_mynn_cloudpdf/))
@@ -1384,9 +1411,9 @@
                   its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte ,                 &
                   errmsg = errmsg , errflg = errflg                                                       &
                           )
-      call mpas_timer_stop('bl_mynn')
-!     call mpas_log_write('--- exit subroutine mynn_bl_driver:')
-!     call mpas_log_write(' ')
+       call mpas_timer_stop('bl_mynn')
+!      call mpas_log_write('--- exit subroutine mynn_bl_driver:')
+!      call mpas_log_write(' ')
        
     case("bl_mynnedmf")
        call mpas_pool_get_config(configs,'config_mynn_cloudpdf'   ,bl_mynn_cloudpdf   )
@@ -1593,7 +1620,6 @@
                             )
        call mpas_timer_stop('MYJ_pbl')
          
-
     case default
 
  end select pbl_select

@@ -415,6 +415,7 @@ module init_atm_cases
                else
                   call init_atm_thompson_aerosols_lbc(timeString, timeStart, block_ptr, mesh, diag, state, lbc_state)
                endif
+
                block_ptr => block_ptr % next
             end do
 

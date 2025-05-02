@@ -433,7 +433,6 @@
 !inout arguments:
  type(mpas_pool_type),intent(inout):: diag_physics
  type(mpas_pool_type),intent(inout):: state
-! type(mpas_pool_type),intent(in):: diag
 
 !local pointer:
  logical,pointer:: do_restart
@@ -492,9 +491,12 @@
           call nssl_2mom_init(ipctmp=5,mixphase=0,ihvol=1, myrank=dminfo % my_proc_id, mpiroot = IO_NODE)
        endif
 
-     case default
+    case("mp_wsm6")
+       call mp_wsm6_init(den0=rho_a,denr=rho_r,dens=rho_s,cl=cliq,cpv=cpv, &
+                         hail_opt=hail_opt,errmsg=errmsg,errflg=errflg)
 
-  end select microp_select
+    case default
+ end select microp_select
 
 !call mpas_log_write('--- end subroutine init_microphysics:')
 
@@ -693,7 +695,7 @@
        istep = istep + 1
        enddo
        call mpas_timer_stop('mp_tempo')
-       
+
     case ("mp_thompson")
        call mpas_timer_start('mp_thompson')
        istep = 1
@@ -709,15 +711,15 @@
                   sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
                   re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
                   has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
-                  ntc        = ntc_p      , muc        = muc_p                                    , &
+                  ntc       = ntc_p       , muc        = muc_p                                    , &
                   ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
                   ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
                   its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte             &
                            )
-          istep = istep + 1
-          enddo
-          call mpas_timer_stop('mp_thompson')
-          
+       istep = istep + 1
+       enddo
+       call mpas_timer_stop('mp_thompson')
+
     case ("mp_thompson_aerosols")
        call mpas_timer_start('mp_thompson_aerosols')
        istep = 1
@@ -821,7 +823,6 @@
        call mpas_timer_stop('mp_nssl')
 
     case default
-
  end select microp_select
 
 !... calculate the 10cm radar reflectivity and relative humidity, if needed:
@@ -831,9 +832,9 @@
  if (l_diags) then
     if(trim(microp_scheme) == "mp_wsm6"     .or. &
        trim(microp_scheme) == "mp_thompson" .or. &
-       trim(microp_scheme) == "mp_thompson_aerosols" .or. &
-       trim(microp_scheme) == "mp_tempo" .or. &
-       trim(microp_scheme) == "mp_nssl2m"   ) then
+       trim(microp_scheme) == "mp_tempo"    .or. &
+       trim(microp_scheme) == "mp_nssl2m"   .or. &
+       trim(microp_scheme) == "mp_thompson_aerosols") then
 !       call mpas_log_write('Computing 3d reflectivity')
        call compute_radar_reflectivity(configs,diag_physics,its,ite)
     else
@@ -844,7 +845,6 @@
     !calculate the relative humidity over water if the temperature is strictly greater than 0.C,
     !over ice otherwise.
     call compute_relhum(diag,its,ite)
-
  end if
 
  if (do_diag_dbz_flag) then
@@ -1279,7 +1279,7 @@
              qg1d(k)  = qg_p(i,k,j)
              nr1d(k)  = nr_p(i,k,j)
              dBZ1d(k) = refl10cm_p(i,k,j)
-             zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,k,j) ! height AGL at mid-layer
+             zp(k) = z_p(i,k,j) - z_p(i,1,j) + 0.5*dz_p(i,k,j) ! height AGL
           enddo
           
           call calc_refl10cm(qv1d,qc1d,qr1d,nr1d,qs1d,qg1d,t1d,p1d,dBZ1d,kts,kte,i,j)

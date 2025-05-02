@@ -207,9 +207,11 @@
     qh_p               !hail mixing ratio                                                   [kg/kg]
 
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
-    nc_p,             &!
-    ni_p,             &!
-    nr_p,             &!
+    nc_p,             &!cloud water droplet number concentration                             [#/kg]
+    ni_p,             &!cloud ice crystal number concentration                               [#/kg]
+    nr_p               !rain drop number concentration                                       [#/kg]
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
     ns_p, ng_p, nh_p, nccn_p, &
     volg_p, volh_p,   &!
     nwfa_p,           &!
@@ -257,12 +259,14 @@
     warm_rain = .false.!warm-phase cloud microphysics only (used in WRF).
 
  logical:: &
+    f_qs,             &!parameter set to true to include the snow mixing ratio.
+    f_qg,             &!parameter set to true to include the graupel mixing ratio.
+    f_qoz              !parameter set to true to include the ozone mixing ratio.
+
+ logical:: &
     f_qc,             &!parameter set to true to include the cloud water mixing ratio.
     f_qr,             &!parameter set to true to include the rain mixing ratio.
     f_qi,             &!parameter set to true to include the cloud ice mixing ratio.
-    f_qs,             &!parameter set to true to include the snow minxg ratio.
-    f_qg,             &!parameter set to true to include the graupel mixing ratio.
-    f_qoz,            &!parameter set to true to include the ozone mixing ratio.
     f_qh
 
  logical:: &
@@ -300,12 +304,29 @@
     recloud_p,        &!
     reice_p,          &!
     resnow_p,         &!
-    refl10cm_p,       &!
-    refl10cm_cu_p      !
+    refl10cm_p         !
+
  real(kind=RKIND),dimension(:,:),allocatable:: &
     refl10cm_1km_p
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
+    refl10cm_cu_p      !
+
  real(kind=RKIND),dimension(:,:),allocatable:: &
     max_hail_diameter_sfc_p, max_hail_diameter_column_p
+
+!... for Thompson cloud microphysics parameterization, including aerosol-aware option:
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    ntc_p,            &!
+    muc_p,            &!
+    nifa2d_p,         &!surface emission of "ice-friendly" aerosols                                     [#/kg-1/s]
+    nwfa2d_p           !surface emission of "water-friendly" aerosols                                   [#/kg-1/s]
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
+    nifa_p,           &!"ice-friendly" number concentration                                                 [#/kg]
+    nwfa_p             !"water-friendly" number concentration                                               [#/kg]
+
+>>>>>>> master
 !=================================================================================================================
 !... variables and arrays related to parameterization of convection:
 !=================================================================================================================
@@ -446,10 +467,12 @@
  real(kind=RKIND),dimension(:,:),allocatable:: &
     maxwidthbl_p,     &!max plume width                                                                        [m]
     maxmfbl_p,        &!maximum mass flux for PBL shallow convection.
-    zbl_plume_p,      &!height of highest penetrating plume                                                    [m]
+    zbl_plume_p        !height of highest penetrating plume                                                    [m]
+
+ real(kind=RKIND),dimension(:,:),allocatable:: &
     excessh_p,        &!maximum heat excess applied to plumes                                                  [K]
     excessq_p          !maximum moisture excess applied to plumes                                          [kg/kg]
-      
+
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     dqke_p,           &!
     qbuoy_p,          &!
@@ -473,7 +496,9 @@
     detqv_p,          &!
     qcbl_p,           &!
     qibl_p,           &!
-    cldfrabl_p,       &!
+    cldfrabl_p         !
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
     cldfrac_cu_p       !
 
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
@@ -489,10 +514,9 @@
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     pattern_spp_lsm, field_sf    !stochastic forcing for the RUC LSM
 
-!... MYJ PBL scheme (module_bl_myjpbl.F):
  real(kind=RKIND),dimension(:,:),allocatable:: &
-    chlowq_p,         &!
-    mixht_p            !
+    chlowq_p,         &! MYJ PBL scheme (module_bl_myjpbl.F)
+    mixht_p            ! MYJ PBL scheme (module_bl_myjpbl.F)
 
 !=================================================================================================================
 !... variables and arrays related to parameterization of gravity wave drag over orography:

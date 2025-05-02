@@ -114,6 +114,7 @@
  character(len=StrKIND),pointer:: mp_scheme,     &
                                   radt_sw_scheme
  logical,pointer:: config_tempo_aerosolaware
+
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_config(configs,'config_microp_scheme' ,mp_scheme     )
@@ -190,6 +191,7 @@
                 if(.not.allocated(taod5502d_p)) allocate(taod5502d_p(ims:ime,jms:jme))
                 if(.not.allocated(taod5503d_p)) allocate(taod5503d_p(ims:ime,kms:kme,jms:jme))
              endif
+
           case default
        end select aerosol_select
 
@@ -326,6 +328,7 @@
                 if(allocated(taod5502d_p)) deallocate(taod5502d_p)
                 if(allocated(taod5503d_p)) deallocate(taod5503d_p)
              endif
+
           case default
        end select aerosol_select
 
@@ -412,7 +415,7 @@
  call mpas_pool_get_config(configs,'config_radt_sw_scheme',radt_sw_scheme      )
  call mpas_pool_get_config(configs,'config_microp_scheme' ,microp_scheme       )
  call mpas_pool_get_config(configs,'config_tempo_aerosolaware',config_tempo_aerosolaware)
-      
+
  call mpas_pool_get_array(mesh,'latCell',latCell)
  call mpas_pool_get_array(mesh,'lonCell',lonCell)
 
