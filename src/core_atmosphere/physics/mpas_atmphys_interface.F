@@ -661,16 +661,6 @@
  integer,pointer:: index_qv,index_qc,index_qr,index_qi,index_qs,index_qg
  integer,pointer:: index_nc,index_ni,index_nr,index_nifa,index_nwfa
  real(kind=RKIND),dimension(:),pointer    :: nifa2d,nwfa2d,nt_c,mu_c
- real(kind=RKIND),dimension(:,:),pointer  :: zgrid,w
- real(kind=RKIND),dimension(:,:),pointer  :: zz,exner,pressure_b
- real(kind=RKIND),dimension(:,:),pointer  :: rho_zz,theta_m,pressure_p
- real(kind=RKIND),dimension(:,:),pointer  :: qv,qc,qr,qi,qs,qg
- real(kind=RKIND),dimension(:,:),pointer  :: nc,ni,nr,nifa,nwfa
- real(kind=RKIND),dimension(:,:),pointer  :: rainprod,evapprod
- real(kind=RKIND),dimension(:,:),pointer  :: re_cloud,re_ice,re_snow
- real(kind=RKIND),dimension(:,:),pointer  :: rthmpten,rqvmpten,rqcmpten,rqrmpten,rqimpten,rqsmpten,rqgmpten
- real(kind=RKIND),dimension(:,:),pointer  :: rncmpten,rnimpten,rnrmpten,rnifampten,rnwfampten
- real(kind=RKIND),dimension(:,:,:),pointer:: scalars
 !TEMPO/NSSL
  character(len=StrKIND),pointer:: nssl_moments
  logical,pointer:: config_tempo_hailaware, config_tempo_aerosolaware
@@ -680,12 +670,19 @@
  integer,pointer:: index_ns,index_ng,index_nh,index_nccn
  integer,pointer:: index_volg,index_volh
  
- real(kind=RKIND),dimension(:,:),pointer  :: qh
- real(kind=RKIND),dimension(:,:),pointer  :: ns,ng,nh,nccn
+ real(kind=RKIND),dimension(:,:),pointer  :: zgrid,w
+ real(kind=RKIND),dimension(:,:),pointer  :: zz,exner,pressure_b
+ real(kind=RKIND),dimension(:,:),pointer  :: rho_zz,theta_m,pressure_p
+ real(kind=RKIND),dimension(:,:),pointer  :: qv,qc,qr,qi,qs,qg,qh
+ real(kind=RKIND),dimension(:,:),pointer  :: ni,nr,nc,ns,ng,nh,nccn,nwfa,nifa
  real(kind=RKIND),dimension(:,:),pointer  :: volg,volh,zrw,zgw,zhw
- real(kind=RKIND),dimension(:,:),pointer  :: refl10cm
+ real(kind=RKIND),dimension(:,:),pointer  :: rainprod,evapprod,refl10cm
  real(kind=RKIND),dimension(:),pointer  :: max_hail_diameter_sfc, max_hail_diameter_column
+ real(kind=RKIND),dimension(:,:),pointer  :: re_cloud,re_ice,re_snow
  real(kind=RKIND),dimension(:,:),pointer  :: qc_bl, cldfrac_bl
+ real(kind=RKIND),dimension(:,:),pointer  :: rthmpten,rqvmpten,rqcmpten,rqrmpten,rqimpten,rqsmpten,rqgmpten
+ real(kind=RKIND),dimension(:,:),pointer  :: rncmpten,rnimpten,rnrmpten,rnifampten,rnwfampten
+ real(kind=RKIND),dimension(:,:,:),pointer:: scalars
 
 !local variables:
  integer:: i,k,j
@@ -709,9 +706,10 @@
  call mpas_pool_get_array(state,'theta_m',theta_m,time_lev)
  call mpas_pool_get_array(state,'w'      ,w      ,time_lev)
 
- call mpas_pool_get_dimension(state,'index_qv',index_qv)
- call mpas_pool_get_dimension(state,'index_qc',index_qc)
- call mpas_pool_get_dimension(state,'index_qr',index_qr)
+ call mpas_pool_get_dimension(state,'index_qv'  ,index_qv  )
+ call mpas_pool_get_dimension(state,'index_qc'  ,index_qc  )
+ call mpas_pool_get_dimension(state,'index_qr'  ,index_qr  )
+
  call mpas_pool_get_array(state,'scalars',scalars,time_lev)
  qv => scalars(index_qv,:,:)
  qc => scalars(index_qc,:,:)
@@ -1140,8 +1138,16 @@
 
 !local pointers:
  character(len=StrKIND),pointer:: mp_scheme
+ character(len=StrKIND),pointer:: nssl_moments
+ logical,pointer:: config_tempo_hailaware, config_tempo_aerosolaware
  integer,pointer:: index_qv,index_qc,index_qr,index_qi,index_qs,index_qg
  integer,pointer:: index_nc,index_ni,index_nr,index_nifa,index_nwfa
+!TEMPO/NSSL
+ integer,pointer:: index_qh
+ integer,pointer:: index_zrw,index_zgw,index_zhw
+ integer,pointer:: index_ns,index_ng,index_nh,index_nccn
+ integer,pointer:: index_volg,index_volh
+ 
  real(kind=RKIND),dimension(:),pointer    :: surface_pressure,tend_sfc_pressure
  real(kind=RKIND),dimension(:),pointer    :: nifa2d,nwfa2d
  real(kind=RKIND),dimension(:,:),pointer  :: zgrid
@@ -1149,26 +1155,15 @@
  real(kind=RKIND),dimension(:,:),pointer  :: rho_zz,theta_m,pressure_p
  real(kind=RKIND),dimension(:,:),pointer  :: rt_diabatic_tend
  real(kind=RKIND),dimension(:,:),pointer  :: dtheta_dt_mp
- real(kind=RKIND),dimension(:,:),pointer  :: qv,qc,qr,qi,qs,qg
- real(kind=RKIND),dimension(:,:),pointer  :: nc,ni,nr,nifa,nwfa
- real(kind=RKIND),dimension(:,:),pointer  :: rainprod,evapprod
+ real(kind=RKIND),dimension(:,:),pointer  :: qv,qc,qr,qi,qs,qg,qh
+ real(kind=RKIND),dimension(:,:),pointer  :: ni,nr,nc,ns,ng,nh,nccn,nwfa,nifa
+ real(kind=RKIND),dimension(:,:),pointer  :: volg,volh,zrw,zgw,zhw
+ real(kind=RKIND),dimension(:,:),pointer  :: rainprod,evapprod,refl10cm
+ real(kind=RKIND),dimension(:),pointer  :: max_hail_diameter_sfc, max_hail_diameter_column
  real(kind=RKIND),dimension(:,:),pointer  :: re_cloud,re_ice,re_snow
  real(kind=RKIND),dimension(:,:),pointer  :: rthmpten,rqvmpten,rqcmpten,rqrmpten,rqimpten,rqsmpten,rqgmpten
  real(kind=RKIND),dimension(:,:),pointer  :: rncmpten,rnimpten,rnrmpten,rnifampten,rnwfampten
  real(kind=RKIND),dimension(:,:,:),pointer:: scalars
-
-!TEMPO/NSSL
- character(len=StrKIND),pointer:: nssl_moments
- logical,pointer:: config_tempo_hailaware, config_tempo_aerosolaware
- integer,pointer:: index_qh
- integer,pointer:: index_zrw,index_zgw,index_zhw
- integer,pointer:: index_ns,index_ng,index_nh,index_nccn
- integer,pointer:: index_volg,index_volh
- real(kind=RKIND),dimension(:,:),pointer  :: qh
- real(kind=RKIND),dimension(:,:),pointer  :: ns,ng,nh,nccn
- real(kind=RKIND),dimension(:,:),pointer  :: volg,volh,zrw,zgw,zhw
- real(kind=RKIND),dimension(:,:),pointer  :: refl10cm
- real(kind=RKIND),dimension(:),pointer  :: max_hail_diameter_sfc, max_hail_diameter_column
 
 !local variables:
  integer:: icount
@@ -1202,6 +1197,7 @@
  call mpas_pool_get_dimension(state,'index_qv'  ,index_qv  )
  call mpas_pool_get_dimension(state,'index_qc'  ,index_qc  )
  call mpas_pool_get_dimension(state,'index_qr'  ,index_qr  )
+
  call mpas_pool_get_array(state,'scalars',scalars,time_lev)
  qv   => scalars(index_qv,:,:)
  qc   => scalars(index_qc,:,:)

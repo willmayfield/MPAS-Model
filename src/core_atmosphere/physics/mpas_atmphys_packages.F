@@ -39,13 +39,11 @@
  character(len=StrKIND),pointer:: config_convection_scheme
  character(len=StrKIND),pointer:: config_pbl_scheme
  character(len=StrKIND),pointer:: config_lsm_scheme
- logical,pointer:: mp_kessler_in,mp_thompson_in,mp_thompson_aers_in,mp_wsm6_in
- logical,pointer:: cu_grell_freitas_in,cu_kain_fritsch_in,cu_ntiedtke_in
- logical,pointer:: bl_mynn_in,bl_ysu_in
- logical,pointer:: bl_mynnedmf_in,bl_myj_in
  logical,pointer:: config_tempo_hailaware, config_tempo_aerosolaware
- logical,pointer:: mp_nssl2m_in,nssl3m_in
+ logical,pointer:: mp_kessler_in,mp_thompson_in,mp_thompson_aers_in,mp_wsm6_in,mp_nssl2m_in,nssl3m_in
  logical,pointer:: mp_tempo_in, tempo_hailaware_in, tempo_aerosolaware_in
+ logical,pointer:: cu_grell_freitas_in,cu_kain_fritsch_in,cu_ntiedtke_in
+ logical,pointer:: bl_mynn_in,bl_mynnedmf_in,bl_ysu_in,bl_myj_in
  logical,pointer:: lsm_noah_in,lsm_ruc_in
  logical,pointer:: sf_noahmp_in
 
@@ -77,9 +75,6 @@
  nullify(mp_thompson_aers_in)
  call mpas_pool_get_package(packages,'mp_thompson_aers_inActive',mp_thompson_aers_in)
 
- nullify(mp_wsm6_in)
- call mpas_pool_get_package(packages,'mp_wsm6_inActive',mp_wsm6_in)
-
  nullify(mp_tempo_in)
  call mpas_pool_get_package(packages,'mp_tempo_inActive',mp_tempo_in)
 
@@ -89,6 +84,9 @@
  nullify(tempo_hailaware_in)
  call mpas_pool_get_package(packages,'tempo_hailaware_inActive',tempo_hailaware_in)
  
+ nullify(mp_wsm6_in)
+ call mpas_pool_get_package(packages,'mp_wsm6_inActive',mp_wsm6_in)
+
  nullify(mp_nssl2m_in)
  call mpas_pool_get_package(packages,'mp_nssl2m_inActive',mp_nssl2m_in)
 
@@ -111,10 +109,10 @@
  mp_kessler_in       = .false.
  mp_thompson_in      = .false.
  mp_thompson_aers_in = .false.
- mp_wsm6_in          = .false.
  mp_tempo_in         = .false.
  tempo_aerosolaware_in  = .false.
  tempo_hailaware_in  = .false.
+ mp_wsm6_in          = .false.
  mp_nssl2m_in            = .false.
  nssl3m_in               = .false.
 
@@ -144,10 +142,10 @@
  call mpas_log_write('    mp_kessler_in           = $l', logicArgs=(/mp_kessler_in/))
  call mpas_log_write('    mp_thompson_in          = $l', logicArgs=(/mp_thompson_in/))
  call mpas_log_write('    mp_thompson_aers_in     = $l', logicArgs=(/mp_thompson_aers_in/))
- call mpas_log_write('    mp_wsm6_in              = $l', logicArgs=(/mp_wsm6_in/))
  call mpas_log_write('    mp_tempo_in             = $l', logicArgs=(/mp_tempo_in/))
  call mpas_log_write('    tempo_aerosolaware_in   = $l', logicArgs=(/tempo_aerosolaware_in/))
  call mpas_log_write('    tempo_hailaware_in      = $l', logicArgs=(/tempo_hailaware_in/))
+ call mpas_log_write('    mp_wsm6_in              = $l', logicArgs=(/mp_wsm6_in/))
  call mpas_log_write('    mp_nssl2m_in            = $l', logicArgs=(/mp_nssl2m_in/))
  call mpas_log_write('    nssl3m_in               = $l', logicArgs=(/nssl3m_in/))
 

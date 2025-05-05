@@ -259,11 +259,11 @@
  integer,intent(in):: its,ite
 
 !local pointers:
- character(len=StrKIND),pointer:: convection_scheme, &
-                                  microp_scheme
- character(len=StrKIND),pointer:: lsm_scheme
-
  integer,pointer:: globalCells(:)
+ character(len=StrKIND),pointer:: convection_scheme, &
+                                  lsm_scheme,        &
+                                  microp_scheme
+
  integer,dimension(:),pointer:: isltyp, ivgtyp
 
  real(kind=RKIND),dimension(:),pointer:: acsnom,acsnow,br,chs,chs2,cpm,cqs2,qgh,qsfc,glw,gsw,grdflx,hfx, &
@@ -284,8 +284,8 @@
 !call mpas_log_write('--- enter subroutine seaice_from_MPAS:')
 
  call mpas_pool_get_config(configs,'config_convection_scheme',convection_scheme)
- call mpas_pool_get_config(configs,'config_microp_scheme'    ,microp_scheme    )
  call mpas_pool_get_config(configs,'config_lsm_scheme'       ,lsm_scheme       )
+ call mpas_pool_get_config(configs,'config_microp_scheme'    ,microp_scheme    )
 
  call mpas_pool_get_array(diag_physics,'acsnom'    ,acsnom    )
  call mpas_pool_get_array(diag_physics,'acsnow'    ,acsnow    )
@@ -384,7 +384,6 @@
            flqc_p(i,j) = flqc(i)
            flhc_p(i,j) = flhc(i)
        endif
-
        !--- inout variables:
        do n = 1,num_soils
           tslb_p(i,n,j) = tslb(n,i)

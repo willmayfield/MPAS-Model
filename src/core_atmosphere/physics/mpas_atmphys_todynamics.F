@@ -211,8 +211,7 @@
  call physics_get_tend_work( &
               block,mesh,nCells,nEdges,nCellsSolve,nEdgesSolve,rk_step,dynamics_substep, &
               pbl_scheme,convection_scheme,microp_scheme,radt_lw_scheme,radt_sw_scheme,  &
-              tempo_aerosolaware,                                                        &
-              index_qv,index_qc,index_qr,index_qi,index_qs,                              &
+              tempo_aerosolaware,index_qv,index_qc,index_qr,index_qi,index_qs,           &
               index_nc,index_ni,index_nifa,index_nwfa,                                   &
               mass,mass_edge,theta_m,scalars,                                            &
               rublten,rvblten,rthblten,rqvblten,rqcblten,rqiblten,rqsblten,              &
@@ -252,8 +251,7 @@
  subroutine physics_get_tend_work( &
                     block,mesh,nCells,nEdges,nCellsSolve,nEdgesSolve,rk_step,dynamics_substep, &
                     pbl_scheme,convection_scheme,microp_scheme,radt_lw_scheme,radt_sw_scheme,  &
-                    tempo_aerosolaware,                                                        &
-                    index_qv,index_qc,index_qr,index_qi,index_qs,                              &
+                    tempo_aerosolaware,index_qv,index_qc,index_qr,index_qi,index_qs,           &
                     index_nc,index_ni,index_nifa,index_nwfa,                                   &
                     mass,mass_edge,theta_m,scalars,                                            &
                     rublten,rvblten,rthblten,rqvblten,rqcblten,rqiblten,rqsblten,              &
@@ -276,7 +274,6 @@
  character(len=StrKIND),intent(in):: radt_lw_scheme
  character(len=StrKIND),intent(in):: radt_sw_scheme
  logical,intent(in):: tempo_aerosolaware
->>>>>>> master
 
  integer,intent(in):: nCells,nEdges,nCellsSolve,nEdgesSolve
  integer,intent(in):: rk_step,dynamics_substep

@@ -64,7 +64,6 @@
 
  if((trim(config_gwdo_scheme) == 'bl_ugwp_gwdo').and.config_ngw_scheme) &
     call ugwpv1_ngw_deallocate
- endif
 
  end subroutine atmphys_finalize
 

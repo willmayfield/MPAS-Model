@@ -200,6 +200,7 @@
  if(.not.allocated(ust_urb_p)   ) allocate(ust_urb_p(ims:ime,jms:jme)   )
  if(.not.allocated(utype_urb_p) ) allocate(utype_urb_p(ims:ime,jms:jme) )
 
+
  if(config_lsm_scheme=='sf_ruc') then
     if(.not.allocated(zs_p)           ) allocate(zs_p(1:num_soils)                           )
     if(.not.allocated(rhosnf_p)       ) allocate(rhosnf_p(ims:ime,jms:jme)                   )
@@ -312,6 +313,7 @@
  if(allocated(ust_urb_p)   ) deallocate(ust_urb_p   )
  if(allocated(utype_urb_p) ) deallocate(utype_urb_p )
 
+
  if (config_lsm_scheme == "sf_ruc") then
     if(allocated(zs_p)           ) deallocate(zs_p           )
     if(allocated(rhosnf_p)       ) deallocate(rhosnf_p       )
@@ -421,7 +423,6 @@
  call mpas_pool_get_array(diag_physics,'udrunoff'  ,udrunoff  )
  call mpas_pool_get_array(diag_physics,'z0'        ,z0        )
  call mpas_pool_get_array(diag_physics,'znt'       ,znt       )
-
  if (config_lsm_scheme .eq. "sf_ruc") then
    call mpas_pool_get_array(diag_physics,'rhosnf'         ,rhosnf           )
    call mpas_pool_get_array(diag_physics,'precipfr'       ,precipfr         )
@@ -653,8 +654,8 @@
  integer,intent(in):: its,ite
 
 !local pointers:
- character(len=StrKIND),pointer:: config_microp_scheme
- character(len=StrKIND),pointer:: config_lsm_scheme
+ character(len=StrKIND),pointer:: config_microp_scheme, &
+                                  config_lsm_scheme
 
  integer,dimension(:),pointer:: isltyp,ivgtyp
 
@@ -713,7 +714,6 @@
  call mpas_pool_get_array(diag_physics,'udrunoff'  ,udrunoff  )
  call mpas_pool_get_array(diag_physics,'z0'        ,z0        )
  call mpas_pool_get_array(diag_physics,'znt'       ,znt       )
-
  if (config_lsm_scheme .eq. "sf_ruc") then
    call mpas_pool_get_array(diag_physics,'rhosnf'         ,rhosnf     )
    call mpas_pool_get_array(diag_physics,'precipfr'       ,precipfr   )

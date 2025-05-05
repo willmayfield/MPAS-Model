@@ -94,6 +94,9 @@
 !   Laura D. Fowler (laura@ucar.edu) / 2017-02-16.
 ! * removed the variables f_qv and f_qg in the call to subroutine camrad.
 !   Laura D. Fowler (laura@ucar.edu) / 2024-02-13.
+!   Laura D. Fowler (laura@ucar.edu) / 2017-02-16.
+! * removed the variables f_qv and f_qg in the call to subroutine camrad.
+!   Laura D. Fowler (laura@ucar.edu) / 2024-02-13.
 
 
  contains
