@@ -413,7 +413,7 @@ module init_atm_cases
                if (rap_aerosols) then
                   call mpas_log_write('Using interpolated aerosols from first guess for LBCs. Skipping monthly climatology interpolation')
                else
-                  call init_atm_thompson_aerosols_lbc(timeString, timeStart, block_ptr, mesh, diag, state, lbc_state)
+                  call init_atm_thompson_aerosols_lbc(timeString, timeStart, block_ptr, mesh, diag, lbc_state)
                endif
                block_ptr => block_ptr % next
             end do
