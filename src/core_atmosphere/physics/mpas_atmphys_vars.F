@@ -203,13 +203,23 @@
     qr_p,             &!rain mixing ratio                                                   [kg/kg]
     qi_p,             &!cloud ice mixing ratio                                              [kg/kg]
     qs_p,             &!snow mixing ratio                                                   [kg/kg]
-    qg_p               !graupel mixing ratio                                                [kg/kg]
+    qg_p,             &!graupel mixing ratio                                                [kg/kg]
+    qh_p               !hail mixing ratio                                                   [kg/kg]
 
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
-    nc_p,             &!cloud water droplet number concentration                             [#/kg]
-    ni_p,             &!cloud ice crystal number concentration                               [#/kg]
-    nr_p               !rain drop number concentration                                       [#/kg]
+    nc_p,             &!
+    ni_p,             &!
+    nr_p,             &!
+    ns_p, ng_p, nh_p, nccn_p, &
+    volg_p, volh_p,   &!
+    nwfa_p,           &!
+    nifa_p,             zrw_p, zgw_p, zhw_p
 
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    muc_p,            &!
+    ntc_p,            &!
+    nifa2d_p
+      
 !... arrays located at w (vertical velocity) points, or at interface between layers:
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     w_p,              &!vertical velocity                                                     [m/s]
@@ -250,9 +260,10 @@
     f_qc,             &!parameter set to true to include the cloud water mixing ratio.
     f_qr,             &!parameter set to true to include the rain mixing ratio.
     f_qi,             &!parameter set to true to include the cloud ice mixing ratio.
-    f_qs,             &!parameter set to true to include the snow mixing ratio.
+    f_qs,             &!parameter set to true to include the snow minxg ratio.
     f_qg,             &!parameter set to true to include the graupel mixing ratio.
-    f_qoz              !parameter set to true to include the ozone mixing ratio.
+    f_qoz,            &!parameter set to true to include the ozone mixing ratio.
+    f_qh
 
  logical:: &
     f_nc,             &!parameter set to true to include the cloud water number concentration.
@@ -272,7 +283,11 @@
     snowncv_p,        &!
     graupelnc_p,      &!
     graupelncv_p,     &!
-    sr_p
+    sr_p,             &!
+    nwfa2d_p
+
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    frainnc_p
 
  integer:: & 
     has_reqc,         &!
@@ -285,19 +300,12 @@
     recloud_p,        &!
     reice_p,          &!
     resnow_p,         &!
-    refl10cm_p         !
-
-!... for Thompson cloud microphysics parameterization, including aerosol-aware option:
+    refl10cm_p,       &!
+    refl10cm_cu_p      !
  real(kind=RKIND),dimension(:,:),allocatable:: &
-    ntc_p,            &!
-    muc_p,            &!
-    nifa2d_p,         &!surface emission of "ice-friendly" aerosols                                     [#/kg-1/s]
-    nwfa2d_p           !surface emission of "water-friendly" aerosols                                   [#/kg-1/s]
-
- real(kind=RKIND),dimension(:,:,:),allocatable:: &
-    nifa_p,           &!"ice-friendly" number concentration                                                 [#/kg]
-    nwfa_p             !"water-friendly" number concentration                                               [#/kg]
-
+    refl10cm_1km_p
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    max_hail_diameter_sfc_p, max_hail_diameter_column_p
 !=================================================================================================================
 !... variables and arrays related to parameterization of convection:
 !=================================================================================================================
@@ -341,6 +349,7 @@
     integer, parameter:: ishallow  = 1 !shallow convection used with grell scheme.
 
  integer,dimension(:,:),allocatable:: &
+    bilbc_p,          &!
     k22_shallow_p,    &!
     kbcon_shallow_p,  &!
     ktop_shallow_p,   &!
@@ -349,7 +358,9 @@
 
  real(kind=RKIND),dimension(:,:),allocatable:: &
     xmb_total_p,      &!
-    xmb_shallow_p      !
+    xmb_shallow_p,    &!
+    sigma_deep_p,     &!
+    sigma_deep_f_p     !
 
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     rthdynten_p,      &!
@@ -364,6 +375,17 @@
     rqvdynten_p,      &!
     rqvdynblten_p,    &!
     rthdynblten_p      !
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
+    sub3d_rthcuten_p,        &!
+    sub3d_rqvcuten_p,        &!
+    sub3d_rucuten_p,         &!
+    sub3d_rvcuten_p           !
+
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    !wlpool_p,     &!
+    sgsgustcu_p,    &
+    vcpool_p
 
 !... ntiedtke specific arrays:
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
@@ -424,8 +446,10 @@
  real(kind=RKIND),dimension(:,:),allocatable:: &
     maxwidthbl_p,     &!max plume width                                                                        [m]
     maxmfbl_p,        &!maximum mass flux for PBL shallow convection.
-    zbl_plume_p        !height of highest penetrating plume                                                    [m]
-
+    zbl_plume_p,      &!height of highest penetrating plume                                                    [m]
+    excessh_p,        &!maximum heat excess applied to plumes                                                  [K]
+    excessq_p          !maximum moisture excess applied to plumes                                          [kg/kg]
+      
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     dqke_p,           &!
     qbuoy_p,          &!
@@ -449,7 +473,8 @@
     detqv_p,          &!
     qcbl_p,           &!
     qibl_p,           &!
-    cldfrabl_p         !
+    cldfrabl_p,       &!
+    cldfrac_cu_p       !
 
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     rqsblten_p,       &!tendency of snow mixing ratio due to PBL processes.
@@ -460,6 +485,14 @@
 
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     pattern_spp_pbl    !stochastic forcing for the MYMM PBL and surface layer schemes.
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
+    pattern_spp_lsm, field_sf    !stochastic forcing for the RUC LSM
+
+!... MYJ PBL scheme (module_bl_myjpbl.F):
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    chlowq_p,         &!
+    mixht_p            !
 
 !=================================================================================================================
 !... variables and arrays related to parameterization of gravity wave drag over orography:
@@ -492,6 +525,65 @@
     dtaux3d_p,        &!gravity wave drag over orography u-stress                                          [m s-1]
     dtauy3d_p          !gravity wave drag over orography u-stress                                          [m s-1]
 
+!... variables for UGWP orographic gravity wave drag:
+
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    var2dls_p,          &!orographic variance (meso-scale orographic variation)                                [m]
+    conls_p,            &!orographic convexity (meso-scale orographic variation)                               [-]
+    oa1ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    oa2ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    oa3ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    oa4ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    ol1ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    ol2ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    ol3ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    ol4ls_p,            &!orographic direction asymmetry function (meso-scale orographic variation)            [-]
+    var2dss_p,          &!orographic variance (small-scale orographic variation)                               [m]
+    conss_p,            &!orographic convexity (small-scale orographic variation)                              [-]
+    oa1ss_p,            &!orographic direction asymmetry function (small-scale orographic variation)           [-]
+    oa2ss_p,            &!orographic direction asymmetry function (small-scale orographic variation)           [-]
+    oa3ss_p,            &!orographic direction asymmetry function (small-scale orographic variation)           [-]
+    oa4ss_p,            &!orographic direction asymmetry function (small-scale orographic variation)           [-]
+    ol1ss_p,            &!orographic direction asymmetry function (small-scale orographic variation)           [-]
+    ol2ss_p,            &!orographic direction asymmetry function (small-scale orographic variation)           [-]
+    ol3ss_p,            &!orographic direction asymmetry function (small-scale orographic variation)           [-]
+    ol4ss_p              !orographic direction asymmetry function (small-scale orographic variation)           [-]
+
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    dusfc_ls_p,         &!vertically-integrated mesoscale orog gravity wave drag u-stress                     [Pa]
+    dvsfc_ls_p,         &!vertically-integrated mesoscale orog gravity wave drag v-stress                     [Pa]
+    dusfc_bl_p,         &!vertically-integrated orog blocking drag u-stress                                   [Pa]
+    dvsfc_bl_p,         &!vertically-integrated orog blocking drag v-stress                                   [Pa]
+    dusfc_ss_p,         &!vertically-integrated small-scale orog gravity wave drag u-stres                    [Pa]
+    dvsfc_ss_p,         &!vertically-integrated small-scale orog gravity wave drag v-stres                    [Pa]
+    dusfc_fd_p,         &!vertically-integrated turb orog form drag u-stress                                  [Pa]
+    dvsfc_fd_p           !vertically-integrated turb orog form drag v-stress                                  [Pa]
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
+    dtaux3d_ls_p,        &!mesoscale orog gravity wave drag u-tendency                                        [m s-2]
+    dtauy3d_ls_p,        &!mesoscale orog gravity wave drag v-tendency                                        [m s-2]
+    dtaux3d_bl_p,        &!orog blocking drag u-tendency u-tendency                                           [m s-2]
+    dtauy3d_bl_p,        &!orog blocking drag u-tendency v-tendency                                           [m s-2]
+    dtaux3d_ss_p,        &!small-scale orog gravity wave drag u-tendency                                      [m s-2]
+    dtauy3d_ss_p,        &!small-scale orog gravity wave drag v-tendency                                      [m s-2]
+    dtaux3d_fd_p,        &!turb orog form drag u-tendency                                                     [m s-2]
+    dtauy3d_fd_p          !turb orog form drag u-tendency                                                     [m s-2]
+
+!... variables for UGWP non-stationary gravity wave (NGW) drag:
+
+ integer,dimension(:,:),allocatable:: &
+    jindx1_tau_p,        &!lower latitude index of NGW momentum flux for interpolation                         [-]
+    jindx2_tau_p          !upper latitude index of NGW momentum flux for interpolation                         [-]
+
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    ddy_j1tau_p,         &!latitude interpolation weight complement for NGW momentum flux                      [-]
+    ddy_j2tau_p           !latitude interpolation weight for NGW momentum flux                                 [-]
+
+ real(kind=RKIND),dimension(:,:,:),allocatable:: &
+    dudt_ngw_p,          &!u-momentum tendency due to non-stationary gravity wave drag                        [m s-2]
+    dvdt_ngw_p,          &!v-momentum tendency due to non-stationary gravity wave drag                        [m s-2]
+    dtdt_ngw_p            !temperature tendency due to non-stationary gravity wave drag                       [K s-1]
+
 !=================================================================================================================
 !... variables and arrays related to parameterization of surface layer:
 !=================================================================================================================
@@ -506,6 +598,7 @@
     ck_p,             &!enthalpy exchange coeff at 10 meters                                                   [?]
     cka_p,            &!enthalpy exchange coeff at the lowest model level                                      [?]
     cqs2_p,           &!
+    cqs_p,            &!
     gz1oz0_p,         &!log of z1 over z0                                                                      [-]
     flhc_p,           &!exchange coefficient for heat                                                          [-]
     flqc_p,           &!exchange coefficient for moisture                                                      [-]
@@ -570,6 +663,34 @@
     sm3d_p,           &!stability function for moisture                                                        [-]
     elpbl_p            !length scale from PBL                                                                  [m]
 
+!... arrays only in myj surface layer scheme (module_sf_myjsfc.F):
+ real(kind=RKIND),dimension(:,:),allocatable:: &
+    thz0_p,           &!potential temperature at roughness length                                              [K]
+    uz0_p,            &!u at roughness length                                                                [m/s]
+    vz0_p,            &!v at roughness length                                                                [m/s]
+    akhs_p,           &!surface exchange coefficient for heat                                                  [-]
+    akms_p,           &!surface exchange coefficient for moisture                                              [-]
+    ct_p,             &!countergradient term                                                                   [-]
+    tshltr_p,         &!shelter potential temperature                                                          [K]
+    qshltr_p,         &!shelter specific humidity                                                              [-]
+    pshltr_p,         &!shelter pressure                                                                      [Pa]
+    th10_p,           &!potential temperature at 10 m                                                          [K]
+    q10_p,            &!specific humidity at 10 m                                                              [-]
+    thz0_sea,         &!potential temperature at roughness length (ice)                                        [K]
+    qz0_sea,          &!specific humidity at roughness length (ice)                                            [-]
+    uz0_sea,          &!u at roughness length (ice)                                                          [m/s]
+    vz0_sea,          &!v at roughness length (ice)                                                          [m/s]
+    akhs_sea,         &!surface exchange coefficient for heat (ice)                                            [-]
+    akms_sea,         &!surface exchange coefficient for moisture (ice)                                        [-]
+    ct_sea,           &!countergradient term (ice)                                                             [-]
+    tshltr_sea,       &!shelter potential temperature (ice)                                                    [K]
+    qshltr_sea,       &!shelter specific humidity (ice)                                                        [-]
+    pshltr_sea,       &!shelter pressure (ice)                                                                [Pa]
+    th10_sea,         &!potential temperature at 10 m (ice)                                                    [K]
+    q10_sea            !specific humidity at 10 m (ice)                                                        [-]
+
+ integer,dimension(:,:),allocatable:: &
+  lowlyr_p            !index of lowest model layer above ground                                                [-]
 !=================================================================================================================
 !... variables and arrays related to parameterization of seaice:
 !... the options set for seaice_albedo_opt, seaice_thickness_opt, and seaicesnowdepth_opt must not be changed
@@ -780,14 +901,18 @@
                        !albedos as functions of the land surface scheme.
 
  integer,public:: &
-    num_soils          !number of soil layers                                                                  [-]
+    num_soils,        &!number of soil layers                                                                  [-]
+    num_landcat,      &!number of landuse categories                                                           [-]
+    num_soilcat        !number of soil categories                                                              [-]
     
  integer,dimension(:,:),allocatable:: &
     isltyp_p,         &!dominant soil type category                                                            [-]
     ivgtyp_p           !dominant vegetation category                                                           [-]
 
  real(kind=RKIND),dimension(:),allocatable:: &
-    dzs_p              !thickness of soil layers                                                               [m]
+    dzs_p,            &!thickness of soil layers                                                               [m]
+    zs_p               !depth of soil layer bottom                                                             [m]
+
  real(kind=RKIND),dimension(:,:,:),allocatable:: &
     smcrel_p,         &!soil moisture threshold below which transpiration starts to stress                     [-]
     sh2o_p,           &!unfrozen soil moisture content                                       [volumetric fraction]
@@ -848,6 +973,26 @@
 
  type(NoahmpIO_type):: mpas_noahmp
 
+!-- arrays needed to run RUC LSM
+ real(kind=RKIND), dimension(:,:), allocatable:: &
+    rhosnf_p,           &!density of snowfall                                                             [kg m-3]
+    precipfr_p,         &!water equivalent of frozen precipitation                                            [mm]
+    qsg_p,              &!saturated mixing ratio at the surface                                          [kg kg-1]
+    qvg_p,              &!water vapor mixing ratio at the surface                                        [kg kg-1]
+    dew_p,              &!dew                                                                             [kg m-2]
+    soilt1_p,           &!snow temperature at 7.5cm depth                                                      [K]
+    tsnav_p,            &!average temperature of snowpack                                                      [C]
+    acrunoff_p,         &!run total accumulated runoff                                                    [kg m-2]
+    snowfallac_p,       &!run total accumulated snowfall taking in to account melting                         [mm] 
+    sfcexc_p,           &!Surface exhcange coefficient for heat                                            [m s-1]
+    sfcevp_p             !total evaporation                                                               [kg m-2]
+
+ real(kind=RKIND), dimension(:,:,:), allocatable:: &
+    smfr3d_p ,          &!fraction of frozen soil moisture                                                     [-]
+    landusef_p,         &!fraction of each landuse category                                                    [-]
+    soilf_p,            &!fraction of each soil category                                                       [-]
+    keepfr3d_p           !flag to keep frozen soil moisture information
+
 !=================================================================================================================
 !.. variables and arrays related to surface characteristics:
 !=================================================================================================================
@@ -873,7 +1018,7 @@
 !   is set to true. the arrays below have the same definition as the corresponding "_p" arrays:
 !=================================================================================================================
 
- real(kind=RKIND),dimension(:,:),allocatable:: br_sea,ch_sea,chs_sea,chs2_sea,cpm_sea,cqs2_sea,      &
+ real(kind=RKIND),dimension(:,:),allocatable:: br_sea,ch_sea,chs_sea,chs2_sea,cpm_sea,cqs_sea,cqs2_sea,      &
                                 flhc_sea,flqc_sea,gz1oz0_sea,hfx_sea,lh_sea,mavail_sea,mol_sea,      &
                                 psih_sea,psim_sea,fh_sea,fm_sea,qfx_sea,qgh_sea,qsfc_sea,regime_sea, &
                                 rmol_sea,ust_sea,wspd_sea,znt_sea,zol_sea,tsk_sea,xland_sea

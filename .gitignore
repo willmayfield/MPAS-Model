@@ -19,6 +19,7 @@ src/operators/*.f90
 # Executables
 *_model
 build_tables
+build_tables_tempo
 
 # NetCDF Files
 *.nc
@@ -61,3 +62,4 @@ stream_list.*
 *.i90
 
 src/core_*/inc
+build/

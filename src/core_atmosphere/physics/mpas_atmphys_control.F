@@ -152,6 +152,18 @@
     if (trim(config_sfclayer_scheme)   == 'suite') config_sfclayer_scheme   = 'sf_mynn'
     if (trim(config_lsm_scheme)        == 'suite') config_lsm_scheme        = 'sf_noah'
 
+ else if (trim(config_physics_suite) == 'hrrrv5') then
+
+    if (trim(config_microp_scheme)     == 'suite') config_microp_scheme     = 'mp_tempo'
+    if (trim(config_convection_scheme) == 'suite') config_convection_scheme = 'off'
+    if (trim(config_pbl_scheme)        == 'suite') config_pbl_scheme        = 'bl_mynnedmf'
+    if (trim(config_gwdo_scheme)       == 'suite') config_gwdo_scheme       = 'bl_ugwp_gwdo'
+    if (trim(config_radt_lw_scheme)    == 'suite') config_radt_lw_scheme    = 'rrtmg_lw'
+    if (trim(config_radt_sw_scheme)    == 'suite') config_radt_sw_scheme    = 'rrtmg_sw'
+    if (trim(config_radt_cld_scheme)   == 'suite') config_radt_cld_scheme   = 'cld_fraction_mynn'
+    if (trim(config_sfclayer_scheme)   == 'suite') config_sfclayer_scheme   = 'sf_mynnsfclay'
+    if (trim(config_lsm_scheme)        == 'suite') config_lsm_scheme        = 'sf_ruc'
+      
  else if (trim(config_physics_suite) == 'none') then
 
     if (trim(config_microp_scheme)     == 'suite') config_microp_scheme     = 'off'
@@ -177,6 +189,8 @@
            config_microp_scheme .eq. 'mp_kessler'           .or. &
            config_microp_scheme .eq. 'mp_thompson'          .or. &
            config_microp_scheme .eq. 'mp_thompson_aerosols' .or. &
+           config_microp_scheme .eq. 'mp_tempo' .or. &
+           config_microp_scheme .eq. 'mp_nssl2m'  .or. &
            config_microp_scheme .eq. 'mp_wsm6')) then
 
     write(mpas_err_message,'(A,A20)') 'illegal value for config_microp_scheme:', &
@@ -199,9 +213,11 @@
  endif
 
 !pbl scheme:
- if(.not. (config_pbl_scheme .eq. 'off'     .or. &
-           config_pbl_scheme .eq. 'bl_mynn' .or. &
-           config_pbl_scheme .eq. 'bl_ysu')) then
+ if(.not. (config_pbl_scheme .eq. 'off'         .or. &
+           config_pbl_scheme .eq. 'bl_mynn'     .or. &
+           config_pbl_scheme .eq. 'bl_mynnedmf' .or. &
+           config_pbl_scheme .eq. 'bl_ysu'      .or. &
+           config_pbl_scheme .eq. 'bl_myj')) then
 
     write(mpas_err_message,'(A,A20)') 'illegal value for pbl_scheme: ', &
           trim(config_pbl_scheme)
@@ -211,7 +227,8 @@
 
 !gravity wave drag over orography scheme:
  if(.not. (config_gwdo_scheme .eq. 'off' .or. &
-           config_gwdo_scheme .eq. 'bl_ysu_gwdo')) then
+           config_gwdo_scheme .eq. 'bl_ysu_gwdo' .or. &
+           config_gwdo_scheme .eq. 'bl_ugwp_gwdo')) then
 
     write(mpas_err_message,'(A,A20)') 'illegal value for gwdo_scheme: ', &
           trim(config_gwdo_scheme)
@@ -242,10 +259,11 @@
  endif
 
 !cloud fraction for radiation schemes:
- if(.not. (config_radt_cld_scheme .eq. 'off'           .or. &
-           config_radt_cld_scheme .eq. 'cld_incidence' .or. &
-           config_radt_cld_scheme .eq. 'cld_fraction'  .or. &
-           config_radt_cld_scheme .eq. 'cld_fraction_thompson')) then
+ if(.not. (config_radt_cld_scheme .eq. 'off'                   .or. &
+           config_radt_cld_scheme .eq. 'cld_incidence'         .or. &
+           config_radt_cld_scheme .eq. 'cld_fraction'          .or. &
+           config_radt_cld_scheme .eq. 'cld_fraction_thompson' .or. &
+           config_radt_cld_scheme .eq. 'cld_fraction_mynn')) then
 
     write(mpas_err_message,'(A,A20)') 'illegal value for calculation of cloud fraction: ', &
           trim(config_radt_cld_scheme)
@@ -265,12 +283,23 @@
     config_radt_cld_scheme = "cld_incidence"
 
  endif
+ if(.not. (config_pbl_scheme .eq. 'bl_mynn'     .or.   &
+           config_pbl_scheme .eq. 'bl_mynnedmf') .and. &
+           (config_radt_cld_scheme .eq. 'cld_fraction_mynn')) then
+
+          write(mpas_err_message,'(A,A20)') 'illegal cloud fraction option for pbl_scheme: ', &
+                trim(config_pbl_scheme)
+          call physics_error_fatal(mpas_err_message)
+
+ endif
 
 !surface-layer scheme:
- if(.not. (config_sfclayer_scheme .eq. 'off'              .or. &
-           config_sfclayer_scheme .eq. 'sf_mynn'          .or. &
+ if(.not. (config_sfclayer_scheme .eq. 'off'     .or. &
+           config_sfclayer_scheme .eq. 'sf_mynn' .or. &
+           config_sfclayer_scheme .eq. 'sf_mynnsfclay' .or. &
            config_sfclayer_scheme .eq. 'sf_monin_obukhov' .or. &
-           config_sfclayer_scheme .eq. 'sf_monin_obukhov_rev')) then
+           config_sfclayer_scheme .eq. 'sf_monin_obukhov_rev' .or. &
+           config_sfclayer_scheme .eq. 'sf_myj' )) then
  
     write(mpas_err_message,'(A,A20)') 'illegal value for surface layer scheme: ', &
           trim(config_sfclayer_scheme)
@@ -278,13 +307,17 @@
  else
     if(config_pbl_scheme == 'bl_mynn') then
        config_sfclayer_scheme = 'sf_mynn'
+    elseif(config_pbl_scheme == 'bl_mynnedmf') then
+       config_sfclayer_scheme = 'sf_mynnsfclay'
     elseif(config_pbl_scheme == 'bl_ysu') then
        if(config_sfclayer_scheme /= 'sf_monin_obukhov' .and. &
           config_sfclayer_scheme /= 'sf_monin_obukhov_rev') then
           write(mpas_err_message,'(A,A20)') 'wrong choice for surface layer scheme with YSU PBL: ', &
                 trim(config_sfclayer_scheme)
-          call physics_error_fatal(mpas_err_message)
+           call physics_error_fatal(mpas_err_message)
        endif
+    elseif(config_pbl_scheme == 'bl_myj') then
+       config_sfclayer_scheme = 'sf_myj'
     endif
  endif
 
@@ -297,6 +330,7 @@
     
  elseif(.not. (config_lsm_scheme .eq. 'off '    .or. &
                config_lsm_scheme .eq. 'sf_noah' .or. &
+               config_lsm_scheme .eq. 'sf_ruc'     .or. &
                config_lsm_scheme .eq. 'sf_noahmp')) then
  
     write(mpas_err_message,'(A,A20)') 'illegal value for land surface scheme: ', &
@@ -377,6 +411,19 @@
              dzs(4,iCell) = 1.00_RKIND
           enddo
 
+       case("sf_ruc")
+         do iCell = 1,nCells
+             dzs(1,iCell) = 0.005_RKIND
+             dzs(2,iCell) = 0.025_RKIND
+             dzs(3,iCell) = 0.045_RKIND
+             dzs(4,iCell) = 0.13_RKIND
+             dzs(5,iCell) = 0.25_RKIND
+             dzs(6,iCell) = 0.35_RKIND
+             dzs(7,iCell) = 0.50_RKIND
+             dzs(8,iCell) = 1.00_RKIND
+             dzs(9,iCell) = 0.70_RKIND
+        enddo
+
        case default
     
     end select lsm_select
@@ -398,6 +445,7 @@
 
 !local variables:
  character(len=StrKIND),pointer:: config_microp_scheme
+ logical,pointer:: config_tempo_hailaware
  logical:: l_qr_acr_qg,l_qr_acr_qs,l_qi_aut_qs,l_freezeH2O
 
 !-----------------------------------------------------------------------------------------------------------------
@@ -408,7 +456,36 @@
 
     call mpas_pool_get_config(configs,'config_microp_scheme',config_microp_scheme)
     if(config_microp_scheme /= "mp_thompson" .or. &
+       config_microp_scheme /= "mp_tempo" .or. &
        config_microp_scheme /= "mp_thompson_aerosols") return
+
+    if (config_microp_scheme == "mp_tempo") then
+       l_qr_acr_qg = .false.
+       l_qr_acr_qs = .false.
+       l_qi_aut_qs = .false.
+       l_freezeH2O = .false.
+
+       ! hailaware scheme needs hailaware table, non hailaware scheme can use either table
+       call mpas_pool_get_config(configs,'config_tempo_hailaware',config_tempo_hailaware)
+       if (config_tempo_hailaware) then
+          inquire(file='MP_TEMPO_HAILAWARE_QRacrQG_DATA.DBL'  ,exist=l_qr_acr_qg)
+       else
+          inquire(file='MP_TEMPO_HAILAWARE_QRacrQG_DATA.DBL'  ,exist=l_qr_acr_qg)
+          if (.not. l_qr_acr_qg) then
+             inquire(file='MP_TEMPO_QRacrQG_DATA.DBL'  ,exist=l_qr_acr_qg)
+          endif
+       endif
+       inquire(file='MP_TEMPO_QRacrQS_DATA.DBL'  ,exist=l_qr_acr_qs)
+       inquire(file='MP_TEMPO_QIautQS_DATA.DBL'  ,exist=l_qi_aut_qs)
+       inquire(file='MP_TEMPO_freezeH2O_DATA.DBL',exist=l_freezeH2O)
+
+       if(.not. (l_qr_acr_qg .and. l_qr_acr_qs .and. l_qi_aut_qs .and. l_freezeH2O)) then
+          write(mpas_err_message,'(A)') &
+               '--- tables to run the TEMPO cloud microphysics do not exist: run build_tables_tempo first.'
+          call physics_error_fatal(mpas_err_message)
+       endif
+       !   call mpas_log_write('l_mp_tables = $l',logicArgs=(/l_mp_tables/))
+    else
 
     l_qr_acr_qg = .false.
     l_qr_acr_qs = .false.
@@ -433,6 +510,7 @@
        call physics_error_fatal(mpas_err_message)
     endif
 !   call mpas_log_write('l_mp_tables = $l',logicArgs=(/l_mp_tables/))
+    endif
 
  endif
 
@@ -480,7 +558,7 @@
 
  call mpas_pool_get_config(blocklist % configs, 'config_gwdo_scheme', gwdo_scheme)
 
- if (trim(gwdo_scheme) /= 'off') then
+ if (trim(gwdo_scheme) == 'bl_ysu_gwdo') then
      maxvar2d_local = -huge(maxvar2d_local)
      block => blockList
      do while (associated(block))
@@ -514,7 +592,7 @@
      if (maxvar2d_global <= 0.0_RKIND .and. iall_water /= 1) then
          call mpas_log_write('*******************************************************************************', &
                              messageType=MPAS_LOG_ERR)
-         call mpas_log_write('The GWDO scheme requires valid var2d, con, oa{1,2,3,4}, and ol{1,2,3,4} fields,', &
+         call mpas_log_write('The YSU GWDO scheme requires valid var2d, con, oa{1,2,3,4}, and ol{1,2,3,4} fields,', &
                              messageType=MPAS_LOG_ERR)
          call mpas_log_write('but these fields appear to be zero everywhere in the model input.', &
                              messageType=MPAS_LOG_ERR)

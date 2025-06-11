@@ -56,6 +56,7 @@ module init_atm_core_interface
       core % Conventions = 'MPAS'
       core % source = 'MPAS'
 
+
 #include "core_variables.inc"
 
    end subroutine init_atm_setup_core
@@ -80,7 +81,6 @@ module init_atm_core_interface
       implicit none
 
       type (domain_type), pointer :: domain
-
 #include "domain_variables.inc"
 
    end subroutine init_atm_setup_domain
@@ -116,9 +116,12 @@ module init_atm_core_interface
 
       logical, pointer :: initial_conds, sfc_update, lbcs
       logical, pointer :: gwd_stage_in, gwd_stage_out, vertical_stage_in, vertical_stage_out, met_stage_in, met_stage_out
+      logical, pointer :: gwd_gsl_stage_out
       logical, pointer :: config_native_gwd_static, config_static_interp, config_vertical_grid, config_met_interp
+      logical, pointer :: config_native_gwd_gsl_static
       logical, pointer :: first_guess_field
       logical, pointer :: mp_thompson_aers_in
+      logical, pointer :: tempo_aerosolaware_in
       integer, pointer :: config_init_case
 
 
@@ -127,6 +130,7 @@ module init_atm_core_interface
       call mpas_pool_get_config(configs, 'config_init_case', config_init_case)
       call mpas_pool_get_config(configs, 'config_static_interp', config_static_interp)
       call mpas_pool_get_config(configs, 'config_native_gwd_static', config_native_gwd_static)
+      call mpas_pool_get_config(configs, 'config_native_gwd_gsl_static', config_native_gwd_gsl_static)
       call mpas_pool_get_config(configs, 'config_vertical_grid', config_vertical_grid)
       call mpas_pool_get_config(configs, 'config_met_interp', config_met_interp)
 
@@ -145,6 +149,9 @@ module init_atm_core_interface
       nullify(gwd_stage_out)
       call mpas_pool_get_package(packages, 'gwd_stage_outActive', gwd_stage_out)
 
+      nullify(gwd_gsl_stage_out)
+      call mpas_pool_get_package(packages, 'gwd_gsl_stage_outActive', gwd_gsl_stage_out)
+
       nullify(vertical_stage_in)
       call mpas_pool_get_package(packages, 'vertical_stage_inActive', vertical_stage_in)
 
@@ -160,14 +167,19 @@ module init_atm_core_interface
       nullify(mp_thompson_aers_in)
       call mpas_pool_get_package(packages, 'mp_thompson_aers_inActive', mp_thompson_aers_in)
 
+      nullify(tempo_aerosolaware_in)
+      call mpas_pool_get_package(packages, 'tempo_aerosolaware_inActive', tempo_aerosolaware_in)
+
       if (.not. associated(initial_conds) .or. &
           .not. associated(sfc_update) .or. &
           .not. associated(gwd_stage_in) .or. &
           .not. associated(gwd_stage_out) .or. &
+          .not. associated(gwd_gsl_stage_out) .or. &
           .not. associated(vertical_stage_in) .or. &
           .not. associated(vertical_stage_out) .or. &
           .not. associated(met_stage_in) .or. &
           .not. associated(met_stage_out) .or. &
+          .not. associated(tempo_aerosolaware_in) .or. &
           .not. associated(mp_thompson_aers_in)) then
          call mpas_log_write('********************************************************************************', messageType=MPAS_LOG_ERR)
          call mpas_log_write('* Error while setting up packages for init_atmosphere core.',                      messageType=MPAS_LOG_ERR)
@@ -186,11 +198,13 @@ module init_atm_core_interface
 
       if (config_init_case == 9) then
          lbcs = .true.
+         tempo_aerosolaware_in = .true.
          mp_thompson_aers_in = .false.
          inquire(file="QNWFA_QNIFA_SIGMA_MONTHLY.dat",exist=lexist)
          if(lexist) mp_thompson_aers_in = .true.
       else
          lbcs = .false.
+         tempo_aerosolaware_in = .false.
          mp_thompson_aers_in = .false.
       end if
 
@@ -204,6 +218,7 @@ module init_atm_core_interface
          gwd_stage_in = config_native_gwd_static .and. &
                         (.not. config_static_interp)
          gwd_stage_out = config_native_gwd_static
+         gwd_gsl_stage_out = config_native_gwd_gsl_static
          vertical_stage_in = config_vertical_grid .and. &
                              (.not. config_native_gwd_static) .and. &
                              (.not. config_static_interp)
@@ -214,13 +229,16 @@ module init_atm_core_interface
                         (.not. config_vertical_grid)
          met_stage_out = config_met_interp
 
+         tempo_aerosolaware_in = .false.
          mp_thompson_aers_in = .false.
          inquire(file="QNWFA_QNIFA_SIGMA_MONTHLY.dat",exist=lexist)
          if((lexist .and. met_stage_out) .or. (lexist .and. met_stage_in)) mp_thompson_aers_in = .true.
+         if((met_stage_out) .or. (met_stage_in)) tempo_aerosolaware_in = .true.
 
       else if (config_init_case == 8) then
          gwd_stage_in = .false.
          gwd_stage_out = .false.
+         gwd_gsl_stage_out = .false.
          vertical_stage_in = .true.
          vertical_stage_out = .false.
          met_stage_in = .false.
@@ -233,20 +251,24 @@ module init_atm_core_interface
       else if (config_init_case == 9) then
          gwd_stage_in = .false.
          gwd_stage_out = .false.
+         gwd_gsl_stage_out = .false.
          vertical_stage_in = .false.
          vertical_stage_out = .false.
          met_stage_in = .true.
          met_stage_out = .true.
 
+         tempo_aerosolaware_in = .false.
          mp_thompson_aers_in = .false.
          inquire(file="QNWFA_QNIFA_SIGMA_MONTHLY.dat",exist=lexist)
          if((lexist .and. met_stage_out) .or. (lexist .and. met_stage_in)) mp_thompson_aers_in = .true.
+         if((met_stage_out) .or. (met_stage_in)) tempo_aerosolaware_in = .true.
 
          initial_conds = .false.   ! Also, turn off the initial_conds package to avoid writing the IC "output" stream
 
       else if (config_init_case == 13) then
          gwd_stage_in = .false.
          gwd_stage_out = .false.
+         gwd_gsl_stage_out = .false.
          vertical_stage_in = .false.
          vertical_stage_out = .true.
          met_stage_in = .false.
@@ -255,6 +277,7 @@ module init_atm_core_interface
       else
          gwd_stage_in = .false.
          gwd_stage_out = .false.
+         gwd_gsl_stage_out = .false.
          vertical_stage_in = .false.
          vertical_stage_out = .false.
          met_stage_in = .false.

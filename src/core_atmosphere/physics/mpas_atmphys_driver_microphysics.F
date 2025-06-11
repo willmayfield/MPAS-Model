@@ -7,21 +7,25 @@
 !
 !=================================================================================================================
  module mpas_atmphys_driver_microphysics
+ use mpas_dmpar, only: IO_NODE
  use mpas_kind_types
  use mpas_pool_routines
  use mpas_timer, only : mpas_timer_start, mpas_timer_stop
 
  use mpas_atmphys_constants
  use mpas_atmphys_init_microphysics
+ use mpas_atmphys_init_tempo
  use mpas_atmphys_interface
  use mpas_atmphys_vars
 
 !wrf physics:
  use module_mp_kessler
  use module_mp_thompson
+ use module_mp_tempo,only: tempo_3d_to_1d_driver, tempo_init
+ ! use module_mp_tempo_utils
  use module_mp_wsm6,only: wsm6
  use mp_wsm6,only: mp_wsm6_init,refl10cm_wsm6
-
+ use module_mp_nssl_2mom
 
  implicit none
  private
@@ -44,6 +48,7 @@
 ! precip_from_MPAS          : initialize timestep local arrays for precipitation.
 ! precip_to_MPAS            : copy local arrays to MPAS arrays.
 ! compute_radar_reflectivity: compute radar reflectivities.
+! compute_radar_reflectivity: compute hourly maximum reflectivities at desired levels.
 ! compute_relhum            : compute relative humidity.
 !
 ! WRF physics called from microphysics_driver:
@@ -85,7 +90,7 @@
 !   Laura D. Fowler (laura@ucar.edu) / 2016-09-19.
 ! * since we removed the local variable microp_scheme from mpas_atmphys_vars.F, now defines microp_scheme as a
 !   pointer to config_microp_scheme.
-!   Laura D. Fowler (laura@ucar.edu) / 2917-02-16.
+!   Laura D. Fowler (laura@ucar.edu) / 2917-02-16. <--- Time travel?
 
 !--- initialization option for WSM6 from WRF version 3.8.1. this option could also be set as a namelist parameter.
  integer,parameter:: hail_opt = 0
@@ -103,10 +108,16 @@
 
 !local pointers:
  character(len=StrKIND),pointer:: microp_scheme
-
+ character(len=StrKIND),pointer:: nssl_moments
+ logical,pointer:: config_tempo_hailaware, config_tempo_aerosolaware
+ logical,pointer:: config_tempo_ml_nc_pbl
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
+ call mpas_pool_get_config(configs,'config_tempo_hailaware',config_tempo_hailaware)
+ call mpas_pool_get_config(configs,'config_tempo_aerosolaware',config_tempo_aerosolaware)
+ call mpas_pool_get_config(configs,'config_tempo_ml_nc_pbl',config_tempo_ml_nc_pbl)
 
 !sounding variables:
  if(.not.allocated(rho_p) ) allocate(rho_p(ims:ime,kms:kme,jms:jme) )
@@ -144,6 +155,7 @@
        if(.not.allocated(recloud_p)) allocate(recloud_p(ims:ime,kms:kme,jms:jme))
        if(.not.allocated(reice_p)  ) allocate(reice_p(ims:ime,kms:kme,jms:jme)  )
        if(.not.allocated(resnow_p) ) allocate(resnow_p(ims:ime,kms:kme,jms:jme) )
+       if(.not.allocated(refl10cm_p)) allocate(refl10cm_p(ims:ime,kms:kme,jms:jme) )
 
        !precipitation flux:
        if(.not.allocated(rainprod_p)) allocate(rainprod_p(ims:ime,kms:kme,jms:jme))
@@ -156,19 +168,95 @@
           if(.not.allocated(ni_p) ) allocate(ni_p(ims:ime,kms:kme,jms:jme))
           if(.not.allocated(nr_p) ) allocate(nr_p(ims:ime,kms:kme,jms:jme))
 
-          microp3_select: select case(trim(microp_scheme))
-             case("mp_thompson_aerosols")
-                if(.not.allocated(nifa2d_p)) allocate(nifa2d_p(ims:ime,jms:jme))
-                if(.not.allocated(nwfa2d_p)) allocate(nwfa2d_p(ims:ime,jms:jme))
-                if(.not.allocated(nc_p)    ) allocate(nc_p(ims:ime,kms:kme,jms:jme)  )
-                if(.not.allocated(nifa_p)  ) allocate(nifa_p(ims:ime,kms:kme,jms:jme))
-                if(.not.allocated(nwfa_p)  ) allocate(nwfa_p(ims:ime,kms:kme,jms:jme))
+         microp3_select: select case(trim(microp_scheme))
+            case("mp_thompson_aerosols")
+               if(.not.allocated(nifa2d_p)) allocate(nifa2d_p(ims:ime,jms:jme))
+               if(.not.allocated(nwfa2d_p)) allocate(nwfa2d_p(ims:ime,jms:jme))
+               if(.not.allocated(nc_p)    ) allocate(nc_p(ims:ime,kms:kme,jms:jme)  )
+               if(.not.allocated(nifa_p)  ) allocate(nifa_p(ims:ime,kms:kme,jms:jme))
+               if(.not.allocated(nwfa_p)  ) allocate(nwfa_p(ims:ime,kms:kme,jms:jme))
 
-             case default
-          end select microp3_select
+            case default
+         end select microp3_select
 
        case default
     end select microp2_select
+
+    case ("mp_tempo","mp_nssl2m")
+       !mass mixing ratios:
+       if(.not.allocated(qi_p)) allocate(qi_p(ims:ime,kms:kme,jms:jme))
+       if(.not.allocated(qs_p)) allocate(qs_p(ims:ime,kms:kme,jms:jme))
+       if(.not.allocated(qg_p)) allocate(qg_p(ims:ime,kms:kme,jms:jme))
+
+       !surface precipitation:
+       if(.not.allocated(sr_p)        ) allocate(sr_p(ims:ime,jms:jme)        )
+       if(.not.allocated(snownc_p)    ) allocate(snownc_p(ims:ime,jms:jme)    )
+       if(.not.allocated(snowncv_p)   ) allocate(snowncv_p(ims:ime,jms:jme)   )
+       if(.not.allocated(graupelnc_p) ) allocate(graupelnc_p(ims:ime,jms:jme) )
+       if(.not.allocated(graupelncv_p)) allocate(graupelncv_p(ims:ime,jms:jme))
+
+       !cloud water,cloud ice,and snow effective radii:
+       if(.not.allocated(recloud_p)) allocate(recloud_p(ims:ime,kms:kme,jms:jme))
+       if(.not.allocated(reice_p)  ) allocate(reice_p(ims:ime,kms:kme,jms:jme)  )
+       if(.not.allocated(resnow_p) ) allocate(resnow_p(ims:ime,kms:kme,jms:jme) )
+
+       !precipitation flux:
+       if(.not.allocated(rainprod_p)) allocate(rainprod_p(ims:ime,kms:kme,jms:jme))
+       if(.not.allocated(evapprod_p)) allocate(evapprod_p(ims:ime,kms:kme,jms:jme))
+
+       microp2a_select: select case(trim(microp_scheme))
+        case("mp_tempo")
+!          if(.not.allocated(ntc_p)) allocate(ntc_p(ims:ime,jms:jme))
+!          if(.not.allocated(muc_p)) allocate(muc_p(ims:ime,jms:jme))
+          if(.not.allocated(ni_p) ) allocate(ni_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(nr_p) ) allocate(nr_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(refl10cm_p)  ) allocate(refl10cm_p(ims:ime,kms:kme,jms:jme) )
+          if(.not.allocated(refl10cm_1km_p)  ) allocate(refl10cm_1km_p(ims:ime,jms:jme) )
+          if(.not.allocated(frainnc_p) ) allocate(frainnc_p(ims:ime,jms:jme) )
+          if(.not.allocated(max_hail_diameter_sfc_p) ) allocate(max_hail_diameter_sfc_p(ims:ime,jms:jme) )
+          if(.not.allocated(max_hail_diameter_column_p) ) allocate(max_hail_diameter_column_p(ims:ime,jms:jme) )
+
+          ! Allocate TEMPO options based on config flags insead of adding more nested select cases
+          ! These flags are associated with appropriate packages in mpas_atmphys_packages.F
+          if (config_tempo_hailaware) then
+             if(.not.allocated(ng_p) ) allocate(ng_p(ims:ime,kms:kme,jms:jme))
+             if(.not.allocated(volg_p)) allocate(volg_p(ims:ime,kms:kme,jms:jme))
+          endif
+
+          if (config_tempo_ml_nc_pbl) then
+             if(.not.allocated(cldfrac_p) ) allocate(cldfrac_p(ims:ime,kms:kme,jms:jme))
+             if(.not.allocated(qcbl_p) ) allocate(qcbl_p(ims:ime,kms:kme,jms:jme))
+          endif
+
+          if (config_tempo_aerosolaware) then
+             if(.not.allocated(nifa2d_p)) allocate(nifa2d_p(ims:ime,jms:jme))
+             if(.not.allocated(nwfa2d_p)) allocate(nwfa2d_p(ims:ime,jms:jme))
+             if(.not.allocated(nc_p)    ) allocate(nc_p(ims:ime,kms:kme,jms:jme)  )
+             if(.not.allocated(nifa_p)  ) allocate(nifa_p(ims:ime,kms:kme,jms:jme))
+             if(.not.allocated(nwfa_p)  ) allocate(nwfa_p(ims:ime,kms:kme,jms:jme))
+          endif
+
+        case("mp_nssl2m")
+          if(.not.allocated(qh_p) ) allocate(qh_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(nc_p) ) allocate(nc_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(ni_p) ) allocate(ni_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(nr_p) ) allocate(nr_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(ns_p) ) allocate(ns_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(ng_p) ) allocate(ng_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(nh_p) ) allocate(nh_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(nccn_p) ) allocate(nccn_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(volg_p)) allocate(volg_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(volh_p)) allocate(volh_p(ims:ime,kms:kme,jms:jme))
+          if(.not.allocated(refl10cm_1km_p)  ) allocate(refl10cm_1km_p(ims:ime,jms:jme) )
+          
+          if (nssl_moments == "nssl3m") then
+            if(.not.allocated(zrw_p) ) allocate(zrw_p(ims:ime,kms:kme,jms:jme))
+            if(.not.allocated(zgw_p) ) allocate(zgw_p(ims:ime,kms:kme,jms:jme))
+            if(.not.allocated(zhw_p) ) allocate(zhw_p(ims:ime,kms:kme,jms:jme))
+          endif
+
+          case default
+    end select microp2a_select
 
     case default
  end select microp_select
@@ -184,10 +272,17 @@
 
 !local pointers:
  character(len=StrKIND),pointer:: microp_scheme
+ character(len=StrKIND),pointer:: nssl_moments
+ logical,pointer:: config_tempo_hailaware, config_tempo_aerosolaware
+ logical,pointer:: config_tempo_ml_nc_pbl
 
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
+ call mpas_pool_get_config(configs,'config_tempo_hailaware',config_tempo_hailaware)
+ call mpas_pool_get_config(configs,'config_tempo_aerosolaware',config_tempo_aerosolaware)
+ call mpas_pool_get_config(configs,'config_tempo_ml_nc_pbl',config_tempo_ml_nc_pbl)
 
 !sounding variables:
  if(allocated(rho_p) ) deallocate(rho_p )
@@ -236,6 +331,7 @@
           if(allocated(muc_p)) deallocate(muc_p)
           if(allocated(ni_p) ) deallocate(ni_p )
           if(allocated(nr_p) ) deallocate(nr_p )
+          if(allocated(refl10cm_p)  ) deallocate(refl10cm_p  )
 
           microp3_select: select case(trim(microp_scheme))
              case("mp_thompson_aerosols")
@@ -250,6 +346,83 @@
 
        case default
     end select microp2_select
+
+    case ("mp_tempo","mp_nssl2m")
+       !mass mixing ratios:
+       if(allocated(qi_p)) deallocate(qi_p)
+       if(allocated(qs_p)) deallocate(qs_p)
+       if(allocated(qg_p)) deallocate(qg_p)
+
+       !surface precipitation:
+       if(allocated(sr_p)        ) deallocate(sr_p        )
+       if(allocated(snownc_p)    ) deallocate(snownc_p    )
+       if(allocated(snowncv_p)   ) deallocate(snowncv_p   )
+       if(allocated(graupelnc_p) ) deallocate(graupelnc_p )
+       if(allocated(graupelncv_p)) deallocate(graupelncv_p)
+
+       !cloud water,cloud ice,and snow effective radii:
+       if(allocated(recloud_p)) deallocate(recloud_p)
+       if(allocated(reice_p)  ) deallocate(reice_p  )
+       if(allocated(resnow_p) ) deallocate(resnow_p )
+
+       !precipitation flux:
+       if(allocated(rainprod_p)) deallocate(rainprod_p)
+       if(allocated(evapprod_p)) deallocate(evapprod_p)
+
+       microp2a_select: select case(trim(microp_scheme))
+        case("mp_tempo")
+!          if(allocated(ntc_p)) deallocate(ntc_p)
+!          if(allocated(muc_p)) deallocate(muc_p)
+          if(allocated(ni_p) ) deallocate(ni_p )
+          if(allocated(nr_p) ) deallocate(nr_p )
+          if(allocated(refl10cm_p)  ) deallocate(refl10cm_p  )
+          if(allocated(refl10cm_1km_p)) deallocate(refl10cm_1km_p)
+          if(allocated(frainnc_p) ) deallocate(frainnc_p)
+          if(allocated(max_hail_diameter_sfc_p) ) deallocate(max_hail_diameter_sfc_p)
+          if(allocated(max_hail_diameter_column_p) ) deallocate(max_hail_diameter_column_p)
+
+          if (config_tempo_hailaware) then
+             if(allocated(ng_p) ) deallocate(ng_p )
+             if(allocated(volg_p) ) deallocate(volg_p )
+          endif
+
+          if (config_tempo_ml_nc_pbl) then
+             if(allocated(cldfrac_p) ) deallocate(cldfrac_p)
+             if(allocated(qcbl_p) ) deallocate(qcbl_p)
+          endif
+
+          if (config_tempo_aerosolaware) then
+             if(allocated(nifa2d_p)) deallocate(nifa2d_p)
+             if(allocated(nwfa2d_p)) deallocate(nwfa2d_p)
+             if(allocated(nc_p)    ) deallocate(nc_p    )
+             if(allocated(nifa_p)  ) deallocate(nifa_p  )
+             if(allocated(nwfa_p)  ) deallocate(nwfa_p  )
+          endif
+
+        case("mp_nssl2m")
+          if(allocated(qh_p) ) deallocate(qh_p )
+          if(allocated(nc_p) ) deallocate(nc_p )
+          if(allocated(nr_p) ) deallocate(nr_p )
+          if(allocated(ni_p) ) deallocate(ni_p )
+          if(allocated(ns_p) ) deallocate(ns_p )
+          if(allocated(ng_p) ) deallocate(ng_p )
+          if(allocated(nh_p) ) deallocate(nh_p )
+          if(allocated(nccn_p) ) deallocate(nccn_p )
+          if(allocated(volg_p) ) deallocate(volg_p )
+          if(allocated(volh_p) ) deallocate(volh_p )
+          if(allocated(rainprod_p)) deallocate(rainprod_p)
+          if(allocated(evapprod_p)) deallocate(evapprod_p)
+          if(allocated(refl10cm_p)) deallocate(refl10cm_p)
+          if(allocated(refl10cm_1km_p)) deallocate(refl10cm_1km_p)
+
+          if (nssl_moments == "nssl3m") then
+            if(allocated(zrw_p) ) deallocate(zrw_p)
+            if(allocated(zgw_p) ) deallocate(zgw_p)
+            if(allocated(zhw_p) ) deallocate(zhw_p)
+          endif
+
+       case default
+    end select microp2a_select
 
     case default
  end select microp_select
@@ -270,10 +443,15 @@
 !inout arguments:
  type(mpas_pool_type),intent(inout):: diag_physics
  type(mpas_pool_type),intent(inout):: state
+! type(mpas_pool_type),intent(in):: diag
 
 !local pointer:
  logical,pointer:: do_restart
  character(len=StrKIND),pointer:: microp_scheme
+ logical,pointer:: config_tempo_hailaware, config_tempo_aerosolaware
+ character(len=StrKIND),pointer:: nssl_moments
+
+ logical :: outputon = .false.
 
 !CCPP-compliant flags:
  character(len=StrKIND):: errmsg
@@ -288,6 +466,9 @@
  errflg = 0
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
+ call mpas_pool_get_config(configs,'config_tempo_hailaware',config_tempo_hailaware)
+ call mpas_pool_get_config(configs,'config_tempo_aerosolaware',config_tempo_aerosolaware)
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
  call mpas_pool_get_config(configs,'config_do_restart'   ,do_restart   )
 
  microp_select: select case(trim(microp_scheme))
@@ -302,9 +483,24 @@
           case default
        end select microp2_select
 
+    case("mp_tempo")
+       call tempo_init(l_mp_tables=l_mp_tables, &
+            hail_aware_flag=config_tempo_hailaware, aerosol_aware_flag=config_tempo_aerosolaware)
+
+       if (config_tempo_aerosolaware) then
+          call init_tempo_aerosols_forMPAS(do_restart,dminfo,mesh,state,time_lev,diag_physics)
+       endif
+
     case("mp_wsm6")
        call mp_wsm6_init(den0=rho_a,denr=rho_r,dens=rho_s,cl=cliq,cpv=cpv, &
                          hail_opt=hail_opt,errmsg=errmsg,errflg=errflg)
+
+    case("mp_nssl2m")
+       if (nssl_moments == "nssl3m") then
+          call nssl_2mom_init(ipctmp=8,mixphase=0,ihvol=1, myrank=dminfo % my_proc_id, mpiroot = IO_NODE)
+       else
+          call nssl_2mom_init(ipctmp=5,mixphase=0,ihvol=1, myrank=dminfo % my_proc_id, mpiroot = IO_NODE)
+       endif
 
     case default
  end select microp_select
@@ -326,7 +522,6 @@
  integer,intent(in):: time_lev
  integer,intent(in):: itimestep
  integer,intent(in):: its,ite
-
 !inout arguments:
  type(mpas_pool_type),intent(inout):: state
  type(mpas_pool_type),intent(inout):: diag
@@ -336,9 +531,15 @@
 
 !local pointers:
  character(len=StrKIND),pointer:: microp_scheme
+ logical,pointer:: config_tempo_aerosolaware,config_tempo_hailaware
+ character(len=StrKIND),pointer:: nssl_moments
+
+ integer :: tempo_options
 
 !local variables and arrays:
  integer:: istep
+ integer, pointer :: do_diag_dbz
+ logical :: do_diag_dbz_flag
 
 !CCPP-compliant flags:
  character(len=StrKIND):: errmsg
@@ -353,6 +554,13 @@
  errflg = 0
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
+ call mpas_pool_get_config(configs,'config_tempo_hailaware',config_tempo_hailaware)
+ call mpas_pool_get_config(configs,'config_tempo_aerosolaware',config_tempo_aerosolaware)
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
+ call mpas_pool_get_array(diag_physics,'do_diag_dbz',do_diag_dbz)
+
+ do_diag_dbz_flag = .false.
+ if (do_diag_dbz == 1) do_diag_dbz_flag = .true.
 
 !... allocation of microphysics arrays:
 !$OMP MASTER
@@ -384,6 +592,117 @@
                    )
        call mpas_timer_stop('mp_kessler')
 
+    case ("mp_tempo")
+       call mpas_timer_start('mp_tempo')
+       tempo_options = 0
+       if (config_tempo_hailaware) tempo_options = tempo_options + 1
+       if (config_tempo_aerosolaware) tempo_options = tempo_options + 1
+
+       istep = 1
+       do while (istep .le. n_microp)
+
+          tempo_opts: select case(tempo_options)
+             case(0)
+                call tempo_3d_to_1d_driver( &
+                     th        = th_p        , qv         = qv_p         , qc         = qc_p         , &
+                     qr        = qr_p        , qi         = qi_p         , qs         = qs_p         , &
+                     qg        = qg_p        , ni         = ni_p         , nr         = nr_p         , &
+                     !! ng        = ng_p        , qb         = volg_p                                   , &
+                     !! nc        = nc_p        , nwfa       = nwfa_p       , nifa       = nifa_p       , &
+                     !! nwfa2d    = nwfa2d_p    , nifa2d     = nifa2d_p                                 , &
+                     pii       = pi_p        , p          = pres_p       , dz         = dz_p         , &
+                     w         = w_p         , dt_in      = dt_microp    , itimestep  = itimestep    , &
+                     rainnc    = rainnc_p    , rainncv    = rainncv_p    , snownc     = snownc_p     , &
+                     snowncv   = snowncv_p   , graupelnc  = graupelnc_p  , graupelncv = graupelncv_p , &
+                     sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
+                     re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
+                     has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
+                     !! ntc       = ntc_p       , muc        = muc_p                                    , &
+                     refl_10cm  = refl10cm_p , frainnc    = frainnc_p                                , &
+                     ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
+                     ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
+                     its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte             &
+                     )
+             case(1)
+                if (config_tempo_aerosolaware) then
+                   call tempo_3d_to_1d_driver( &
+                        th        = th_p        , qv         = qv_p         , qc         = qc_p         , &
+                        qr        = qr_p        , qi         = qi_p         , qs         = qs_p         , &
+                        qg        = qg_p        , ni         = ni_p         , nr         = nr_p         , &
+                        !! ng        = ng_p        , qb         = volg_p                                   , &
+                        nc        = nc_p        , nwfa       = nwfa_p       , nifa       = nifa_p       , &
+                        nwfa2d    = nwfa2d_p    , nifa2d     = nifa2d_p                                 , &
+                        pii       = pi_p        , p          = pres_p       , dz         = dz_p         , &
+                        w         = w_p         , dt_in      = dt_microp    , itimestep  = itimestep    , &
+                        rainnc    = rainnc_p    , rainncv    = rainncv_p    , snownc     = snownc_p     , &
+                        snowncv   = snowncv_p   , graupelnc  = graupelnc_p  , graupelncv = graupelncv_p , &
+                        sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
+                        re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
+                        has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
+                        !! ntc       = ntc_p       , muc        = muc_p                                    , &
+                        refl_10cm  = refl10cm_p , frainnc    = frainnc_p                                , &
+                        qcbl      = qcbl_p      , cldfrac    = cldfrac_p                                , &
+                        ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
+                        ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
+                        its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte             &
+                        )
+                elseif (config_tempo_hailaware) then
+                   call tempo_3d_to_1d_driver( &
+                        th        = th_p        , qv         = qv_p         , qc         = qc_p         , &
+                        qr        = qr_p        , qi         = qi_p         , qs         = qs_p         , &
+                        qg        = qg_p        , ni         = ni_p         , nr         = nr_p         , &
+                        ng        = ng_p        , qb         = volg_p                                   , &
+                        !! nc        = nc_p        , nwfa       = nwfa_p       , nifa       = nifa_p       , &
+                        !! nwfa2d    = nwfa2d_p    , nifa2d     = nifa2d_p                                 , &
+                        pii       = pi_p        , p          = pres_p       , dz         = dz_p         , &
+                        w         = w_p         , dt_in      = dt_microp    , itimestep  = itimestep    , &
+                        rainnc    = rainnc_p    , rainncv    = rainncv_p    , snownc     = snownc_p     , &
+                        snowncv   = snowncv_p   , graupelnc  = graupelnc_p  , graupelncv = graupelncv_p , &
+                        sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
+                        re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
+                        has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
+                        !! ntc       = ntc_p       , muc        = muc_p                                    , &
+                        refl_10cm  = refl10cm_p , frainnc    = frainnc_p                                , &
+                        !! qcbl      = qcbl_p      , cldfrac    = cldfrac_p                                , &
+                        ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
+                        ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
+                        its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte             &
+                        )
+                else
+                   call physics_error_fatal('driver_microphysics(): TEMPO called with invalid options -- case 1')
+                endif
+             case(2)
+                call tempo_3d_to_1d_driver( &
+                     th        = th_p        , qv         = qv_p         , qc         = qc_p         , &
+                     qr        = qr_p        , qi         = qi_p         , qs         = qs_p         , &
+                     qg        = qg_p        , ni         = ni_p         , nr         = nr_p         , &
+                     ng        = ng_p        , qb         = volg_p                                   , &
+                     nc        = nc_p        , nwfa       = nwfa_p       , nifa       = nifa_p       , &
+                     nwfa2d    = nwfa2d_p    , nifa2d     = nifa2d_p                                 , &
+                     pii       = pi_p        , p          = pres_p       , dz         = dz_p         , &
+                     w         = w_p         , dt_in      = dt_microp    , itimestep  = itimestep    , &
+                     rainnc    = rainnc_p    , rainncv    = rainncv_p    , snownc     = snownc_p     , &
+                     snowncv   = snowncv_p   , graupelnc  = graupelnc_p  , graupelncv = graupelncv_p , &
+                     sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
+                     re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
+                     has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
+                     !! ntc       = ntc_p       , muc        = muc_p                                    , &
+                     refl_10cm  = refl10cm_p , frainnc    = frainnc_p                                , &
+                     max_hail_diameter_sfc = max_hail_diameter_sfc_p                                 , &
+                     max_hail_diameter_column = max_hail_diameter_column_p                           , &
+                     qcbl      = qcbl_p      , cldfrac    = cldfrac_p                                , &
+                     ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
+                     ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
+                     its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte             &
+                     )
+             case default
+                call physics_error_fatal('driver_microphysics(): TEMPO called with invalid options -- case default')
+             end select tempo_opts
+
+       istep = istep + 1
+       enddo
+       call mpas_timer_stop('mp_tempo')
+       
     case ("mp_thompson")
        call mpas_timer_start('mp_thompson')
        istep = 1
@@ -460,16 +779,71 @@
                )
        call mpas_timer_stop('mp_wsm6')
 
+    case ("mp_nssl2m")
+       call mpas_timer_start('mp_nssl')
+       if (nssl_moments == "nssl3m") then
+          call nssl_2mom_driver( &
+                  th        = th_p        , qv         = qv_p         , qc         = qc_p         , &
+                  qr        = qr_p        , qi         = qi_p         , qs         = qs_p         , &
+                  qh        = qg_p        , qhl        = qh_p         , cn         = nccn_p       , &
+                  ccw       = nc_p        , crw        = nr_p         , cci        = ni_p         , &
+                  csw       = ns_p        , chw        = ng_p         , chl        = nh_p         , &
+                  vhw       = volg_p      , vhl        = volh_p       , dn         = rho_p        , &
+                  zrw       = zrw_p       , zhw        = zgw_p        , zhl        = zhw_p        , &
+                  pii       = pi_p        , p          = pres_p       , dz         = dz_p         , &
+                  w         = w_p         , dtp        = dt_microp    , itimestep  = itimestep    , &
+                  rainnc    = rainnc_p    , rainncv    = rainncv_p    , snownc     = snownc_p     , &
+                  snowncv   = snowncv_p   , grplnc     = graupelnc_p  , grplncv    = graupelncv_p , &
+                  sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
+                  re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
+                  has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
+                  diagflag  = l_diags     , dbz        = refl10cm_p   , diag_dbz   = do_diag_dbz_flag  , &
+                  ntmul      = n_microp   , ntcnt      = 1            , lastloop   = .true.       , &
+                  refl_diagnostic = refl10cm_1km_p                                                , &
+                  ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
+                  ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
+                  its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte             &
+                           )
+       else
+          call nssl_2mom_driver( &
+                  th        = th_p        , qv         = qv_p         , qc         = qc_p         , &
+                  qr        = qr_p        , qi         = qi_p         , qs         = qs_p         , &
+                  qh        = qg_p        , qhl        = qh_p         , cn         = nccn_p       , &
+                  ccw       = nc_p        , crw        = nr_p         , cci        = ni_p         , &
+                  csw       = ns_p        , chw        = ng_p         , chl        = nh_p         , &
+                  vhw       = volg_p      , vhl        = volh_p       , dn         = rho_p        , &
+                  pii       = pi_p        , p          = pres_p       , dz         = dz_p         , &
+                  w         = w_p         , dtp        = dt_microp    , itimestep  = itimestep    , &
+                  rainnc    = rainnc_p    , rainncv    = rainncv_p    , snownc     = snownc_p     , &
+                  snowncv   = snowncv_p   , grplnc     = graupelnc_p  , grplncv    = graupelncv_p , &
+                  sr        = sr_p        , rainprod   = rainprod_p   , evapprod   = evapprod_p   , &
+                  re_cloud  = recloud_p   , re_ice     = reice_p      , re_snow    = resnow_p     , &
+                  has_reqc  = has_reqc    , has_reqi   = has_reqi     , has_reqs   = has_reqs     , &
+                  diagflag  = l_diags     , dbz        = refl10cm_p   , diag_dbz   = do_diag_dbz_flag  , &
+                  ntmul      = n_microp   , ntcnt      = 1            , lastloop   = .true.       , &
+                  refl_diagnostic = refl10cm_1km_p                                                , &
+                  ids = ids , ide = ide , jds = jds , jde = jde , kds = kds , kde = kde           , &
+                  ims = ims , ime = ime , jms = jms , jme = jme , kms = kms , kme = kme           , &
+                  its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte             &
+                           )
+       endif
+       call mpas_timer_stop('mp_nssl')
+
     case default
+
  end select microp_select
 
 !... calculate the 10cm radar reflectivity and relative humidity, if needed:
+
+ !ensure that we only call compute_radar_reflectivity() if we are using an MPS that supports
+ !the computation of simulated radar reflectivity:
  if (l_diags) then
-    !ensure that we only call compute_radar_reflectivity() if we are using an MPS that supports
-    !the computation of simulated radar reflectivity:
     if(trim(microp_scheme) == "mp_wsm6"     .or. &
        trim(microp_scheme) == "mp_thompson" .or. &
-       trim(microp_scheme) == "mp_thompson_aerosols") then
+       trim(microp_scheme) == "mp_thompson_aerosols" .or. &
+       trim(microp_scheme) == "mp_tempo" .or. &
+       trim(microp_scheme) == "mp_nssl2m"   ) then
+!       call mpas_log_write('Computing 3d reflectivity')
        call compute_radar_reflectivity(configs,diag_physics,its,ite)
     else
        call mpas_log_write('*** NOTICE: NOT computing simulated radar reflectivity')
@@ -479,7 +853,24 @@
     !calculate the relative humidity over water if the temperature is strictly greater than 0.C,
     !over ice otherwise.
     call compute_relhum(diag,its,ite)
+
  end if
+
+ if (do_diag_dbz_flag) then
+    if(trim(microp_scheme) == "mp_tempo"    .or. &
+       trim(microp_scheme) == "mp_nssl2m"   ) then
+       call mpas_log_write('Computing hourly max reflectivity')
+       call compute_hourly_max_radar_reflectivity(configs,diag_physics,its,ite)
+    else
+       call mpas_log_write('*** NOTICE: NOT computing hourly max simulated radar reflectivity')
+       call mpas_log_write('            since WSM6 or Thompson microphysics scheme was not selected')
+    end if
+ endif
+
+ if(trim(microp_scheme) == "mp_tempo") then
+    call mpas_log_write('Computing accumulated max hail diameter at the surface')
+    call compute_accumulated_max_hail(diag_physics,its,ite)
+ endif
 
 !... copy updated precipitation from the wrf-physics grid back to the geodesic-dynamics grid:
  call precip_to_MPAS(configs,diag_physics,its,ite)
@@ -512,6 +903,7 @@
 
 !local pointers:
  character(len=StrKIND),pointer:: microp_scheme
+ character(len=StrKIND),pointer:: nssl_moments
  integer,pointer:: nCellsSolve
  real,dimension(:),pointer:: graupelncv,rainncv,snowncv,sr
 
@@ -521,6 +913,7 @@
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
 
  call mpas_pool_get_array(diag_physics,'graupelncv',graupelncv)
  call mpas_pool_get_array(diag_physics,'rainncv'   ,rainncv   )
@@ -558,6 +951,41 @@
           sr(i)         = 0._RKIND
        enddo
 
+    case ("mp_tempo")
+       do j = jts, jte
+       do i = its, ite
+          snowncv_p(i,j)    = 0._RKIND
+          graupelncv_p(i,j) = 0._RKIND
+          snownc_p(i,j)     = 0._RKIND
+          graupelnc_p(i,j)  = 0._RKIND
+          sr_p(i,j)         = 0._RKIND
+          frainnc_p(i,j)    = 0._RKIND
+       enddo
+       enddo
+
+       do i = its,ite
+          snowncv(i)    = 0._RKIND
+          graupelncv(i) = 0._RKIND
+          sr(i)         = 0._RKIND
+       enddo
+
+    case ("mp_nssl2m")
+       do j = jts, jte
+       do i = its, ite
+          snowncv_p(i,j)    = 0._RKIND
+          graupelncv_p(i,j) = 0._RKIND
+          snownc_p(i,j)     = 0._RKIND
+          graupelnc_p(i,j)  = 0._RKIND
+          sr_p(i,j)         = 0._RKIND
+       enddo
+       enddo
+
+       do i = its,ite
+          snowncv(i)    = 0._RKIND
+          graupelncv(i) = 0._RKIND
+          sr(i)         = 0._RKIND
+       enddo
+
     case default
  end select microp_select
 
@@ -576,12 +1004,14 @@
 
 !local pointers:
  character(len=StrKIND),pointer:: microp_scheme
+ character(len=StrKIND),pointer:: nssl_moments
  integer,dimension(:),pointer:: i_rainnc
 
  real(kind=RKIND),pointer:: config_bucket_rainnc
  real(kind=RKIND),dimension(:),pointer:: precipw
  real(kind=RKIND),dimension(:),pointer:: graupelnc,rainnc,snownc
  real(kind=RKIND),dimension(:),pointer:: graupelncv,rainncv,snowncv,sr
+ real(kind=RKIND),dimension(:),pointer:: frainnc
 
 !local variables and arrays:
  integer:: i,j,k
@@ -590,6 +1020,7 @@
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme       )
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments)
  call mpas_pool_get_config(configs,'config_bucket_rainnc',config_bucket_rainnc)
 
  call mpas_pool_get_array(diag_physics,'i_rainnc'  ,i_rainnc  )
@@ -647,6 +1078,39 @@
        enddo
        enddo
 
+    case ("mp_tempo")
+       call mpas_pool_get_array(diag_physics,'frainnc',frainnc)
+
+       do j = jts,jte
+       do i = its,ite
+          !time-step precipitation:
+          snowncv(i)    = snownc_p(i,j)
+          graupelncv(i) = graupelnc_p(i,j)
+          sr(i) = (snownc_p(i,j) + graupelnc_p(i,j)) / (rainnc_p(i,j)+1.e-12)
+
+          !accumulated precipitation:
+          snownc(i)    = snownc(i) + snowncv(i)
+          graupelnc(i) = graupelnc(i) + graupelncv(i)
+
+          !accumulated freezing rain precipitation:
+          frainnc(i)    = frainnc(i) + frainnc_p(i,j)
+       enddo
+       enddo
+
+    case ("mp_nssl2m")
+       do j = jts,jte
+       do i = its,ite
+          !time-step precipitation:
+          snowncv(i)    = snownc_p(i,j)
+          graupelncv(i) = graupelnc_p(i,j)
+          sr(i) = (snownc_p(i,j) + graupelnc_p(i,j)) / (rainnc_p(i,j)+1.e-12)
+
+          !accumulated precipitation:
+          snownc(i)    = snownc(i) + snowncv(i)
+          graupelnc(i) = graupelnc(i) + graupelncv(i)
+       enddo
+       enddo
+
     case default
  end select microp_select
 
@@ -665,7 +1129,8 @@
 
 !local pointers:
  character(len=StrKIND),pointer:: microp_scheme
- real(kind=RKIND),dimension(:),pointer:: refl10cm_max,refl10cm_1km,refl10cm_1km_max
+ character(len=StrKIND),pointer:: nssl_moments
+ real(kind=RKIND),dimension(:),pointer:: refl10cm,refl10cm_max,refl10cm_1km,refl10cm_1km_max
 
 !local variables and arrays:
  integer:: i,j,k,kp
@@ -675,7 +1140,9 @@
 !-----------------------------------------------------------------------------------------------------------------
 
  call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
-
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments) ! not needed?
+ 
+ call mpas_pool_get_array(diag_physics,'refl10cm',refl10cm)
  call mpas_pool_get_array(diag_physics,'refl10cm_max',refl10cm_max)
  call mpas_pool_get_array(diag_physics,'refl10cm_1km',refl10cm_1km)
  call mpas_pool_get_array(diag_physics,'refl10cm_1km_max',refl10cm_1km_max)
@@ -684,7 +1151,72 @@
     case ("mp_kessler")
        call physics_error_fatal('--- calculation of radar reflectivity is not available' // &
                                  'with kessler cloud microphysics')
+    case ("mp_nssl2m")
+       ! Reflectivity is already computed in 3D in the refl10cm_p array, so just read out the values
+       if(.not.allocated(dBz1d)) allocate(dBZ1d(kts:kte))
+       if(.not.allocated(zp)   ) allocate(zp(kts:kte)   )
+       call mpas_log_write("Computing refl10cm_1km_max")
+       !call mpas_log_write("max before = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
+       do j = jts,jte ! Assuming here that jts == jte (2D arrays)
+       do i = its,ite
 
+          do k = kts,kte
+             dBZ1d(k) = -10._RKIND
+             zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,k,j) ! height AGL at mid-layer
+          enddo
+
+          kp = 1
+          do k = kts,kte
+             dBZ1d(k) = max(-10._RKIND,refl10cm_p(i,k,j))
+             if(zp(k) .lt. 1000.) kp = k
+          enddo
+
+          refl10cm_max(i) = maxval(dBZ1d(:))
+          w1 = (zp(kp+1)-1000.)/(zp(kp+1)-zp(kp))
+          w2 = 1.0 - w1
+          refl10cm_1km(i) = w1*dBZ1d(kp) + w2*dBZ1d(kp+1)
+  !        refl10cm_1km_max(i) = max(refl10cm_1km_max(i),refl10cm_1km(i))
+
+        enddo
+        enddo
+ !      call mpas_log_write("max after = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
+
+       if(allocated(dBz1d)) deallocate(dBZ1d)
+       if(allocated(zp)   ) deallocate(zp   )
+
+    case ("mp_tempo")
+       ! Reflectivity is already computed in 3D in the refl10cm_p array, so just read out the values
+       if(.not.allocated(dBz1d)) allocate(dBZ1d(kts:kte))
+       if(.not.allocated(zp)   ) allocate(zp(kts:kte)   )
+       call mpas_log_write("Computing refl10cm_1km_max")
+       !call mpas_log_write("max before = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
+       do j = jts,jte ! Assuming here that jts == jte (2D arrays)
+       do i = its,ite
+
+          do k = kts,kte
+             dBZ1d(k) = -35._RKIND
+             zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,k,j) ! height AGL at mid-layer
+          enddo
+
+          kp = 1
+          do k = kts,kte
+             dBZ1d(k) = max(-35._RKIND,refl10cm_p(i,k,j))
+             if(zp(k) .lt. 1000.) kp = k
+          enddo
+
+          refl10cm_max(i) = maxval(dBZ1d(:))
+          w1 = (zp(kp+1)-1000.)/(zp(kp+1)-zp(kp))
+          w2 = 1.0 - w1
+          refl10cm_1km(i) = w1*dBZ1d(kp) + w2*dBZ1d(kp+1)
+  !        refl10cm_1km_max(i) = max(refl10cm_1km_max(i),refl10cm_1km(i))
+
+        enddo
+        enddo
+ !      call mpas_log_write("max after = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
+
+       if(allocated(dBz1d)) deallocate(dBZ1d)
+       if(allocated(zp)   ) deallocate(zp   )
+       
     case ("mp_wsm6")
        if(.not.allocated(p1d)  ) allocate(p1d(kts:kte)  )
        if(.not.allocated(t1d)  ) allocate(t1d(kts:kte)  )
@@ -705,7 +1237,7 @@
              qs1d(k)  = qs_p(i,k,j)
              qg1d(k)  = qg_p(i,k,j)
              dBZ1d(k) = -35._RKIND
-             zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,1,j) ! height AGL
+             zp(k) = z_p(i,k,j) - z_p(i,1,j) + 0.5*dz_p(i,k,j) ! height AGL
           enddo
 
           call refl10cm_wsm6(qv1d,qr1d,qs1d,qg1d,t1d,p1d,dBZ1d,kts,kte)
@@ -719,7 +1251,7 @@
           w1 = (zp(kp+1)-1000.)/(zp(kp+1)-zp(kp))
           w2 = 1.0 - w1
           refl10cm_1km(i) = w1*dBZ1d(kp) + w2*dBZ1d(kp+1)
-          refl10cm_1km_max(i) = max(refl10cm_1km_max(i),refl10cm_1km(i))
+!          refl10cm_1km_max(i) = max(refl10cm_1km_max(i),refl10cm_1km(i))
        enddo
        enddo
 
@@ -755,8 +1287,8 @@
              qs1d(k)  = qs_p(i,k,j)
              qg1d(k)  = qg_p(i,k,j)
              nr1d(k)  = nr_p(i,k,j)
-             dBZ1d(k) = -35._RKIND
-             zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,1,j) ! height AGL
+             dBZ1d(k) = refl10cm_p(i,k,j)
+             zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,k,j) ! height AGL at mid-layer
           enddo
 
           call calc_refl10cm(qv1d,qc1d,qr1d,nr1d,qs1d,qg1d,t1d,p1d,dBZ1d,kts,kte,i,j)
@@ -764,6 +1296,7 @@
           kp = 1
           do k = kts,kte
              dBZ1d(k) = max(-35._RKIND,dBZ1d(k))
+             refl10cm_p(i,k,j) = dBZ1d(k)
              if(zp(k) .lt. 1000.) kp = k
           enddo
           refl10cm_max(i) = maxval(dBZ1d(:))
@@ -787,8 +1320,116 @@
 
     case default
  end select microp_select
-
+! call mpas_log_write("end compute 3d reflectivity")
  end subroutine compute_radar_reflectivity
+
+!=================================================================================================================
+subroutine compute_hourly_max_radar_reflectivity(configs,diag_physics,its,ite)
+!=================================================================================================================
+
+!input arguments:
+ type(mpas_pool_type),intent(in):: configs
+ integer,intent(in):: its,ite
+
+!inout arguments:
+ type(mpas_pool_type),intent(inout):: diag_physics
+
+!local pointers:
+ character(len=StrKIND),pointer:: microp_scheme
+ character(len=StrKIND),pointer:: nssl_moments
+ real(kind=RKIND),dimension(:),pointer:: refl10cm_1km_max, refl10cm_1km
+
+!local variables and arrays:
+ integer:: i,j,k,kp
+ real(kind=RKIND),dimension(:),allocatable:: qv1d,qc1d,qr1d,qs1d,qg1d,t1d,p1d,nr1d,dBZ1d,zp
+ real(kind=RKIND):: w1,w2
+
+!-----------------------------------------------------------------------------------------------------------------
+
+ call mpas_pool_get_config(configs,'config_microp_scheme',microp_scheme)
+ call mpas_pool_get_config(configs,'config_nssl_moments',nssl_moments) ! not needed?
+
+! call mpas_pool_get_array(diag_physics,'refl10cm_max',refl10cm_max)
+  call mpas_pool_get_array(diag_physics,'refl10cm_1km',refl10cm_1km)
+  call mpas_pool_get_array(diag_physics,'refl10cm_1km_max',refl10cm_1km_max)
+
+ microp_select: select case(microp_scheme)
+
+    case ("mp_kessler")
+       call physics_error_fatal('--- calculation of radar reflectivity is not available' // &
+                                 'with kessler cloud microphysics')
+    case ("mp_nssl2m")
+
+       ! Reflectivity is already computed in the refl10cm_1km_p array, so just
+       ! compare against previous values
+       !if(.not.allocated(zp)   ) allocate(zp(kts:kte)   )
+       call mpas_log_write("Computing refl10cm_1km_max")
+       call mpas_log_write("max before = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
+       do j = jts,jte ! Assuming here that jts == jte (2D arrays)
+       do i = its,ite
+
+          !do k = kts,kte
+          !   dBZ1d(k) = -10._RKIND
+          !   zp(k) = z_p(i,k,j) - z_p(i,1,j)+0.5*dz_p(i,k,j) ! height AGL at mid-layer
+          !enddo
+
+          !kp = 1
+          !do k = kts,kte
+          !   dBZ1d(k) = max(-10._RKIND,refl10cm_p(i,k,j))
+          !   if(zp(k) .lt. 1000.) kp = k
+          !enddo
+
+          !refl10cm_max(i) = maxval(dBZ1d(:))
+          !w1 = (zp(kp+1)-1000.)/(zp(kp+1)-zp(kp))
+          !w2 = 1.0 - w1
+          !refl10cm_1km(i) = w1*dBZ1d(kp) + w2*dBZ1d(kp+1)
+          refl10cm_1km_max(i) = max(refl10cm_1km_max(i),refl10cm_1km_p(i,j))
+
+        enddo
+        enddo
+       call mpas_log_write("max after = $r dbz", realArgs=(/maxval(refl10cm_1km_max)/))
+
+       !if(allocated(dBz1d)) deallocate(dBZ1d)
+       !if(allocated(zp)   ) deallocate(zp   )
+    case ("mp_wsm6","mp_tempo")
+       do i = its,ite
+          refl10cm_1km_max(i) = max(refl10cm_1km_max(i),refl10cm_1km(i))
+       enddo
+
+    case default
+
+ end select microp_select
+
+ end subroutine compute_hourly_max_radar_reflectivity
+
+!=================================================================================================================
+ subroutine compute_accumulated_max_hail(diag_physics,its,ite)
+!=================================================================================================================
+
+!input arguments:
+ integer,intent(in):: its,ite
+
+!inout arguments:
+ type(mpas_pool_type),intent(inout):: diag_physics
+
+!local pointers:
+ real(kind=RKIND),dimension(:),pointer:: max_hail_diameter_sfc, max_hail_diameter_sfc_acc
+
+!local variables and arrays:
+ integer:: i,j
+
+!-----------------------------------------------------------------------------------------------------------------
+
+ call mpas_pool_get_array(diag_physics,'max_hail_diameter_sfc',max_hail_diameter_sfc)
+ call mpas_pool_get_array(diag_physics,'max_hail_diameter_sfc_acc',max_hail_diameter_sfc_acc)
+
+ do j = jts,jte ! Assuming here that jts == jte (2D arrays)
+    do i = its,ite
+       max_hail_diameter_sfc_acc(i) = max(max_hail_diameter_sfc_acc(i), max_hail_diameter_sfc_p(i,j))
+    enddo
+ enddo
+
+end subroutine compute_accumulated_max_hail
 
 !=================================================================================================================
  subroutine compute_relhum(diag,its,ite)

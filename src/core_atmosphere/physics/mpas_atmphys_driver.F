@@ -23,6 +23,7 @@
  use mpas_atmphys_driver_oml
  use mpas_atmphys_constants
  use mpas_atmphys_interface
+ use mpas_atmphys_sfc_diagnostics,only: atmphys_sfc_diagnostics
  use mpas_atmphys_update
  use mpas_atmphys_vars, only: l_camlw,l_conv,l_radtlw,l_radtsw
  use mpas_timer
@@ -31,6 +32,21 @@
  private
  public:: physics_driver
 
+ !
+ ! Abstract interface for routine used to communicate halos of fields
+ ! in a named group
+ !
+ abstract interface
+      subroutine halo_exchange_routine(domain, halo_group, ierr)
+
+         use mpas_derived_types, only : domain_type
+
+         type (domain_type), intent(inout) :: domain
+         character(len=*), intent(in) :: halo_group
+         integer, intent(out), optional :: ierr
+
+      end subroutine halo_exchange_routine
+ end interface
 
 !MPAS top physics driver.
 !Laura D. Fowler (send comments to laura@ucar.edu).
@@ -107,12 +123,13 @@
 
 
 !=================================================================================================================
- subroutine physics_driver(domain,itimestep,xtime_s)
+ subroutine physics_driver(domain,itimestep,xtime_s,exchange_halo_group)
 !=================================================================================================================
 
 !input arguments:
  integer,intent(in):: itimestep
  real(kind=RKIND),intent(in):: xtime_s
+ procedure (halo_exchange_routine) :: exchange_halo_group
 
 !inout arguments:
  type(domain_type),intent(inout):: domain
@@ -127,6 +144,7 @@
                                  output_noahmp,       &
                                  tend_physics,        &
                                  atm_input,           &
+                                 ngw_input,           &
                                  sfc_input
 
  logical,pointer:: config_frac_seaice
@@ -188,6 +206,7 @@
     call mpas_pool_get_subpool(block%structs,'output_noahmp'      ,output_noahmp      )
     call mpas_pool_get_subpool(block%structs,'atm_input'          ,atm_input          )
     call mpas_pool_get_subpool(block%structs,'sfc_input'          ,sfc_input          )
+    call mpas_pool_get_subpool(block%structs,'ngw_input'          ,ngw_input          )
     call mpas_pool_get_subpool(block%structs,'tend_physics'       ,tend_physics       )
 
     call mpas_pool_get_dimension(block%dimensions,'nThreads',nThreads)
@@ -210,10 +229,10 @@
 
     !call to cloud scheme:
     if(l_radtlw .or. l_radtsw) then
-       call allocate_cloudiness
+       call allocate_cloudiness(block%configs)
 !$OMP PARALLEL DO
        do thread=1,nThreads
-          call driver_cloudiness(block%configs,mesh,diag_physics,sfc_input, &
+          call driver_cloudiness(itimestep,block%configs,mesh,diag_physics,sfc_input, &
                                  cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
        end do
 !$OMP END PARALLEL DO
@@ -257,7 +276,7 @@
 
     !deallocate all radiation arrays:
     if(config_radt_sw_scheme.ne.'off' .or. config_radt_lw_scheme.ne.'off') &
-       call deallocate_cloudiness
+       call deallocate_cloudiness(block%configs)
     if(config_radt_sw_scheme.ne.'off') call deallocate_radiation_sw(block%configs)
     if(config_radt_lw_scheme.ne.'off') call deallocate_radiation_lw(block%configs)
 
@@ -278,15 +297,15 @@
 
     !call to land-surface scheme:
     if(config_lsm_scheme .ne. 'off') then
-       if(config_lsm_scheme == 'sf_noah') then
-          call allocate_lsm
+       if(config_lsm_scheme .eq. 'sf_noah' .or. config_lsm_scheme .eq. 'sf_ruc') then
+          call allocate_lsm(block%configs)
 !$OMP PARALLEL DO
           do thread=1,nThreads
              call driver_lsm(itimestep,block%configs,mesh,diag_physics,sfc_input, &
                              cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
           end do
 !$OMP END PARALLEL DO
-       call deallocate_lsm
+       call deallocate_lsm(block%configs)
 
        elseif(config_lsm_scheme == 'sf_noahmp') then
           do thread=1,nThreads
@@ -296,14 +315,21 @@
           enddo
        endif
 
-       call allocate_seaice
+       call allocate_seaice(block%configs)
 !$OMP PARALLEL DO
        do thread=1,nThreads
-          call driver_seaice(block%configs,diag_physics,sfc_input, &
+          call driver_seaice(itimestep,block%configs,mesh,diag_physics,sfc_input, &
                              cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
        enddo
 !$OMP END PARALLEL DO
-       call deallocate_seaice
+       call deallocate_seaice(block%configs)
+
+!$OMP PARALLEL DO
+       do thread=1,nThreads
+          call atmphys_sfc_diagnostics(block%configs,mesh,diag,diag_physics,sfc_input,output_noahmp, &
+                           cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
+       enddo
+!$OMP END PARALLEL DO
     endif
 
     !call to pbl schemes:
@@ -321,14 +347,14 @@
 
     !call to gravity wave drag over orography scheme:
     if(config_gwdo_scheme .ne. 'off') then
-       call allocate_gwdo
+       call allocate_gwdo(block%configs)
 !$OMP PARALLEL DO
        do thread=1,nThreads
-          call driver_gwdo(itimestep,block%configs,mesh,sfc_input,diag_physics,tend_physics, &
-                           cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
+          call driver_gwdo(itimestep,block%configs,mesh,sfc_input,ngw_input,diag_physics,       &
+                           tend_physics,cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
        end do
 !$OMP END PARALLEL DO
-       call deallocate_gwdo
+       call deallocate_gwdo(block%configs)
     endif
 
     !call to convection scheme:
@@ -342,8 +368,8 @@
        call allocate_convection(block%configs)
 !$OMP PARALLEL DO
        do thread=1,nThreads
-          call driver_convection(itimestep,block%configs,mesh,sfc_input,diag_physics,tend_physics, &
-                                 cellSolveThreadStart(thread),cellSolveThreadEnd(thread))
+          call driver_convection(itimestep,block%configs,mesh,sfc_input,diag_physics,tend_physics,diag,domain%dminfo, &
+                                 cellSolveThreadStart(thread),cellSolveThreadEnd(thread),exchange_halo_group,block)
        end do
 !$OMP END PARALLEL DO
        call deallocate_convection(block%configs)

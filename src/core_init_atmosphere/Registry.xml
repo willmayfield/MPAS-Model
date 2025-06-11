@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<registry model="mpas" core="init_atmosphere" core_abbrev="init_atm" version="8.2.0">
+<registry model="mpas" core="init_atmosphere" core_abbrev="init_atm" version="8.2.3-3.12">
 
 <!-- **************************************************************************************** -->
 <!-- ************************************** Dimensions ************************************** -->
@@ -44,6 +44,13 @@
                      description="The number of prescribed pressure levels in the climatological GOCART data set"/>
                 <dim name="nMonths" definition="namelist:config_months"
                      description="The number of months in a year"/>
+                     description="The number of soil categories used in the land surface model"/>
+		<dim name="nlcat" definition="namelist:config_landuse_data" calculation='20 + 4 * merge(1,0,config_landuse_data(1:4)=="USGS")'
+                     description="The number of landuse categories used in the land surface model"/>
+                <dim name="nscat" definition="16" definition:"namelist:config_nsoilcat"
+                     description="The number of soil categories used in the land surface model"/>
+	        <dim name="nVegOpt" definition="namelist:config_nvegopt"
+                     description="The number of vegetation fraction option: 1 - clim, 2 - real-time"/>
         </dims>
 
 
@@ -63,9 +70,11 @@
                                         5 = super-cell, \newline
                                         6 = mountain wave, \newline
                                         7 = real-data initial conditions from, e.g., GFS, \newline
-                                        8 = surface field (SST, sea-ice) update file for use with real-data simulations \newline
-                                        9 = lateral boundary conditions update file for use with real-data simulations \newline
-                                        13 = CAM-MPAS 3-d grid with specified topography and zeta levels"
+                                        8 = surface field (SST, sea-ice) update file for use with real-data simulations, \newline
+                                        9 = lateral boundary conditions update file for use with real-data simulations, \newline
+                                        13 = CAM-MPAS 3-d grid with specified topography and zeta levels, \newline
+					55 = microphysics test: 3D stratocumulus, \newline
+					66 = microphysics test: 2D flow over terrain"					
                      possible_values="1 -- 9"/>
 
                 <nml_option name="config_calendar_type" type="character" default_value="gregorian" in_defaults="false"
@@ -100,7 +109,7 @@
 
                 <nml_option name="config_interface_projection" type="character"     default_value="linear_interpolation"
                      units="-"
-                     description="projecting layer values to the interface, linear vertical interpolation or integral" 
+                     description="projecting layer values to the interface, linear vertical interpolation or integral"
                      possible_values="'linear_interpolation' or 'layer_integral' (layer average value)"/>
 
         </nml_record>
@@ -137,6 +146,16 @@
                      description="The number of months in a year"
                      possible_values="Positive integer values"/>
 
+                <nml_option name="config_nsoilcat"              type="integer"       default_value="16"
+                     units='-'
+                     description="The number of landuse categories used by the LSM."
+                     possible_values="16"/>
+
+                <nml_option name="config_nvegopt"               type="integer"       default_value="1"
+                     units='-'
+                     description="The number of vegetation fraction option used by the LSM."
+                     possible_values="1"/>
+
         </nml_record>
 
         <nml_record name="data_sources" in_defaults="true">
@@ -165,6 +184,11 @@
                      units="-"
                      description="The land use classification to use (case 7 only)"
                      possible_values="`USGS' or `MODIFIED_IGBP_MODIS_NOAH'"/>
+
+                <nml_option name="config_soilcat_data"          type="character"     default_value="STASGO"
+                     units="-"
+                     description="The soil type classification to use (case 7 only)"
+                     possible_values="`STASGO' or `BNU'"/>
 
                 <nml_option name="config_topo_data"             type="character"     default_value="GMTED2010"
                      units="-"
@@ -201,6 +225,10 @@
                      description="Whether to use specific-humidity as the first-guess moisture variable. If this option is False, relative humidity will be used."
                      possible_values="true or false"/>
 
+		<nml_option name="config_lai_data"           type="character"     default_value="MODIS"
+                     units="-"
+                     description="The climatological monthly leaf area index dataset to use (case 7 only)"
+                     possible_values="`MODIS'"/>
         </nml_record>
 
         <nml_record name="vertical_grid" in_defaults="true">
@@ -268,6 +296,11 @@
                      description="Whether to recompute subgrid-scale orography statistics directly on the native MPAS mesh (case 7 only)"
                      possible_values="true or false"/>
 
+                <nml_option name="config_native_gwd_gsl_static"     type="logical"       default_value="false"
+                     units="-"
+                     description="Whether to recompute subgrid-scale orography statistics for the GSL drag directly on the native MPAS mesh (case 7 only)"
+                     possible_values="true or false"/>
+
                 <nml_option name="config_gwd_cell_scaling"      type="real"          default_value="1.0"      in_defaults="false"
                      units="-"
                      description="Scaling factor for the effective grid cell diameter used in computation of GWD static fields"
@@ -281,6 +314,16 @@
                 <nml_option name="config_met_interp"            type="logical"       default_value="true"
                      units="-"
                      description="Whether to interpolate first-guess fields from intermediate file"
+                     possible_values="true or false"/>
+
+		<nml_option name="config_aerosol_climo"            type="logical"       default_value="false"
+                     units="-"
+                     description="Whether to use monthly climatology for water- and ice-friendly aerosols"
+                     possible_values="true or false"/>
+
+		<nml_option name="config_tempo_rap"            type="logical"       default_value="false"
+                     units="-"
+                     description="Whether to use aerosols from RAP for TEMPO microphysics instead of the monthly climatology"
                      possible_values="true or false"/>
 
                 <nml_option name="config_input_sst"             type="logical"       default_value="false"
@@ -348,12 +391,21 @@
                 <package name="lbcs" description="Active when lateral boundary conditions are interpolated and written."/>
                 <package name="gwd_stage_in" description="Active only if GWD static fields are be generated and other static fields are not being generated"/>
                 <package name="gwd_stage_out" description="Active only if GWD static fields are be generated and other static fields are not being generated"/>
+                <package name="gwd_gsl_stage_out" description="Active only if GSL GWD static fields are be generated"/>
                 <package name="vertical_stage_in" description="Active only if a vertical grid is being generated"/>
                 <package name="vertical_stage_out" description="Active only if a vertical grid is being generated"/>
                 <package name="met_stage_in" description="Active only if meteorological fields are being interpolated"/>
                 <package name="met_stage_out" description="Active only if meteorological fields are being interpolated"/>
+                <package name="mp_kessler_in" description="parameterization of kessler microphysics."/>
+                <package name="mp_thompson_in" description="parameterization of Thompson cloud microphysics."/>
+                <package name="mp_wsm6_in" description="parameterization of WSM6 cloud microphysics."/>
+                <package name="mp_nssl2m_in" description="parameterization of NSSL 2-moment microphysics."/>
+                <package name="nssl3m_in" description="variables for NSSL 3-moment microphysics."/>
                 <package name="first_guess_field" description="3-d atmospheric or land-surface fields on first-guess levels"/>
                 <package name="mp_thompson_aers_in" description="initialization of GOCART-based Thompson water- and ice-friendly aerosols"/>
+		<package name="mp_tempo_in" description="parameterization of TEMPO cloud microphysics."/>
+		<package name="tempo_aerosolaware_in" description="variables for TEMPO aerosol-aware microphysics."/>
+		<package name="tempo_hailaware_in" description="variables for TEMPO hail-aware microphysics."/>
         </packages>
 
 
@@ -362,10 +414,10 @@
 <!-- **************************************************************************************** -->
 
 	<streams>
-		<stream name="input" 
-                        type="input" 
+		<stream name="input"
+                        type="input"
                         filename_template="x1.40962.grid.nc"
-                        input_interval="initial_only" 
+                        input_interval="initial_only"
                         immutable="true">
 
                         <var name="latCell"/>
@@ -420,12 +472,15 @@
                         <var name="iswater_lu" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="ivgtyp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="isltyp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+                        <var name="landusef" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+                        <var name="soilf" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="snoalb" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="soiltemp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="greenfrac" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="shdmin" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="shdmax" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="albedo12m" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
+                        <var name="lai12m" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="soilcomp" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="soilcl1" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
                         <var name="soilcl2" packages="gwd_stage_in;vertical_stage_in;met_stage_in"/>
@@ -463,8 +518,8 @@
                         <var name="dss" packages="met_stage_in"/>
 		</stream>
 
-		<stream name="output" 
-                        type="output" 
+		<stream name="output"
+                        type="output"
                         filename_template="x1.40962.init.nc"
                         output_interval="initial_only"
                         packages="initial_conds"
@@ -524,6 +579,8 @@
                         <var name="isice_lu"/>
                         <var name="iswater_lu"/>
                         <var name="ivgtyp"/>
+                        <var name="landusef"/>
+                        <var name="soilf"/>
                         <var name="isltyp"/>
                         <var name="snoalb"/>
                         <var name="soiltemp"/>
@@ -531,6 +588,7 @@
                         <var name="shdmin"/>
                         <var name="shdmax"/>
                         <var name="albedo12m"/>
+                        <var name="lai12m"/>
                         <var name="soilcomp"/>
                         <var name="soilcl1"/>
                         <var name="soilcl2"/>
@@ -570,7 +628,7 @@
                         <var name="v_init" packages="met_stage_out"/>
                         <var name="t_init" packages="met_stage_out"/>
                         <var name="qv_init" packages="met_stage_out"/>
-                        <var_array name="scalars" packages="met_stage_out;mp_thompson_aers_in"/>
+                        <var_array name="scalars" packages="met_stage_out;mp_thompson_aers_in;tempo_aerosolaware_in"/>
                         <var name="u" packages="met_stage_out"/>
                         <var name="w" packages="met_stage_out"/>
                         <var name="dz" packages="met_stage_out"/>
@@ -588,6 +646,7 @@
                         <var name="xice" packages="met_stage_out"/>
                         <var name="seaice" packages="met_stage_out"/>
                         <var name="vegfra" packages="met_stage_out"/>
+                        <var name="canwat" packages="met_stage_out"/>
                         <var name="sfc_albbck" packages="met_stage_out"/>
                         <var name="xland" packages="met_stage_out"/>
                         <var name="rho" packages="met_stage_out"/>
@@ -603,12 +662,44 @@
                         <var name="q2" packages="met_stage_out"/>
                         <var name="rh2" packages="met_stage_out"/>
                         <var name="t2m" packages="met_stage_out"/>
+                        <var name="refl10cm" packages="met_stage_out"/>
+                        <var name="uReconstructZonal" packages="met_stage_out"/>
+                        <var name="uReconstructMeridional" packages="met_stage_out"/>
 		</stream>
+
+                <stream name="ugwp_oro_data"
+                        type="output"
+                        filename_template="x1.40962.ugwp_oro_data.nc"
+                        output_interval="initial_only"
+                        immutable="true"
+                        packages="gwd_gsl_stage_out">
+
+                        <var name="var2dls"/>
+                        <var name="conls"/>
+                        <var name="oa1ls"/>
+                        <var name="oa2ls"/>
+                        <var name="oa3ls"/>
+                        <var name="oa4ls"/>
+                        <var name="ol1ls"/>
+                        <var name="ol2ls"/>
+                        <var name="ol3ls"/>
+                        <var name="ol4ls"/>
+                        <var name="var2dss"/>
+                        <var name="conss"/>
+                        <var name="oa1ss"/>
+                        <var name="oa2ss"/>
+                        <var name="oa3ss"/>
+                        <var name="oa4ss"/>
+                        <var name="ol1ss"/>
+                        <var name="ol2ss"/>
+                        <var name="ol3ss"/>
+                        <var name="ol4ss"/>
+                </stream>
 
 		<stream name="surface" 
                         type="output" 
                         filename_template="x1.40962.sfc_update.nc"
-                        output_interval="86400" 
+                        output_interval="86400"
                         filename_interval="none"
                         packages="sfc_update"
                         immutable="true">
@@ -790,11 +881,17 @@
                 <var name="ivgtyp" name_in_code="lu_index" type="integer"  dimensions="nCells" units="unitless"
                      description="dominant vegetation category"/>
 
+		<var name="landusef" name_in_code="landusef" type="real"  dimensions="nlcat nCells" units="unitless"
+                     description="fraction of each landuse category present in each cell"/>
+
                 <var name="mminlu" type="text" dimensions="" units="unitless"
                      description="land use classification"/>
 
                 <var name="isltyp" name_in_code="soilcat_top"  type="integer"  dimensions="nCells" units="unitless"
                      description="dominate soil category"/>
+
+		<var name="soilf" name_in_code="soilf" type="real"  dimensions="nscat nCells" units="unitless"
+                     description="fraction of each soil type present in each cell"/>
 
                 <var name="snoalb" type="real" dimensions="nCells" units="unitless"
                      description="annual maximum snow albedo"/>
@@ -802,17 +899,20 @@
                 <var name="soiltemp" type="real" dimensions="nCells" units="K"
                      description="annual mean deep soil temperature"/>
 
-                <var name="greenfrac" type="real" dimensions="nMonths nCells" units="unitless"
-                     description="monthly-mean climatological greeness fraction"/>
+                <var name="greenfrac" type="real" dimensions="nMonths nCells" units="percent"
+                     description="monthly-mean climatological greenness fraction"/>
 
-                <var name="shdmin" type="real" dimensions="nCells" units="unitless"
+                <var name="shdmin" type="real" dimensions="nCells" units="percent"
                      description="minimum fractional coverage of annual green vegetation fraction"/>
 
-                <var name="shdmax" type="real" dimensions="nCells" units="unitless"
+                <var name="shdmax" type="real" dimensions="nCells" units="percent"
                      description="maximum fractional coverage of annual green vegetation fraction"/>
 
-                <var name="albedo12m" type="real" dimensions="nMonths nCells" units="unitless"
+                <var name="albedo12m" type="real" dimensions="nMonths nCells" units="percent"
                      description="monthly-mean climatological surface albedo"/>
+                     
+                <var name="lai12m" type="real" dimensions="nMonths nCells" units="unitless"
+                     description="monthly-mean climatological leaf area index"/>
 
                 <var name="isice_lu" type="integer" dimensions="" units="unitless" default_value="24"
                      description="Index category for snow/ice"/>
@@ -869,7 +969,7 @@
                      description="effective orographic length for southerly flow"
                      packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
 
-                <var name="ol3" type="real" dimensions="nCells" units="unitles"
+                <var name="ol3" type="real" dimensions="nCells" units="unitless"
                      description="effective orographic length for south-westerly flow"
                      packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
 
@@ -877,18 +977,100 @@
                      description="effective orographic length for north-westerly flow"
                      packages="gwd_stage_out;vertical_stage_out;met_stage_out"/>
 
+                <!-- GSL GWDO fields - meso-scale -->
+                <var name="var2dls" type="real" dimensions="nCells" units="m"
+                     description="standard deviation of subgrid-scale orography (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="conls" type="real" dimensions="nCells" units="unitless"
+                     description="orographic convexity (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa1ls" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for westerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa2ls" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for southerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa3ls" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for south-westerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa4ls" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for north-westerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol1ls" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for westerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol2ls" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for southerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol3ls" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for south-westerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol4ls" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for north-westerly flow (meso-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <!-- GSL GWDO fields - small-scale -->
+                <var name="var2dss" type="real" dimensions="nCells" units="m"
+                     description="standard deviation of subgrid-scale orography (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="conss" type="real" dimensions="nCells" units="unitless"
+                     description="orographic convexity (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa1ss" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for westerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa2ss" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for southerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa3ss" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for south-westerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="oa4ss" type="real" dimensions="nCells" units="unitless"
+                     description="asymmetry of subgrid-scale orography for north-westerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol1ss" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for westerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol2ss" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for southerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol3ss" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for south-westerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
+                <var name="ol4ss" type="real" dimensions="nCells" units="unitless"
+                     description="effective orographic length for north-westerly flow (small-scale GWD)"
+                     packages="gwd_gsl_stage_out"/>
+
                 <!-- GOCART aerosol fields -->
                 <var name="nifa_gocart_clim" type="real" dimensions="nMonths nGocartLevels nCells" units="nb kg^{-1}"
                      description="climatological Gocart ice-friendly number concentration"
-                     packages="mp_thompson_aers_in"/>
+                     packages="mp_thompson_aers_in;tempo_aerosolaware_in"/>
 
                 <var name="nwfa_gocart_clim" type="real" dimensions="nMonths nGocartLevels nCells" units="nb kg^{-1}"
                      description="climatological Gocart water-friendly number concentration"
-                     packages="mp_thompson_aers_in"/>
+                     packages="mp_thompson_aers_in;tempo_aerosolaware_in"/>
 
                 <var name="pwif_gocart_clim" type="real"  dimensions="nMonths nGocartLevels nCells" units="Pa"
                      description="climatological Gocart pressure levels"
-                     packages="mp_thompson_aers_in"/>
+                     packages="mp_thompson_aers_in;tempo_aerosolaware_in"/>
 
                 <!-- description of the vertical grid structure -->
                 <var name="hx" type="real" dimensions="nVertLevelsP1 nCells" units="m"
@@ -1026,13 +1208,40 @@
                         <var name="qr" array_group="moist" units="kg kg^{-1}"
                              description="Rain water mixing ratio"/>
 
+                        <var name="qi" array_group="moist" units="kg kg^{-1}"
+                             description="Ice mixing ratio"/>
+
+                        <var name="qs" array_group="moist" units="kg kg^{-1}"
+                             description="Snow mixing ratio"/>
+
+                        <var name="qg" array_group="moist" units="kg kg^{-1}"
+                             description="Graupel mixing ratio"/>
+
+                        <var name="qh" array_group="moist" units="kg kg^{-1}"
+                             description="hail mixing ratio"/>
+
+                        <var name="ni" array_group="number" units="nb kg^{-1}"
+                             description="Cloud ice number concentration"/>
+
+                        <var name="nr" array_group="number" units="nb kg^{-1}"
+                             description="Rain number concentration"/>
+
+                        <var name="nc" array_group="number" units="nb kg^{-1}"
+                             description="Cloud droplet number concentration"/>
+
+                        <var name="ns" array_group="number" units="nb kg^{-1}"
+                             description="Snow number concentration"/>
+
+                        <var name="ng" array_group="number" units="nb kg^{-1}"
+                             description="Graupel number concentration"/>
+
                         <var name="nifa" array_group="number" units="nb kg^{-1}"
                              description="Gocart ice-friendly aerosol number concentration"
-                             packages="mp_thompson_aers_in"/>
+                             packages="mp_thompson_aers_in;tempo_aerosolaware_in"/>
 
                         <var name="nwfa" array_group="number" units="nb kg^{-1}"
                              description="Gocart water-friendly aerosol number concentration"
-                             packages="mp_thompson_aers_in"/>
+                             packages="mp_thompson_aers_in;tempo_aerosolaware_in"/>
                 </var_array>
 
                 <!-- Climatology for ocean mixed-layer depth -->
@@ -1068,13 +1277,52 @@
                         <var name="lbc_qr" array_group="moist" units="kg kg^{-1}"
                              description="Rain water mixing ratio on lateral boundary cells"/>
 
+                        <var name="lbc_qi" array_group="moist" units="kg kg^{-1}"
+                             description="Lateral boundary tendency of ice mixing ratio"/>
+
+                        <var name="lbc_qs" array_group="moist" units="kg kg^{-1}"
+                             description="Lateral boundary tendency of snow mixing ratio"/>
+
+                        <var name="lbc_qg" array_group="moist" units="kg kg^{-1}"
+                             description="Lateral boundary tendency of graupel mixing ratio"/>
+
+                       <var name="lbc_qh" array_group="moist"  units="kg kg^{-1} s^{-1}"
+                             description="Lateral boundary tendency of hail mixing ratio"/>
+
+                        <var name="lbc_nr" array_group="number" units="kg^{-1}"
+                             description="Lateral boundary tendency of rain number concentration"/>
+
+                        <var name="lbc_ni" array_group="number" units="kg^{-1}"
+                             description="Lateral boundary tendency of ice number concentration"/>
+
+                        <var name="lbc_nc" array_group="number" units="kg^{-1}"
+                             description="Lateral boundary tendency of droplet number concentration"/>
+
+                        <var name="lbc_ns" array_group="number" units="kg^{-1}"
+                             description="Lateral boundary tendency of snow number concentration"/>
+
+                        <var name="lbc_ng" array_group="number" units="kg^{-1}"
+                             description="Lateral boundary tendency of graupel number concentration"/>
+
+                        <var name="lbc_nh" array_group="number" units="m^{-3} s^{-1}"
+                             description="Lateral boundary tendency of hail number concentration"/>
+
+                        <var name="lbc_nccn" array_group="number" units="m^{-3} s^{-1}"
+                             description="Lateral boundary tendency of CCN number concentration"/>
+
+                        <var name="lbc_volg" array_group="volume" units="m^{3} s^{-1}"
+                             description="Lateral boundary tendency of graupel particle volume"/>
+
+                        <var name="lbc_volh" array_group="volume" units="m^{3} s^{-1}"
+                             description="Lateral boundary tendency of hail particle volume"/>
+
                         <var name="lbc_nifa" array_group="number" units="nb kg^{-1}"
                              description="Gocart ice-friendly aerosol number concentration on lateral boundary cells"
-                             packages="mp_thompson_aers_in"/>
+                             packages="mp_thompson_aers_in;tempo_aerosolaware_in"/>
 
                         <var name="lbc_nwfa" array_group="number" units="nb kg^{-1}"
                              description="Gocart water-friendly aerosol number concentration on lateral boundary cells"
-                             packages="mp_thompson_aers_in"/>
+                             packages="mp_thompson_aers_in;tempo_aerosolaware_in"/>
                 </var_array>
 
         </var_struct>
@@ -1109,6 +1357,36 @@
                 <var name="sh_fg" name_in_code="sh" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
                      description="First guess specific humidity"
                      packages="first_guess_field"/>
+
+	        <var name="qnwfa_fg" name_in_code="qnwfa" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+		     description="First guess water-friendly aerosols"/>
+
+		<var name="qnifa_fg" name_in_code="qnifa" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+		     description="First guess ice-friendly aerosols"/>
+
+                <var name="qc_fg" name_in_code="qc" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess cloud mixing ratio"/>
+
+                <var name="qr_fg" name_in_code="qr" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Rain Mixing Ratio"/>
+
+                <var name="qi_fg" name_in_code="qi" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Cloud Ice Mixing Ratio"/>
+
+                <var name="qs_fg" name_in_code="qs" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Snow Mixing Ratio"/>
+
+                <var name="qg_fg" name_in_code="qg" type="real" dimensions="nFGLevels nCells Time" units="kg kg^{-1}"
+                     description="First guess Graupel Mixing Ratio"/>
+
+                <var name="qnc_fg" name_in_code="qnc" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+                     description="First guess Number Concentration of Cloud Droplets"/>
+
+                <var name="qni_fg" name_in_code="qni" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+                     description="First guess Number Concentration of Cloud Ice"/>
+
+                <var name="qnr_fg" name_in_code="qnr" type="real" dimensions="nFGLevels nCells Time" units="kg^{-1}"
+                     description="First guess  Specific Number Concentration of Rain"/>
 
                 <var name="soilz_fg" name_in_code="soilz" type="real" dimensions="nCells Time" units="m"
                      description="First guess soil height"
@@ -1207,9 +1485,13 @@
                      description="geopotential height vertically interpolated from first guess"
                      packages="met_stage_out"/>
 
-                <var name="vegfra" type="real" dimensions="nCells Time" units="unitless"
+                <var name="vegfra" type="real" dimensions="nCells Time" units="percent"
                      description="vegetation fraction"
                      packages="met_stage_out"/>
+
+	        <var name="canwat" type="real" dimensions="nCells Time" units="kg m^{-2}"
+		     description="water in canopy" 
+   		     packages="met_stage_out"/>
 
                 <var name="sfc_albbck" type="real" dimensions="nCells Time" units="unitless"
                      description="background surface albedo"
@@ -1346,5 +1628,10 @@
                 <var name="precipw" type="real" dimensions="nCells Time" units="kg m^{-2}"
                      description="precipitable water"
                      packages="met_stage_out"/>
-        </var_struct>
+
+                <var name="refl10cm" type="real" dimensions="nVertLevels nCells Time" units="dBZ"
+                     description="10 cm radar reflectivity"
+                     packages="met_stage_out"/>
+</var_struct>
+
 </registry>
