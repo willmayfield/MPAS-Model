@@ -10,6 +10,10 @@ load("stack-intel-oneapi-mpi/2021.13")
 load("cmake/3.27.9")
 load("parallel-netcdf/1.12.3")
 load("parallelio/2.6.2")
+load("mkl/2024.2.1")
+load("netcdf-hdf5parallel/4.7.4")
+
+
 
 if mode() == "load" then
   setenv("PNETCDF", os.getenv("parallel_netcdf_ROOT"))

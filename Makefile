@@ -462,7 +462,7 @@ intel-mpi:   # BUILDTARGET Intel compiler suite with Intel MPI library
 	"CC_PARALLEL = mpiicc" \
 	"CXX_PARALLEL = mpiicpc" \
 	"FC_SERIAL = ifort" \
-	"CC_SERIAL = icc" \
+	"CC_SERIAL = icx" \
 	"CXX_SERIAL = icpc" \
 	"FFLAGS_PROMOTION = -real-size 64" \
 	"FFLAGS_OPT = -O3 -convert big_endian -free -align array64byte" \
