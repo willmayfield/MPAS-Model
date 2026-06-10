@@ -351,6 +351,43 @@
 
  enddo
 
+ case( 410 )
+ do iCell = 1, nCellsSolve
+    iSoil = 1
+    zs_fg(iSoil,iCell) = 0.5_RKIND * dzs_fg(iSoil,iCell)
+    do iSoil = 2, nFGSoilLevels
+       zs_fg(iSoil,iCell) = zs_fg(iSoil-1,iCell)        &
+                          + 0.5_RKIND * dzs_fg(iSoil-1,iCell) &
+                          + 0.5_RKIND * dzs_fg(iSoil,iCell)
+    enddo
+ enddo
+
+ do iCell = 1, nCellsSolve
+!    dzs(1,iCell) = 0.10_RKIND
+!    dzs(2,iCell) = 0.30_RKIND
+!    dzs(3,iCell) = 0.60_RKIND
+!    dzs(4,iCell) = 1.00_RKIND
+       dzs(1,iCell)  = 0.05_RKIND
+       dzs(2,iCell)  = 0.10_RKIND
+       dzs(3,iCell)  = 0.10_RKIND
+       dzs(4,iCell)  = 0.10_RKIND
+       dzs(5,iCell)  = 0.30_RKIND
+       dzs(6,iCell)  = 0.35_RKIND
+       dzs(7,iCell)  = 0.50_RKIND
+       dzs(8,iCell)  = 1.00_RKIND
+       dzs(9,iCell)  = 1.00_RKIND
+       dzs(10,iCell) = 1.50_RKIND
+
+    iSoil = 1
+    zs(iSoil,iCell)  = 0.5_RKIND * dzs(iSoil,iCell)
+    do iSoil = 2, nSoilLevels
+       zs(iSoil,iCell) = zs(iSoil-1,iCell)              &
+                       + 0.5_RKIND * dzs(iSoil-1,iCell) &
+                       + 0.5_RKIND * dzs(iSoil,iCell)
+    enddo
+
+ enddo
+
  case(9)
    if(.not.allocated(zs2)) allocate(zs2(nSoilLevels))
    do iCell = 1, nCellsSolve
@@ -536,7 +573,7 @@ end subroutine init_soil_layers_properties
        sm_input(ifgSoil+1,iCell) = sm_fg(ifgSoil,iCell)
     enddo
 
-    zhave(nFGSoilLevels+2,iCell) = 300._RKIND/100._RKIND
+    zhave(nFGSoilLevels+2,iCell) = 600._RKIND/100._RKIND
     st_input(nFGSoilLevels+2,iCell) = tmn(iCell)
     sm_input(nFGSoilLevels+2,iCell) = sm_input(nFGSoilLevels,iCell)
 
@@ -953,7 +990,7 @@ end subroutine init_soil_layers_properties
 !note that this threshold is also defined in module_physics_vars.F.It is defined here to avoid
 !adding "use module_physics_vars" since this subroutine is only used for the initialization of
 !a "real" forecast with $CORE = init_nhyd_atmos.
- real(kind=RKIND),parameter:: total_depth        = 3.   ! 3-meter soil depth.
+ real(kind=RKIND),parameter:: total_depth        = 6.   ! 3-meter soil depth.
 
 !-----------------------------------------------------------------------------------------------------------------
 !call mpas_log_write('')

@@ -120,7 +120,7 @@
                      description="The number of vertical levels to be used in the model"
                      possible_values="Positive integer values"/>
 
-                <nml_option name="config_nsoillevels"           type="integer"       default_value="4"
+                <nml_option name="config_nsoillevels"           type="integer"       default_value="10"
                      units="-"
                      description="The number of vertical soil levels needed by LSM in the model (case 7 only)"
                      possible_values="Positive integer values"/>
