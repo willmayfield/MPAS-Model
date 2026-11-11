@@ -8,6 +8,8 @@
 !=================================================================================================================
  module mpas_atmphys_driver_pbl
  use mpas_kind_types
+ use mpas_derived_types,only: MPAS_LOG_CRIT
+ use mpas_log,only: mpas_log_write
  use mpas_pool_routines
  use mpas_timer,only: mpas_timer_start,mpas_timer_stop
 
@@ -1007,6 +1009,62 @@
 
  end subroutine pbl_from_MPAS
 
+#ifdef STOCHASTIC_PHYSICS
+!=================================================================================================================
+ subroutine spp_pbl_from_MPAS(configs,tend_physics,itimestep,its,ite)
+!=================================================================================================================
+!SPP for the MYNN PBL schemes: reuse the SPPT pattern, which is centered on 1, as the zero-mean perturbation
+!pattern_spp_pbl. The pattern is clipped at +/- config_spp_pbl_stddev_cutoff standard
+!deviations. Its amplitude (standard deviation) is set with config_sppt_1 (single pattern only).
+
+!input arguments:
+ type(mpas_pool_type),intent(in):: configs
+ type(mpas_pool_type),intent(in):: tend_physics
+
+ integer,intent(in):: itimestep,its,ite
+
+!local variables:
+ integer:: i,k,j
+ real(kind=RKIND):: spp_pert,spp_limit
+
+!local pointers:
+ logical,pointer:: do_sppt
+ integer,pointer:: config_spp_pbl
+ real(kind=RKIND),pointer:: config_sppt_1
+ real(kind=RKIND),pointer:: config_spp_pbl_stddev_cutoff
+ real(kind=RKIND),dimension(:,:),pointer:: stoch_pattern_sppt
+!-----------------------------------------------------------------------------------------------------------------
+
+ call mpas_pool_get_config(configs,'config_spp_pbl',config_spp_pbl)
+ if(config_spp_pbl /= 1) return
+
+ call mpas_pool_get_config(configs,'do_sppt',do_sppt)
+ if(.not. do_sppt) &
+    call mpas_log_write('config_spp_pbl = 1 requires do_sppt = true to generate the perturbation pattern', &
+                        messageType=MPAS_LOG_CRIT)
+
+!the pattern is advanced after the physics are called, so it is not yet valid at the first time-step:
+ if(itimestep == 1) return
+
+ call mpas_pool_get_config(configs,'config_sppt_1',config_sppt_1)
+ call mpas_pool_get_config(configs,'config_spp_pbl_stddev_cutoff',config_spp_pbl_stddev_cutoff)
+ call mpas_pool_get_array(tend_physics,'stoch_pattern_sppt',stoch_pattern_sppt)
+
+ spp_limit = config_spp_pbl_stddev_cutoff * config_sppt_1
+
+ do j = jts,jte
+ do k = kts,kte
+ do i = its,ite
+    spp_pert = stoch_pattern_sppt(k,i) - 1._RKIND
+    if(spp_limit > 0._RKIND) spp_pert = max(min(spp_pert,spp_limit),-spp_limit)
+    pattern_spp_pbl(i,k,j) = spp_pert
+ enddo
+ enddo
+ enddo
+
+ end subroutine spp_pbl_from_MPAS
+#endif
+
 !=================================================================================================================
  subroutine pbl_to_MPAS(configs,state,diag_physics,tend_physics,its,ite)
 !=================================================================================================================
@@ -1549,6 +1607,10 @@
 
 !copy MPAS arrays to local arrays:
  call pbl_from_MPAS(configs,state,mesh,sfc_input,diag_physics,tend_physics,its,ite)
+#ifdef STOCHASTIC_PHYSICS
+ if(trim(pbl_scheme) == "bl_mynn" .or. trim(pbl_scheme) == "bl_mynnedmf") &
+    call spp_pbl_from_MPAS(configs,tend_physics,itimestep,its,ite)
+#endif
 
  initflag = 1
  if(config_do_restart .or. itimestep > 1) initflag = 0

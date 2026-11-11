@@ -2160,9 +2160,10 @@ module atm_time_integration
 
 #ifdef STOCHASTIC_PHYSICS
 ! apply random perturbation pattern to physics process (hydrostatic) tendencies
-      if (dosppt(domain)) then
-        call stochastic_physics_pattern_apply(domain, 'phys')
-      endif
+! (disabled: the SPPT pattern is used only for SPP in the MYNN PBL scheme)
+!      if (dosppt(domain)) then
+!        call stochastic_physics_pattern_apply(domain, 'phys')
+!      endif
 #endif
 
       call physics_get_tend( block, mesh, state, diag, tend, tend_physics, &
@@ -2174,9 +2175,10 @@ module atm_time_integration
 
 #ifdef STOCHASTIC_PHYSICS
 ! apply random perturbation pattern to the accumulated (non-hydrostatic) physics tendencies
-      if (dosppt(domain)) then
-        call stochastic_physics_pattern_apply(domain, 'prog')
-      endif
+! (disabled: the SPPT pattern is used only for SPP in the MYNN PBL scheme)
+!      if (dosppt(domain)) then
+!        call stochastic_physics_pattern_apply(domain, 'prog')
+!      endif
 #endif
 
 #else

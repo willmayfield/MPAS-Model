@@ -3154,6 +3154,11 @@
                      description="configuration for spp boundary layer"
                      possible_values="`0: off',`1: activated'"/>
 
+                <nml_option name="config_spp_pbl_stddev_cutoff" type="real" default_value="1.5" in_defaults="false"
+                     units="-"
+                     description="clip the SPP PBL pattern (the SPPT pattern minus 1) to +/- this many standard deviations, where the standard deviation is config_sppt_1; 0 = no clipping"
+                     possible_values="Non-negative real values"/>
+
                 <nml_option name="config_bucket_radt" type="real" default_value="1.0e9" in_defaults="false"
                      units="-"
                      description="threshold above which accumulated radiation diagnostics are reset"
