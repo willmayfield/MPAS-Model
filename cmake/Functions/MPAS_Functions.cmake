@@ -217,6 +217,9 @@ function(mpas_core_target)
     if (MPAS_JEDI_IO)
         set(CPP_EXTRA_FLAGS ${CPP_EXTRA_FLAGS} -DMPAS_JEDI_IO)
     endif()
+    if (STOCHASTIC_PHYSICS)
+        set(CPP_EXTRA_FLAGS ${CPP_EXTRA_FLAGS} -DSTOCHASTIC_PHYSICS)
+    endif()
 
     add_custom_command(OUTPUT Registry_processed.xml
             COMMAND ${CPP_EXECUTABLE} -E -P ${CPP_EXTRA_FLAGS} ${CMAKE_CURRENT_SOURCE_DIR}/Registry.xml > Registry_processed.xml
